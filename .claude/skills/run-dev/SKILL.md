@@ -9,15 +9,18 @@ description: >-
 
 # Run the dev server
 
+> **Note:** The backend and helper scripts are planned but not yet
+> implemented. These steps define the target workflow.
+
 1. Ensure the environment is installed:
    - Windows: `scripts/setup.ps1`
    - Linux/macOS/WSL: `scripts/setup.sh`
-2. Start the server (run in foreground so the user sees logs):
+2. Start the server in the foreground so the user sees logs:
    - Windows: `scripts/dev.ps1`
    - Linux/macOS/WSL: `scripts/dev.sh`
-   - Accept an optional port argument: `scripts/dev.sh 9090`.
+   - Optional port argument: `scripts/dev.sh 9090`
 3. Verify with a quick health check:
-   `curl -s http://127.0.0.1:8080/health` → expect `{"status":"ok", ...}`.
+   `curl -s http://127.0.0.1:8080/health` → expect `{"status":"ok", ...}`
 4. Tell the user the two URLs: UI at `/`, Swagger docs at `/docs`.
 
 If the server is already running on the port, do NOT start a second one —
