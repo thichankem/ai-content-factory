@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest:*)",
+      "Bash(python -m ruff:*)",
+      "Bash(python -m mypy:*)",
+      "Bash(scripts/*.ps1)",
+      "Bash(scripts/*.sh)",
+      "Bash(scripts/smoke.py:*)",
+      "Bash(curl:*)",
+      "ReadFile(frontend/*)",
+      "ReadFile(docs/*)",
+      "ReadFile(tests/*)",
+      "ReadFile(pyproject.toml)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /:*)",
+      "Bash(git checkout --:*)",
+      "EditFile(.env)"
+    ]
+  },
+  "outputStyle": {
+    "compact": true
+  }
+}
