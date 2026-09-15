@@ -7,12 +7,15 @@ description: >-
 
 # Run the test suite
 
-1. Use the wrapper script (it activates the venv):
+> **Note:** The test suite and helper scripts are planned but not yet
+> implemented. These steps define the target workflow.
+
+1. Use the wrapper script (it activates the virtual environment):
    - Windows: `scripts/test.ps1`
    - Linux/macOS/WSL: `scripts/test.sh`
 2. Pass pytest arguments through when needed, e.g.
    - single file: `scripts/test.sh tests/test_domain.py`
    - with coverage: `scripts/test.sh --cov=content_factory --cov-report=term-missing`
-3. Report pass/fail count to the user. Fix failures before finishing the task.
+3. Report pass/fail counts to the user. Fix failures before finishing the task.
 
 Expected baseline: the full suite (~25 tests) passes in a few seconds.
