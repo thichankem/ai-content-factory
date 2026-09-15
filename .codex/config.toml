@@ -1,0 +1,15 @@
+# Project-scoped configuration for OpenAI Codex CLI.
+#
+# Codex reads AGENTS.md at the repository root automatically; `codex.md` is a
+# compatibility alias. This file only tunes sandbox/approval behaviour for
+# this specific project.
+
+# Run common dev commands (pytest, ruff, mypy, scripts/*) without asking.
+# Change to "on-request" if you prefer to approve each command.
+approval_policy = "auto"
+
+# Allow writes inside the repository workspace, read-only elsewhere.
+sandbox_mode = "workspace-write"
+
+# Nothing sensitive: language models are only enabled via env vars, keys live
+# in .env (gitignored).
