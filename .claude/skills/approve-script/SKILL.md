@@ -12,9 +12,6 @@ description: >-
 This is the heart of the human-in-the-loop guarantee — do NOT skip the rights
 confirmation step below.
 
-> **Note:** The backend is planned but not yet implemented. These steps define
-> the target workflow and become usable once the API exists.
-
 1. Update the script and confirm source rights (both in one call):
 
 ```bash
@@ -35,7 +32,7 @@ confirms, or the script is clearly original.
 ```bash
 curl -s -X POST http://127.0.0.1:8080/projects/<PROJECT_ID>/approvals \
   -H 'Content-Type: application/json' \
-  -d '{"stage": "script", "status": "approved", "comment": "Approved via agent"}'
+  -d '{"stage": "script", "verdict": "approved", "comment": "Approved via agent"}'
 ```
 
 3. Start generation:
@@ -46,5 +43,9 @@ curl -s -X POST http://127.0.0.1:8080/projects/<PROJECT_ID>/generate
 
 4. Verify the final state is `generating`; report the transition chain to the
    user: `script_review → script_approved → generating`.
+
+   Generation runs in the background (watch `progress`). When it finishes the
+   project moves to `video_review` — hand over to the `review-video` skill for
+   the final approval gate and publishing.
 
 Tip: on Windows PowerShell use `curl.exe` instead of `curl`.
