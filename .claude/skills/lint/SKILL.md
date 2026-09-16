@@ -8,9 +8,6 @@ description: >-
 
 # Lint & type-check
 
-> **Note:** The codebase and helper scripts are planned but not yet
-> implemented. These steps define the target workflow.
-
 1. Run the wrapper:
    - Windows: `scripts/lint.ps1`
    - Linux/macOS/WSL: `scripts/lint.sh`
