@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Content Factory</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a73e8'/%3E%3Cpath d='M9 10h14v2H9zm0 5h10v2H9zm0 5h14v2H9z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">◈</span>
+      <span class="brand-name">AI Content Factory</span>
+    </div>
+    <div class="topbar-actions">
+      <span id="health" class="badge">connecting…</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- LEFT: projects -->
+    <aside class="sidebar">
+      <button id="btn-new-project" class="btn primary block">＋ New project</button>
+      <div class="sidebar-label">Projects</div>
+      <div id="projects" class="project-list"></div>
+      <div class="sidebar-footer">
+        <div id="lib-stats" class="muted small"></div>
+      </div>
+    </aside>
+
+    <!-- CENTER: research notebook -->
+    <main class="workspace">
+      <div id="empty-state" class="empty-state">
+        <div class="empty-icon">◈</div>
+        <h2>Welcome to AI Content Factory</h2>
+        <p>Select a project from the left, or create a new one to start producing.</p>
+        <button id="btn-new-project-2" class="btn primary">＋ New project</button>
+      </div>
+
+      <div id="notebook" hidden>
+        <div class="nb-header">
+          <div>
+            <h2 id="nb-title"></h2>
+            <div id="nb-subtitle" class="muted small"></div>
+          </div>
+          <div class="nb-actions">
+            <button id="btn-research" class="btn">Run research</button>
+            <button id="btn-generate" class="btn primary">Generate script</button>
+          </div>
+        </div>
+
+        <div class="nb-tabs" role="tablist">
+          <button class="tab active" data-tab="sources" role="tab">Sources</button>
+          <button class="tab" data-tab="facts" role="tab">Key facts</button>
+          <button class="tab" data-tab="script" role="tab">Script</button>
+          <button class="tab" data-tab="documents" role="tab">Documents</button>
+        </div>
+
+        <div class="tab-panel active" id="panel-sources">
+          <div id="research-status" class="muted small panel-note"></div>
+          <div id="sources" class="sources"></div>
+        </div>
+
+        <div class="tab-panel" id="panel-facts">
+          <div id="facts" class="facts"></div>
+        </div>
+
+        <div class="tab-panel" id="panel-script">
+          <label class="field-label" for="script-box">Narration script</label>
+          <textarea id="script-box" rows="14" placeholder="No script yet — generate one or paste the final narration."></textarea>
+          <label class="inline">
+            <input type="checkbox" id="rights-box"> Source rights confirmed
+          </label>
+          <div class="row">
+            <button id="btn-save" class="btn primary">Save script</button>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-documents">
+          <div class="explorer">
+            <div class="explorer-header">
+              <h3>Document explorer</h3>
+            </div>
+            <form id="doc-search-form" class="inline-form">
+              <input id="doc-query" placeholder="Search arXiv, Crossref, Gutenberg, Wikipedia, Internet Archive…">
+              <button type="submit" class="btn">Search</button>
+            </form>
+            <div id="doc-results" class="doc-results"></div>
+          </div>
+          <div class="explorer">
+            <div class="explorer-header">
+              <h3>Library</h3>
+            </div>
+            <form id="lib-search-form" class="inline-form">
+              <input id="lib-query" placeholder="Search downloaded documents…">
+              <button type="submit" class="btn">Search</button>
+            </form>
+            <div id="lib-hits" class="lib-hits"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT: pipeline inspector -->
+    <aside class="inspector">
+      <div id="inspector-empty" class="inspector-empty muted">Select a project</div>
+      <div id="inspector-content" hidden>
+        <div class="inspector-card">
+          <div class="inspector-head">
+            <h3>Pipeline</h3>
+            <span id="status-badge" class="status draft">draft</span>
+          </div>
+          <dl id="detail-meta" class="meta"></dl>
+        </div>
+
+        <div class="inspector-card">
+          <div id="progress-wrap" class="progress-wrap" hidden>
+            <div class="progress"><div id="progress-bar"></div></div>
+            <span id="progress-label" class="muted small"></span>
+          </div>
+          <div id="video-card" class="video-card" hidden>
+            <img id="video-thumb" alt="Video thumbnail">
+            <div id="video-meta" class="muted small"></div>
+            <button id="btn-open-editor" class="btn primary block mt">Open video editor</button>
+          </div>
+          <div id="published-box" class="published" hidden></div>
+          <div id="error-box" class="error" hidden></div>
+          <div id="actions" class="actions">
+            <button id="btn-approve-script" class="btn">Approve script</button>
+            <button id="btn-start" class="btn primary">Start generation</button>
+            <button id="btn-approve-video" class="btn">Approve video</button>
+            <button id="btn-reject-video" class="btn danger">Reject video</button>
+            <button id="btn-publish" class="btn primary">Publish</button>
+          </div>
+        </div>
+
+        <div class="inspector-card">
+          <h3>Attached documents</h3>
+          <div id="attached-docs" class="attached"></div>
+        </div>
+
+        <div class="inspector-card">
+          <h3>Review history</h3>
+          <div id="approvals" class="approvals"></div>
+        </div>
+
+        <div id="error" class="error" hidden></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Video editor -->
+  <div id="editor" class="editor-overlay" hidden>
+    <div class="editor-topbar">
+      <div class="editor-brand">
+        <span class="brand-mark">▶</span>
+        <h2>Video editor</h2>
+        <select id="ed-aspect" class="ed-select">
+          <option value="9:16">9:16 · Vertical</option>
+          <option value="16:9">16:9 · Landscape</option>
+          <option value="1:1">1:1 · Square</option>
+          <option value="4:5">4:5 · Portrait</option>
+        </select>
+        <select id="ed-fps" class="ed-select">
+          <option value="24">24 fps</option>
+          <option value="30" selected>30 fps</option>
+          <option value="60">60 fps</option>
+        </select>
+        <select id="ed-quality" class="ed-select">
+          <option value="low">Quality: Low</option>
+          <option value="medium">Quality: Medium</option>
+          <option value="high" selected>Quality: High</option>
+        </select>
+      </div>
+      <div class="editor-actions">
+        <span id="ed-status" class="muted small"></span>
+        <button id="btn-ed-voice" class="btn" title="Synthesize narration for every scene">🎙 Voiceover</button>
+        <button id="btn-ed-undo" class="btn" title="Undo">↶</button>
+        <button id="btn-ed-redo" class="btn" title="Redo">↷</button>
+        <button id="btn-ed-save" class="btn">Save</button>
+        <button id="btn-ed-export" class="btn primary">Export video</button>
+        <button id="btn-ed-close" class="btn" title="Close">✕</button>
+      </div>
+    </div>
+
+    <div class="editor-body">
+      <div class="editor-preview">
+        <div class="canvas-frame" id="canvas-frame">
+          <canvas id="preview-canvas"></canvas>
+        </div>
+        <div class="player-controls">
+          <button id="btn-play" class="btn icon-btn">▶</button>
+          <span id="play-time" class="muted small">0:00 / 0:00</span>
+          <input id="seek" type="range" min="0" max="1000" value="0">
+        </div>
+      </div>
+
+      <div class="editor-props">
+        <h3>Scene</h3>
+        <label>Text
+          <textarea id="prop-text" rows="3"></textarea>
+        </label>
+        <label>Duration <span id="prop-duration-val" class="val">3s</span>
+          <input id="prop-duration" type="range" min="0.5" max="20" step="0.5" value="3">
+        </label>
+        <label>Speed <span id="prop-speed-val" class="val">1x</span>
+          <input id="prop-speed" type="range" min="0.5" max="2" step="0.25" value="1">
+        </label>
+        <div class="two-col">
+          <label>Background
+            <input id="prop-bg" type="color" value="#1a1d27">
+          </label>
+          <label>Text color
+            <input id="prop-color" type="color" value="#ffffff">
+          </label>
+        </div>
+        <label>Transition
+          <select id="prop-transition">
+            <option value="cut">Cut</option>
+            <option value="fade">Fade</option>
+            <option value="slide">Slide</option>
+            <option value="zoom">Zoom</option>
+            <option value="wipe">Wipe</option>
+            <option value="circle">Circle</option>
+            <option value="dissolve">Dissolve</option>
+          </select>
+        </label>
+        <div class="two-col">
+          <label>Text position
+            <select id="prop-position">
+              <option value="top">Top</option>
+              <option value="center">Center</option>
+              <option value="bottom">Bottom</option>
+            </select>
+          </label>
+          <label>Text style
+            <select id="prop-style">
+              <option value="normal">Normal</option>
+              <option value="title">Title</option>
+              <option value="subtitle">Subtitle</option>
+              <option value="caption">Caption</option>
+              <option value="neon">Neon</option>
+              <option value="outline">Outline</option>
+              <option value="shadow">Shadow</option>
+            </select>
+          </label>
+        </div>
+        <label>Font size <span id="prop-font-val" class="val">44</span>
+          <input id="prop-font" type="range" min="16" max="120" value="44">
+        </label>
+        <div class="two-col">
+          <label>Filter
+            <select id="prop-filter">
+              <option value="none">None</option>
+              <option value="grayscale">Grayscale</option>
+              <option value="sepia">Sepia</option>
+              <option value="invert">Invert</option>
+              <option value="blur">Blur</option>
+              <option value="vignette">Vignette</option>
+              <option value="warm">Warm</option>
+              <option value="cool">Cool</option>
+              <option value="contrast">Contrast</option>
+              <option value="brightness">Brightness</option>
+            </select>
+          </label>
+          <label>Ken Burns
+            <select id="prop-kenburns">
+              <option value="none">None</option>
+              <option value="pan-left">Pan left</option>
+              <option value="pan-right">Pan right</option>
+              <option value="zoom-in">Zoom in</option>
+              <option value="zoom-out">Zoom out</option>
+            </select>
+          </label>
+        </div>
+        <div class="two-col">
+          <label>Entrance
+            <select id="prop-entrance">
+              <option value="none">None</option>
+              <option value="fade">Fade</option>
+              <option value="slide-up">Slide up</option>
+              <option value="zoom">Zoom</option>
+              <option value="bounce">Bounce</option>
+              <option value="blur-in">Blur in</option>
+            </select>
+          </label>
+          <label>Exit
+            <select id="prop-exit">
+              <option value="none">None</option>
+              <option value="fade">Fade</option>
+              <option value="slide-down">Slide down</option>
+              <option value="zoom">Zoom</option>
+            </select>
+          </label>
+        </div>
+        <div class="two-col">
+          <label>Effect
+            <select id="prop-effect">
+              <option value="none">None</option>
+              <option value="glitch">Glitch</option>
+              <option value="pixelate">Pixelate</option>
+              <option value="scanlines">Scanlines</option>
+              <option value="film-grain">Film grain</option>
+              <option value="old-film">Old film</option>
+              <option value="dreamy">Dreamy</option>
+              <option value="sharpen">Sharpen</option>
+              <option value="mosaic">Mosaic</option>
+            </select>
+          </label>
+          <label>Grade
+            <select id="prop-grade">
+              <option value="none">None</option>
+              <option value="teal-orange">Teal &amp; orange</option>
+              <option value="noir">Noir</option>
+              <option value="vintage">Vintage</option>
+              <option value="cyberpunk">Cyberpunk</option>
+              <option value="pastel">Pastel</option>
+            </select>
+          </label>
+        </div>
+        <h4>Motion (keyframes)</h4>
+        <label>Scale <span id="prop-scale-val" class="val">1</span>
+          <input id="prop-scale" type="range" min="0.5" max="2" step="0.05" value="1">
+        </label>
+        <label>Rotation <span id="prop-rot-val" class="val">0°</span>
+          <input id="prop-rot" type="range" min="-180" max="180" step="1" value="0">
+        </label>
+        <label>Opacity <span id="prop-opacity-val" class="val">100%</span>
+          <input id="prop-opacity" type="range" min="0" max="1" step="0.05" value="1">
+        </label>
+        <div class="two-col">
+          <label>Offset X <span id="prop-posx-val" class="val">0</span>
+            <input id="prop-posx" type="range" min="-100" max="100" step="1" value="0">
+          </label>
+          <label>Offset Y <span id="prop-posy-val" class="val">0</span>
+            <input id="prop-posy" type="range" min="-100" max="100" step="1" value="0">
+          </label>
+        </div>
+        <label>Easing
+          <select id="prop-easing">
+            <option value="linear">Linear</option>
+            <option value="ease-in">Ease in</option>
+            <option value="ease-out">Ease out</option>
+            <option value="ease-in-out" selected>Ease in-out</option>
+          </select>
+        </label>
+        <h4>Overlay sticker</h4>
+        <div class="two-col">
+          <label>Emoji
+            <input id="prop-overlay-emoji" placeholder="🔥 (empty = off)">
+          </label>
+          <label>Position
+            <select id="prop-overlay-pos">
+              <option value="top-left">Top left</option>
+              <option value="top-right" selected>Top right</option>
+              <option value="center">Center</option>
+              <option value="bottom-left">Bottom left</option>
+              <option value="bottom-right">Bottom right</option>
+            </select>
+          </label>
+        </div>
+        <label>Sticker size <span id="prop-overlay-size-val" class="val">48</span>
+          <input id="prop-overlay-size" type="range" min="16" max="140" value="48">
+        </label>
+        <label>Voice pitch <span id="prop-pitch-val" class="val">1x</span>
+          <input id="prop-pitch" type="range" min="0.5" max="2" step="0.1" value="1">
+        </label>
+        <div class="props-actions">
+          <button id="btn-scene-add" class="btn">＋ Add</button>
+          <button id="btn-scene-dup" class="btn">Duplicate</button>
+          <button id="btn-scene-del" class="btn danger">Delete</button>
+        </div>
+        <label class="inline">
+          <input type="checkbox" id="prop-captions"> Captions
+        </label>
+        <label class="inline">
+          <input type="checkbox" id="prop-music"> Background music
+        </label>
+
+        <div class="ai-assist">
+          <h3>✨ AI Assist</h3>
+          <p class="muted small">One-click AI editing — the AI reads your scenes and applies the best look, pacing and text.</p>
+          <div class="props-actions">
+            <button id="btn-ai-auto" class="btn primary">⚡ Auto-edit all</button>
+            <button id="btn-ai-beat" class="btn">🎵 Beat sync</button>
+          </div>
+          <label>BPM <span id="prop-bpm-val" class="val">120</span>
+            <input id="prop-bpm" type="range" min="60" max="180" value="120">
+          </label>
+          <div class="props-actions">
+            <button id="btn-ai-suggest" class="btn">💡 Suggest look</button>
+            <button id="btn-ai-polish" class="btn">✨ Polish text</button>
+          </div>
+          <button id="btn-ai-captions" class="btn">📝 Auto-captions</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="editor-timeline">
+      <div class="tl-track-label">Scenes</div>
+      <div id="timeline" class="timeline"></div>
+      <div class="tl-track-label">Text</div>
+      <div id="timeline-text" class="timeline"></div>
+      <div class="tl-track-label">Music</div>
+      <div id="timeline-music" class="timeline"></div>
+    </div>
+  </div>
+
+  <!-- New project modal -->
+  <div id="modal" class="modal-overlay" hidden>
+    <div class="modal">
+      <h2>New project</h2>
+      <form id="create-form">
+        <label>Name
+          <input id="name" maxlength="120" placeholder="The quiet power of small habits" required>
+        </label>
+        <label>Topic
+          <input id="topic" maxlength="500" placeholder="Story angle / source to explore" required>
+        </label>
+        <div class="row">
+          <label>Language
+            <input id="language" value="vi" maxlength="8">
+          </label>
+          <label>Duration (s)
+            <input id="duration" type="number" value="45" min="5" max="600">
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="btn-modal-cancel" class="btn">Cancel</button>
+          <button type="submit" class="btn primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/app.js"></script>
+  <script src="/assets/editor.js"></script>
+</body>
+</html>
