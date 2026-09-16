@@ -9,9 +9,6 @@ description: >-
 
 # Run the dev server
 
-> **Note:** The backend and helper scripts are planned but not yet
-> implemented. These steps define the target workflow.
-
 1. Ensure the environment is installed:
    - Windows: `scripts/setup.ps1`
    - Linux/macOS/WSL: `scripts/setup.sh`
