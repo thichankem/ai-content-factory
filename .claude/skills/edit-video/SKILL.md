@@ -1,17 +1,66 @@
 ---
 name: edit-video
 description: >-
-  Open the professional video editor for a project in video review: edit
-  scenes on the multitrack timeline (text, duration, speed, transitions,
-  filters, Ken Burns, text styles, entrance/exit), export a real WebM, and
-  upload it. Use when the user wants to edit/refine the produced video.
+  Edit a produced video: structural edits on the server timeline (split,
+  merge, duplicate, delete, reorder, bulk look apply, markers), measure and
+  validate the cut, compile a render plan, tweak scenes in the browser
+  Studio, synthesize voiceover, and export a real WebM. Use when the user
+  wants to edit, refine, clean up, or critique the produced video.
 ---
 
 # Edit and export the video
 
 After production finishes the project reaches `video_review` with an editable
-scene-based video project. The browser editor (open via the "Open video
-editor" button in the UI) provides:
+scene-based video project. See `docs/EDITING.md` for the full model, the
+validator rule table, and the render plan contract.
+
+## Server timeline engine (authoritative)
+
+The server owns structure. This is the safest way to clean up a cut, and the
+only way an external agent should edit one.
+
+```bash
+P=http://127.0.0.1:8080/projects/<PROJECT_ID>
+
+# Measure + validate: score, stats, and findings (contrast, dead air,
+# overflow, pacing, transition length, duration drift)
+curl -s $P/timeline/report
+
+# Repair the document (ids, ranges, keyframes, opening transition)
+curl -s -X POST $P/timeline/normalize
+
+# Structural edits
+curl -s -X POST $P/timeline/scenes/<SCENE_ID>/split \
+  -H 'Content-Type: application/json' -d '{"at": 0.5}'
+curl -s -X POST $P/timeline/scenes/<SCENE_ID>/merge
+curl -s -X POST $P/timeline/scenes/<SCENE_ID>/duplicate
+curl -s -X DELETE $P/timeline/scenes/<SCENE_ID>
+curl -s -X POST $P/timeline/scenes/<SCENE_ID>/move \
+  -H 'Content-Type: application/json' -d '{"to_index": 0}'
+
+# Apply one look to many scenes (values are validated, not assigned raw)
+curl -s -X POST $P/timeline/scenes/bulk \
+  -H 'Content-Type: application/json' \
+  -d '{"scene_ids": ["<ID1>", "<ID2>"], "patch": {"grade": "noir", "font_size": 60}}'
+
+# Markers (labelled cues, beats, chapter turns)
+curl -s -X POST $P/timeline/markers \
+  -H 'Content-Type: application/json' \
+  -d '{"time_seconds": 2.5, "label": "beat 1", "color": "#22d3ee"}'
+curl -s -X DELETE $P/timeline/markers/<MARKER_ID>
+
+# Compile the render plan: absolute slots, resolved looks, caption cues,
+# and the audio layers a renderer consumes
+curl -s $P/render-plan
+```
+
+A cut stays editable in `generating`, `video_review`, `video_approved`, and
+`published` (re-cutting after publish is normal). Every save is normalized and
+increments the server-owned `revision`.
+
+## Browser Studio
+
+The Studio ("Open Video Studio") provides:
 
 - Multitrack timeline: Scenes, Text, and Music tracks.
 - Per-scene editing: text, duration, speed (0.5x–2x), background color,
@@ -41,6 +90,11 @@ editor" button in the UI) provides:
   durations are automatically re-synced to the narration audio, the voice
   plays back during preview, and it is captured into the exported WebM as an
   Opus audio track alongside the VP9 video. Per-scene pitch is honored.
+- **Pro Engine bar**: the server engine surfaced in the editor — live score
+  and stats, the finding list (click a finding to jump to its scene), and
+  buttons for Split, Merge, Duplicate, Delete, reorder, 📍 Marker, 🧹 Clean,
+  🩺 Check, and 📋 Render Plan. Each action pushes local tweaks, calls one
+  server operation, and adopts the returned document.
 - **Export**: records the canvas preview into a real WebM and uploads it via
   `POST /projects/{id}/video/upload`; the status line reports the exported
   file size, encode time, and effective fps.
