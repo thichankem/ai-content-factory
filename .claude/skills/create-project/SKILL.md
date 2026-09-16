@@ -8,11 +8,8 @@ description: >-
 
 # Create a project through the API
 
-> **Note:** The backend is planned but not yet implemented. These steps define
-> the target workflow and become usable once the API exists.
-
-Prerequisite: the dev server runs at `http://127.0.0.1:8080` (start it with the
-`run-dev` skill once available).
+Prerequisite: the dev server runs at `http://127.0.0.1:8080` (start it with
+the `run-dev` skill if needed).
 
 1. Gather three values from the user (or take them from context):
    - `name` — max 120 characters, e.g. "The quiet power of small habits"
