@@ -15,6 +15,19 @@ This directory contains technical specifications, architecture blueprints, agent
 | [`SEO-SCORING.md`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/docs/SEO-SCORING.md) | **SEO Scoring & Packaging Audit**: The research-backed scoring model for YouTube/Shorts/TikTok, the verified optimiser contract, the A/B and calibration statistics, and how to score a real project. | English |
 | [`COMPUTE-RESOURCES.md`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/docs/COMPUTE-RESOURCES.md) | **Compute Resources**: How the GPU is discovered and used — multi-build NVENC unlock, measured encode/decode numbers, the admission ladder, the overload abort thresholds, and how to unlock the GPU for torch models. | English |
 
+### Frontend Review (`docs/frontend/`)
+
+An audit of the two parallel frontends (the vanilla-JS studio FastAPI actually serves at `/`, and the Next.js rewrite under `frontend/src/`): architecture and tech debt, a verified bug list with `file:line` evidence, security and trust findings, feature proposals, and an upgrade/testing roadmap. These are **operator-facing audit reports**, so they follow the same Vietnamese exception as `KE-HOACH-TONG-THE.md`.
+
+| File | Purpose |
+| :--- | :--- |
+| [`frontend/README.md`](./frontend/README.md) | Index, measured snapshot of the frontend surface, library-version drift table |
+| [`frontend/01-KIEN-TRUC-VA-TECH-DEBT.md`](./frontend/01-KIEN-TRUC-VA-TECH-DEBT.md) | Architecture, state layering, dead code, and the two-frontend decision that blocks everything else |
+| [`frontend/02-DANH-SACH-LOI.md`](./frontend/02-DANH-SACH-LOI.md) | 18 concrete bugs (P0–P3) with evidence, cause, and fix |
+| [`frontend/03-BAO-MAT-VA-DO-TIN-CAY.md`](./frontend/03-BAO-MAT-VA-DO-TIN-CAY.md) | Security posture, exposure chain, and why the Gate 1 approval cannot currently be passed from the Next UI |
+| [`frontend/04-CHUC-NANG-DE-XUAT.md`](./frontend/04-CHUC-NANG-DE-XUAT.md) | 17 feature proposals (WebCodecs/WebGPU export, provenance per clip, script↔timeline sync, undo/redo, a11y, i18n) |
+| [`frontend/05-LO-TRINH-VA-KIEM-THU.md`](./frontend/05-LO-TRINH-VA-KIEM-THU.md) | Testing strategy, ESLint/CI gates, and the Next 14→16 / React 18→19 upgrade path |
+
 ---
 
 ## Maintenance & Update Protocol
