@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { useUIStore } from "@/stores/useUIStore";
 import { useProjectStore } from "@/stores/useProjectStore";
-import { useSEO, SeoScoreResult, SeoOptimizeResult } from "@/hooks/useSEO";
+import { useSEO } from "@/hooks/useSEO";
+import { SeoReport } from "@/types/seo";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,52 @@ import {
   Flame,
 } from "lucide-react";
 
+/**
+ * The modal's own view model.
+ *
+ * The SEO engine answers with a :interface:`SeoReport` — weighted dimensions,
+ * blocking signals and measurable quick wins — while this screen draws a flat
+ * six-row breakdown. The report is folded into that shape at the boundary rather
+ * than reshaping the screen: every number still comes from the engine, and the
+ * demo values below stay readable when no audit has run yet.
+ */
+interface SeoScoreView {
+  platform: string;
+  score: number;
+  grade: string;
+  /** ``false`` when the engine reported a blocking signal for this pack. */
+  passed: boolean;
+  breakdown: Record<string, { label: string; score: number; weight: number; passed: boolean; tip: string }>;
+  fixes: Array<{ signal: string; gain: number; action: string }>;
+}
+
+/** Fold a backend report into the flat shape this modal draws. */
+function toScoreView(report: SeoReport): SeoScoreView {
+  return {
+    platform: report.platform,
+    score: report.score,
+    grade: report.grade,
+    passed: report.blocking.length === 0,
+    breakdown: Object.fromEntries(
+      report.dimensions.map((dimension) => [
+        dimension.key,
+        {
+          label: dimension.label,
+          score: Math.round(dimension.score),
+          weight: dimension.weight,
+          passed: dimension.score >= 60 && !dimension.signals.some((signal) => signal.blocking),
+          tip: `${dimension.signals.length} tín hiệu · trọng số ${Math.round(dimension.weight * 100)}%`,
+        },
+      ])
+    ),
+    fixes: report.quick_wins.map((win) => ({
+      signal: win.signal_id,
+      gain: win.points,
+      action: win.fix,
+    })),
+  };
+}
+
 export function SeoPackagingModal() {
   const { isSeoModalOpen, setSeoModalOpen } = useUIStore();
   const { currentProject } = useProjectStore();
@@ -33,7 +80,7 @@ export function SeoPackagingModal() {
   const [description, setDescription] = useState("Khám phá công thức giữ chân người xem video ngắn triệu view...");
   const [copiedFix, setCopiedFix] = useState<string | null>(null);
 
-  const [scoreResult, setScoreResult] = useState<SeoScoreResult>({
+  const [scoreResult, setScoreResult] = useState<SeoScoreView>({
     platform: "tiktok",
     score: 84.5,
     grade: "A",
@@ -65,7 +112,7 @@ export function SeoPackagingModal() {
         description,
         tags: tags.split(" ").filter(Boolean),
       });
-      setScoreResult(res);
+      setScoreResult(toScoreView(res));
     } catch {
       // Keep rich demo data
     }

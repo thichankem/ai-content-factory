@@ -6,6 +6,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useTimelineStore } from "@/stores/useTimelineStore";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { useTimelineCommands } from "@/hooks/useTimelineCommands";
+import { createScene, createVideoProject } from "@/lib/scenes";
 import { Sparkles, X, ArrowRight, CornerDownLeft, Loader2 } from "lucide-react";
 
 export function CommandBarModal() {
@@ -28,15 +29,16 @@ export function CommandBarModal() {
     if (!cmdText.trim()) return;
     setStatusMessage(null);
 
-    const videoProject = currentProject?.video_project || {
-      scenes: scenes.length > 0 ? scenes : [
-        { index: 0, label: "Hook", duration: 3.5, text: "Hook mở đầu" },
-        { index: 1, label: "Body", duration: 15.0, text: "Thân bài nội dung" },
-        { index: 2, label: "Payoff", duration: 5.0, text: "Lời kết CTA" },
-      ],
-      aspect_ratio: "9:16",
-      target_duration_seconds: 45,
-    };
+    const videoProject = currentProject?.video_project || createVideoProject(
+      scenes.length > 0
+        ? scenes
+        : [
+            createScene(0, { label: "Hook", duration: 3.5, text: "Hook mở đầu" }),
+            createScene(1, { label: "Body", duration: 15.0, text: "Thân bài nội dung" }),
+            createScene(2, { label: "Payoff", duration: 5.0, text: "Lời kết CTA" }),
+          ],
+      { aspect_ratio: "9:16", target_duration_seconds: 45 }
+    );
 
     try {
       const res = await commandMutation.mutateAsync({

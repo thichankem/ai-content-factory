@@ -8,7 +8,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { scriptApi } from "@/lib/api";
+import { projectsApi, scriptApi } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { syncProject } from "@/lib/projectSync";
 import { ViralityRequest } from "@/types/qa";
@@ -40,7 +40,7 @@ export function useScriptEngine(projectId?: string) {
   const selectStyleMutation = useMutation({
     mutationFn: ({ style }: { style: string }) => {
       if (!projectId) throw new Error("No project selected");
-      return scriptApi.selectScriptStyle(projectId, style);
+      return projectsApi.selectScriptStyle(projectId, style);
     },
     onSuccess: (project) => syncProject(queryClient, project),
   });
@@ -48,7 +48,7 @@ export function useScriptEngine(projectId?: string) {
   const analyzeScriptMutation = useMutation({
     mutationFn: (payload: { script?: string | null; style?: string | null } = {}) => {
       if (!projectId) throw new Error("No project selected");
-      return scriptApi.analyzeScript(projectId, payload);
+      return projectsApi.analyzeScript(projectId, payload);
     },
   });
 

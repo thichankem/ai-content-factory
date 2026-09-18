@@ -86,3 +86,5 @@ export interface ScriptAnalyzeRequest {
   script?: string | null;
   style?: string | null;
 }
+
+export * from "./studio";

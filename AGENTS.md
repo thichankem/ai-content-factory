@@ -56,6 +56,26 @@ still planned.
 - `tests/test_architecture.py` enforces these rules: disjoint mixins, methods
   reachable from the composed service, a module line budget, and the
   `models`/`services` re-export surface. Run it after any structural change.
+- A required text field that two kinds of caller spell two different ways uses
+  `models.common.TwinSpelling`: declare `PRIMARY` and `ALIAS`, expose whichever
+  accessor name the callers already use, and let the base class own the
+  "either one, exactly one" rule. Do not hand-roll that validator again.
+
+## The contract with the web clients
+
+`frontend/` (the studio) and `frontend/app.js` (the legacy dashboard) read
+specific field names out of specific responses. A mismatch there is silent — a
+`NaN` width, an editor stuck on its placeholder, a cost card reading `$0.00` —
+so `tests/test_frontend_contract.py` drives the real pipeline over HTTP with the
+payloads the clients actually send and asserts the fields they actually read.
+Change a request model or a response model and run that file.
+
+The house rule for a name that genuinely has two spellings is to **serve both**
+rather than pick one: canonical fields stay (`script`, `calls`, `text`,
+`duration_seconds`) and the client-facing spelling is added beside them
+(`raw_script`, `estimated_usage`, `command`, `duration`), either as a real field,
+a `@computed_field` alias, or a `TwinSpelling` mixin. Rejecting the spelling a
+working client already sends is how a UI breaks without anyone noticing.
 
 ## Read this first
 
@@ -82,6 +102,13 @@ agents (Claude Code, Codex, DeepSeek, Gemini).
   `scripts/lint.sh`): `python -m ruff check src tests`,
   `python -m ruff format --check src tests`, `python -m mypy src`, and
   `python -m pytest`.
+- The ruff rule set in `pyproject.toml` is wider than the defaults. If you add a
+  rule, fix the tree rather than the rule; the `ignore` list carries a reason per
+  entry and nothing lands there without one.
+- Never run `ruff --select <rule>` to decide whether a `# noqa` is stale:
+  `--select` *replaces* the configured set, so every directive in the tree looks
+  unused and a `--fix` will delete live ones. Use the plain `ruff check` —
+  `RUF100` is enabled and reports genuinely unused directives correctly.
 - Before reporting a large task done, run the smoke test: `scripts/smoke.ps1`
   (Windows) or `scripts/smoke.sh` (Linux/macOS/WSL).
 - Do not invent files or commands that do not exist yet. If a step depends on

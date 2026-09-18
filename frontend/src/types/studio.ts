@@ -113,6 +113,8 @@ export interface ScriptBriefSettings {
   specificFactsAndData: string;
   referenceLinksAndDocs: string;
   uploadedFiles?: Array<{ name: string; size: number; snippet?: string }>;
+  attachedFiles?: Array<{ id: string; name: string; size: number; type: string }>;
+  attachedPages?: Array<{ id: string; url: string; note?: string }>;
 
   /** 9. Reference examples. */
   benchmarkCreatorOrChannel: string;
@@ -153,5 +155,19 @@ export interface ChatbotMessage {
   diffAfter?: string;
   applied?: boolean;
   canUndo?: boolean;
+  timestamp: string;
+}
+
+/** Historical snapshot of a script section or full document. */
+export interface SectionHistoryEntry {
+  id: string;
+  sectionKey: string;
+  sectionLabel: string;
+  version: number;
+  text: string;
+  summary: string;
+  wordCount: number;
+  estimatedSeconds: number;
+  author: "user" | "ai" | "snapshot";
   timestamp: string;
 }

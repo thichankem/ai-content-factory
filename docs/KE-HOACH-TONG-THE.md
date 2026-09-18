@@ -1537,3 +1537,82 @@ Người vận hành yêu cầu thiết kế lại Bước 1 trong phần fronte
 - `mypy src`: **Success: no issues found in 120 source files!**
 - Visual Inspection bằng Playwright & Multimodal AI Vision: Đã kiểm tra toàn bộ luồng chọn dòng 1-4, viết lại Hook 3s bằng Chatbot, hiển thị diff, cập nhật editor, và nút hoàn tác khôi phục kịch bản.
 - Localhost: Cả Next.js frontend (`http://localhost:3000`) và FastAPI backend (`http://127.0.0.1:8080`) đang chạy nền và sẵn sàng phục vụ.
+
+## 2026-09-18 — Backend khớp hợp đồng frontend + refactor toàn bộ
+
+**1. Ba lỗi backend thật (đều tái hiện được, không phải suy đoán)**
+
+- **Handler 422 tự crash thành 500.** `validation_handler` trả về `exc.errors()` nguyên bản; pydantic nhét chính object `ValueError` vào `ctx`, không serialize được, nên `JSONResponse` ném `TypeError` *bên trong* handler lỗi. Hệ quả: mọi request sai định dạng trả 500 câm thay vì 422 nói rõ sai ở đâu — và nó che luôn toàn bộ các lệch hợp đồng bên dưới. Sửa bằng `_json_safe()`.
+- **`/seo/ab/plan` 500 khi không gửi `daily_traffic`.** `plan_ab_test` trả `days=None` (trung thực), nhưng view gọi `int(None)` → `TypeError`. Thêm `_int_or()`; `estimated_days=0` nghĩa là "chưa ước lượng", `days` vẫn giữ `None`.
+- **`/cost/check` luôn báo $0.00.** Studio gửi `estimated_usage`, model chỉ đọc `calls` → dự toán rỗng mà vẫn trả 200. Đây là kiểu lệch hợp đồng nguy hiểm nhất: không lỗi, chỉ sai tiền. Nay nhận cả hai tên và trả thêm `within_budget`/`estimated_cost`/`by_service`.
+
+**2. Các lệch hợp đồng đã đóng**
+
+| Chỗ | Vấn đề | Xử lý |
+|---|---|---|
+| `GET /agents` | thiếu `script_styles`, `tts_voices`; agent thiếu `id`/`role`/`provider`/`capabilities` | mở rộng `AgentInfo` + `AgentCatalog`; voice lấy từ `tts.voice_catalog()` nên picker không thể đề xuất giọng engine không nói được |
+| `POST /projects/{id}/agent-result` | client gửi `markdown_response`, model đòi `markdown` → 422 | `TwinSpelling` |
+| `POST /timeline/command` | client gửi `command`, model đòi `text` → 422; response thiếu `parsed_command`/`message` | nhận cả hai + trả cả hai |
+| `POST /media/dedup` | studio gửi body rỗng → 422; response là list, studio đọc `{duplicates}` | body tùy chọn (rỗng = quét cả thư viện); trả `{groups, count, duplicates[{original,duplicate,similarity}], checked}` |
+| `POST /qa/copyright/verdict` | `asset_ids: []` bị validator từ chối | batch rỗng là hợp lệ → `passed:true`, kèm `checked:0` |
+| `GET /media/{id}/transcribe` | dashboard gọi GET, backend chỉ có POST (405) | sửa client sang POST (transcribe là thao tác ghi) |
+| `PUT /projects/{id}/timeline` | dashboard lưu timeline, route không tồn tại (404) | thêm route nhận thẳng `VideoProject` |
+| `TimelineMarker` | app.js đọc `item.time`, backend chỉ trả `time_seconds` → hiện `undefined` | thêm alias `time` |
+| `project.script` | studio đọc `script.raw_script`/`.sections`, nhưng `script` là **chuỗi** (app.js, CLI, agent tools đều cần chuỗi) | studio đọc `script_document`; thêm alias `name`/`words`/`duration_target_seconds` cho section và `total_duration` cho plan |
+
+**3. Refactor**
+
+- Rút quy tắc "hai cách viết, đúng một cái" vào `models.common.TwinSpelling` — trước đó 4 model tự viết lại cùng một validator.
+- Bật thêm bộ rule ruff mà chính codebase đã tự đánh dấu bằng `# noqa` (`BLE`) cùng loạt rule đã sửa một lượt (`C4`, `PERF`, `PTH`, `RET`, `RUF`). `ignore` có lý do cho từng mục bị loại.
+- Sửa 87+ phát hiện thật: bỏ `int(round(...))` thừa, `zip(x, x[1:])` → `itertools.pairwise`, `try/except/pass` → `contextlib.suppress`, `open()` → `Path.open()`, `os.path.abspath` → `Path.resolve`.
+- 20 chỗ `except Exception` cố ý nay đều mang lý do: từ đây mọi blind-except phải nói rõ vì sao.
+- **Bài học đã ghi vào `AGENTS.md`:** không bao giờ chạy `ruff --select <rule>` để phán một `# noqa` là thừa — `--select` *thay thế* bộ rule đang cấu hình, nên mọi directive trông như thừa và `--fix` sẽ xoá directive đang dùng thật.
+
+**4. Kiểm chứng**
+
+- `tests/test_frontend_contract.py` (mới): chạy pipeline thật qua HTTP bằng đúng payload của hai client và khẳng định đúng các field chúng đọc — 11 test, chốt lại toàn bộ hợp đồng trên.
+- `tests/test_resources.py`: test watchdog timeout trước đây phụ thuộc RAM thật (chạy full suite là tụt dưới ngưỡng 350MB nên báo sai nguyên nhân). Nay cô lập bằng governor có áp lực tiêm vào.
+- `ruff check` / `ruff format --check` / `mypy src`: sạch. `pytest` toàn bộ: **1049 test, 0 fail**. `scripts/smoke.py`: **64/64 PASSED**.
+- **Lưu ý còn tồn:** bản `frontend/src/components/script/ScriptStudio.tsx` đang sửa dở trong working tree (không phải của tôi) đọc lại `project.script?.raw_script`, tức là mất bản sửa `script_document` đang có trong HEAD — cần thống nhất trước khi commit tiếp.
+
+## 2026-09-18 — Nối dây frontend sau merge: `npm run type-check` 77 lỗi → 0
+
+**1. Lỗi merge thật là gì**
+
+Merge giữa công việc *section-history* (Script Studio) và đợt refactor tách type của `main` để lại cây làm việc nửa vời:
+
+- `ScriptSectionHistoryModal.tsx` **mất khỏi đĩa** (còn trong `git stash@{0}`), `SectionHistoryEntry` không còn nơi khai báo.
+- 13 tệp vẫn import `@/types/api` / `@/types/project` trong khi hai module đó đã bị xoá.
+- `ScriptStudio.tsx` đọc lại `project.script?.raw_script` — đúng cái `docs/frontend/README.md` mô tả: *"hợp đồng mới đã dựng xong, điểm nối chưa được chuyển"*.
+- `npx tsc --noEmit`: **77 lỗi / 20 tệp**, tức là frontend không build được, dù CI backend vẫn xanh (CI không có job frontend).
+
+**2. Đã sửa**
+
+| Chỗ | Vấn đề | Xử lý |
+|---|---|---|
+| `script/ScriptStudio.tsx` | đọc `project.script?.raw_script`; `ViralityScoreResult` từ `types/api` đã xoá; payload virality gửi `scriptText` | đọc `script_document.raw_script`; dùng `ViralityResult` từ `@/types/qa`; gửi `script_text` (tên studio dùng, backend nhận) |
+| `stores/useProjectStore.ts` | `useProjectStore` bị khai báo **hai lần** (bản merge cũ còn sót); `ProjectStatus` import từ module sai | xoá bản trùng; `ProjectStatus` lấy từ `@/types/common` |
+| `hooks/useProjects.ts` | thiếu `aiAssistMutation` (page.tsx gọi); `publishMutation` bắt `platforms` bắt buộc | thêm mutation gọi `timelineApi.aiAssist`; `platforms` thành tuỳ chọn — bỏ trống là để backend dùng mặc định của dự án |
+| `app/page.tsx`, `campaign/ContentEmpireStudio.tsx` | import `useWorkflowCampaign` — hook đã bị thay bằng `useCampaign` + `useWorkflowDAG` | tách đúng hai hook theo chủ sở hữu khái niệm |
+| `app/page.tsx` | dự án "demo" giả được tiêm với `status: "video_review"` + `source_rights_confirmed: true`; `catch` báo **thành công** khi lỗi | xoá nhánh demo (không còn fake Gate 2, không auto-confirm quyền nguồn); catch nói thật là thất bại |
+| `hooks/useScriptEngine.ts` | gọi `scriptApi.selectScriptStyle`/`analyzeScript` — hai hàm này thuộc `projectsApi` | trỏ về `projectsApi` |
+| `hooks/useWorkflowDAG.ts`, `workflow/DAGWorkflowStudio.tsx` | node dùng `block_type`/`name`/`config`; palette dùng type tự chế (`script_draft`, `ffmpeg_render`); payload `{nodes, edges}` | node theo `type`/`label`/`params`; palette theo `WorkflowNodeType` thật; checklist & save gửi `{workflow, force}` |
+| `types/timeline.ts` | thiếu `RenderPlan` mà endpoint `/render-plan` đang trả | thêm `RenderPlan`/`RenderStep`/`SubtitleCue`/`AudioTrackPlan` theo `models/timeline.py` |
+| `export/SeoPackagingModal.tsx` | đọc shape `breakdown`/`fixes` không còn trong hợp đồng `SeoReport` | view model riêng + `toScoreView()` gấp `dimensions`/`quick_wins` của engine vào shape màn hình vẫn vẽ |
+| `lib/scenes.ts` (**mới**) | 4 màn hình tự dựng scene bằng 4 khoá → thiếu ~25 trường của `VideoScene` | `createScene()`/`createVideoProject()` giữ mặc định ở một chỗ, theo `models/timeline.py` |
+| `qa/ComplianceModal.tsx`, `media/ExternalIngestionModal.tsx` | sai tên field: `duration`/`aspectRatio`, `font`/`primary_color`, list thay vì `{asset_ids}`, `narration_audio`/`bgm_audio`, `content_text` | tên canonical: `duration_seconds`/`aspect_ratio`, `fonts`/`dominant_colors`, `{asset_ids}`, `voiceover`/`background_music`, `raw_content` |
+| `timeline/TimelineVisualizer.tsx`, `TimelineAssemblyStudio.tsx`, `media/HtmlSlideDeckStudio.tsx`, `media/VideoUrlRecookStudio.tsx`, `copilot/CommandBarModal.tsx` | scene dựng cục bộ thiếu trường; `scene.duration` có thể null | dùng `createScene`/`createVideoProject`; đọc `duration ?? duration_seconds` |
+
+**3. Kiểm chứng**
+
+- `npm run type-check` (`tsc --noEmit`): **0 lỗi, exit code 0** (trước: 77 lỗi / 20 tệp).
+- Không đụng backend: ngoài `frontend/` và `docs/`, không tệp nào bị sửa, nên trạng thái xanh của `ruff`/`mypy`/`pytest` ghi ở entry trên vẫn nguyên.
+
+**4. Việc còn lại (không chặn build)**
+
+- `SeoPackagingModal` vẫn vẽ breakdown 6 dòng theo view model riêng. Muốn hiển thị thẳng `dimensions`/`blocking`/`quick_wins` của engine là một việc UI riêng (`docs/frontend/04`).
+- `next build` chưa chạy trong phiên này vì dev server cổng 3000 đang dùng chung `.next`.
+- CI vẫn **không** có job frontend (`docs/frontend/05`, giai đoạn 1) — cửa sổ để lỗi kiểu này tái diễn vẫn mở.
+- `types/script.ts` nay có `export * from "./studio";` để các tệp cũ import `@/types/script` vẫn chạy. Nó làm mờ ranh giới "hợp đồng vs view model" mà `types/studio.ts` dựng ra; khi rảnh nên trỏ 5 tệp `components/script/*` sang `@/types/studio` rồi bỏ dòng re-export đó.
+
+**5. Mục "Lưu ý còn tồn" của entry trước đã đóng:** `ScriptStudio.tsx` nay đọc `script_document`, không còn `script.raw_script`.

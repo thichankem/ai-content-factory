@@ -14,7 +14,8 @@
 
 import { create } from "zustand";
 
-import { Project, ProjectStatus } from "@/types/project";
+import { ProjectStatus } from "@/types/common";
+import { Project } from "@/types/project";
 import { ScriptDocument } from "@/types/script";
 
 interface ProjectStore {
@@ -90,57 +91,5 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   setScriptContent: (rawScript) =>
     set((state) => ({
       currentProject: draftProject(rawScript, state.currentProject),
-    })),
-}));
-
-export const useProjectStore = create<ProjectStore>((set) => ({
-  currentProject: null,
-  projects: [],
-  isLoading: false,
-  setCurrentProject: (project) => set({ currentProject: project }),
-  setProjects: (projects) => set({ projects }),
-  setLoading: (loading) => set({ isLoading: loading }),
-  updateProjectStatus: (status) =>
-    set((state) => ({
-      currentProject: state.currentProject
-        ? { ...state.currentProject, status }
-        : null,
-    })),
-  confirmSourceRights: () =>
-    set((state) => ({
-      currentProject: state.currentProject
-        ? { ...state.currentProject, source_rights_confirmed: true }
-        : null,
-    })),
-  setScriptContent: (rawScript) =>
-    set((state) => ({
-      currentProject: state.currentProject
-        ? {
-            ...state.currentProject,
-            script_document: {
-              topic: state.currentProject.topic || "Re-Cooked Project",
-              style: state.currentProject.script_document?.style || "retention_fast",
-              raw_script: rawScript,
-              sections: state.currentProject.script_document?.sections || [],
-            },
-          }
-        : {
-            id: "recook-proj-" + Date.now(),
-            name: "Re-Cooked Project",
-            topic: "Re-Cooked Project",
-            target_language: "vi",
-            duration_target_seconds: 30,
-            status: "draft" as ProjectStatus,
-            source_rights_confirmed: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            script: rawScript,
-            script_document: {
-              topic: "Re-Cooked Project",
-              style: "retention_fast",
-              raw_script: rawScript,
-              sections: [],
-            },
-          },
     })),
 }));

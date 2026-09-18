@@ -100,7 +100,7 @@ export function ExportReviewStudio() {
 
   const handlePublish = async () => {
     if (!currentProject) return;
-    await publishMutation.mutateAsync(currentProject.id);
+    await publishMutation.mutateAsync({ projectId: currentProject.id });
   };
 
   return (

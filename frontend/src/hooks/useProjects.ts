@@ -12,7 +12,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { projectsApi } from "@/lib/api";
+import { projectsApi, timelineApi } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { syncProject } from "@/lib/projectSync";
 import { useProjectStore } from "@/stores/useProjectStore";
@@ -103,9 +103,8 @@ export function useProjects() {
   /**
    * Publish to the approved platforms.
    *
-   * ``platforms`` is required by the payload — the backend's field is
-   * ``platforms`` (not ``destinations``), and omitting it publishes to the
-   * default platform only.
+   * ``platforms`` is the backend's field name (not ``destinations``). Omitting it
+   * — the default — lets the backend publish to the project's default platform.
    */
   const publishMutation = useMutation({
     mutationFn: ({
@@ -113,8 +112,12 @@ export function useProjects() {
       platforms,
     }: {
       projectId: string;
-      platforms: string[];
-    }) => projectsApi.publishProject(projectId, { platforms }),
+      platforms?: string[];
+    }) =>
+      projectsApi.publishProject(
+        projectId,
+        platforms && platforms.length > 0 ? { platforms } : {}
+      ),
     onSuccess: (project) => syncProject(queryClient, project),
   });
 
@@ -125,6 +128,12 @@ export function useProjects() {
 
   const renderMutation = useMutation({
     mutationFn: (projectId: string) => projectsApi.renderProject(projectId),
+    onSuccess: (project) => syncProject(queryClient, project),
+  });
+
+  /** Fit, beat-sync and re-time the timeline through the AI-assist block. */
+  const aiAssistMutation = useMutation({
+    mutationFn: (projectId: string) => timelineApi.aiAssist(projectId),
     onSuccess: (project) => syncProject(queryClient, project),
   });
 
@@ -141,5 +150,6 @@ export function useProjects() {
     publishMutation,
     voiceoverMutation,
     renderMutation,
+    aiAssistMutation,
   };
 }

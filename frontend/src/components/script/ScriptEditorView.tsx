@@ -18,6 +18,7 @@ import {
   Film,
   Sparkles,
   Layers,
+  History,
 } from "lucide-react";
 
 interface StoryboardScene {
@@ -42,6 +43,8 @@ interface ScriptEditorViewProps {
   topic: string;
   platform: string;
   targetDuration: string;
+  onOpenHistory?: () => void;
+  historyCount?: number;
 }
 
 export function ScriptEditorView({
@@ -58,6 +61,8 @@ export function ScriptEditorView({
   topic,
   platform,
   targetDuration,
+  onOpenHistory,
+  historyCount = 0,
 }: ScriptEditorViewProps) {
   const [viewMode, setViewMode] = useState<"raw" | "storyboard">("raw");
   const [copied, setCopied] = useState(false);
@@ -219,9 +224,22 @@ export function ScriptEditorView({
                 viewMode === "storyboard" ? "bg-nle-panel text-nle-cyan font-bold shadow-sm" : "text-gray-400 hover:text-white"
               }`}
             >
-              Phân cảnh 2 cột (Storyboard)
+              Thẻ Phân Cảnh (Storyboard)
             </button>
           </div>
+
+          {onOpenHistory && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenHistory}
+              className="text-[11px] border-amber-500/30 text-amber-300 hover:text-white hover:bg-amber-500/10 h-7 px-2"
+              title="Lịch sử các phiên bản phân đoạn"
+            >
+              <History className="w-3.5 h-3.5 mr-1 text-amber-400" />
+              Lịch sử ({historyCount})
+            </Button>
+          )}
 
           <Button
             variant="outline"
@@ -295,33 +313,41 @@ export function ScriptEditorView({
             />
           </div>
         ) : (
-          /* Two-Column Storyboard View */
-          <div className="flex-1 overflow-y-auto border border-nle-border rounded-lg bg-nle-panel divide-y divide-nle-border">
-            <div className="grid grid-cols-12 gap-2 p-2.5 bg-nle-surface text-[10px] font-mono uppercase text-gray-400 font-bold sticky top-0 z-10 border-b border-nle-border">
-              <div className="col-span-1 text-center">Scene</div>
-              <div className="col-span-2">Thời gian / Phần</div>
-              <div className="col-span-5">🎙️ Lời thoại Voiceover (TTS)</div>
-              <div className="col-span-4">🎬 Chỉ dẫn Hình ảnh Visual Cue</div>
-            </div>
+          /* Single-Column Storyboard Scene Cards */
+          <div className="flex-1 overflow-y-auto space-y-3 p-1 pr-2 scrollbar-thin scrollbar-thumb-nle-border">
             {storyboardScenes.map((sc, idx) => (
               <div
                 key={sc.id}
-                className="grid grid-cols-12 gap-2 p-2.5 text-xs hover:bg-nle-surface/50 transition-colors"
+                className="p-3.5 rounded-xl border border-nle-border bg-nle-panel hover:border-nle-cyan/40 transition-colors space-y-2.5 shadow-sm"
               >
-                <div className="col-span-1 text-center font-mono font-bold text-nle-cyan">
-                  #{idx + 1}
+                <div className="flex items-center justify-between border-b border-nle-border/60 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-6 h-6 rounded bg-nle-cyan/20 text-nle-cyan font-mono font-bold text-xs flex items-center justify-center">
+                      #{idx + 1}
+                    </span>
+                    <Badge variant="outline" className="text-xs text-amber-300 border-amber-500/40 font-semibold">
+                      {sc.section}
+                    </Badge>
+                  </div>
+                  <span className="font-mono text-xs text-gray-400 font-medium">
+                    ⏱️ {sc.timeRange}
+                  </span>
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <Badge variant="outline" className="text-[10px] text-amber-300 border-amber-500/30">
-                    {sc.section}
-                  </Badge>
-                  <div className="text-[10px] font-mono text-gray-400">{sc.timeRange}</div>
-                </div>
-                <div className="col-span-5 text-gray-100 font-sans leading-relaxed">
-                  {sc.voiceover}
-                </div>
-                <div className="col-span-4 text-emerald-300/90 text-[11px] bg-nle-surface/60 p-2 rounded border border-emerald-500/20 font-sans italic">
-                  {sc.visualCue}
+
+                {sc.visualCue && (
+                  <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 text-xs font-sans leading-relaxed">
+                    <span className="font-bold text-emerald-400 mr-1.5 uppercase text-[10px] tracking-wider block sm:inline">
+                      🎬 Visual Cue:
+                    </span>
+                    <span className="italic">{sc.visualCue}</span>
+                  </div>
+                )}
+
+                <div className="p-3 rounded-lg bg-nle-surface border border-nle-border text-xs text-gray-100 font-sans leading-relaxed">
+                  <span className="font-bold text-nle-cyan mr-1.5 uppercase text-[10px] tracking-wider block sm:inline">
+                    🎙️ Lời thoại Voiceover:
+                  </span>
+                  <span>{sc.voiceover}</span>
                 </div>
               </div>
             ))}

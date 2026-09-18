@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useUIStore } from "@/stores/useUIStore";
 import { useTimelineStore } from "@/stores/useTimelineStore";
 import { useProjectStore } from "@/stores/useProjectStore";
+import { createScene } from "@/lib/scenes";
 import {
   DownloadCloud,
   Link as LinkIcon,
@@ -173,10 +174,10 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
 
     // Also inject 4 structured scenes to timeline
     const recookedScenes = [
-      { index: 0, label: "Scene 1: Viral Hook", duration: 3.5, text: "Hook giật gân 3 giây đầu", filter: "cyberpunk" },
-      { index: 1, label: "Scene 2: Core Proof", duration: 12.0, text: "Bằng chứng & Giải mã cơ chế", filter: "teal_orange" },
-      { index: 2, label: "Scene 3: Unexpected Turn", duration: 10.0, text: "Cú lật bất ngờ, xóa tan định kiến", filter: "matrix" },
-      { index: 3, label: "Scene 4: Call To Action", duration: 6.5, text: "Kêu gọi hành động & Tương tác", filter: "clean" },
+      createScene(0, { label: "Scene 1: Viral Hook", duration: 3.5, text: "Hook giật gân 3 giây đầu", grade: "cyberpunk" }),
+      createScene(1, { label: "Scene 2: Core Proof", duration: 12.0, text: "Bằng chứng & Giải mã cơ chế", grade: "teal-orange" }),
+      createScene(2, { label: "Scene 3: Unexpected Turn", duration: 10.0, text: "Cú lật bất ngờ, xóa tan định kiến", filter: "contrast" }),
+      createScene(3, { label: "Scene 4: Call To Action", duration: 6.5, text: "Kêu gọi hành động & Tương tác", filter: "none" }),
     ];
     setScenes(recookedScenes);
 

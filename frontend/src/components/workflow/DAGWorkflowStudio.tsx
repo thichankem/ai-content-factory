@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useProjectStore } from "@/stores/useProjectStore";
-import { useWorkflowDAG, WorkflowNode, WorkflowEdge, WorkflowBlockDef } from "@/hooks/useWorkflowDAG";
+import { useWorkflowDAG } from "@/hooks/useWorkflowDAG";
+import { Workflow, WorkflowBlockDef, WorkflowEdge, WorkflowNode } from "@/types/workflow";
 import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,28 +27,37 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+/**
+ * The palette the canvas falls back to before ``GET /workflow/blocks`` answers.
+ *
+ * A block is ``type``/``label``/``params``/``default_params``: ``params`` lists the
+ * names the backend *requires*, the canvas reads the starting values from
+ * ``default_params``. The types are the :type:`WorkflowNodeType` members the runner
+ * accepts — the old palette used made-up ones (``script_draft``, ``ffmpeg_render``)
+ * that the save rejected.
+ */
 const DEFAULT_PALETTE_BLOCKS: WorkflowBlockDef[] = [
-  { type: "research", name: "1. Research Engine", category: "input", description: "Thu thập dữ kiện từ arXiv, Wikipedia, Gutenberg", inputs: [], outputs: ["facts"], default_config: { max_sources: 5 } },
-  { type: "script_draft", name: "2. Script Drafting", category: "process", description: "Sinh kịch bản Claude/Gemini theo preset", inputs: ["facts"], outputs: ["script"], default_config: { preset: "storytelling" } },
-  { type: "script_approval", name: "3. Gate 1: Human Approval", category: "gate", description: "Bắt buộc duyệt kịch bản & xác nhận bản quyền", inputs: ["script"], outputs: ["approved_script"], default_config: {} },
-  { type: "voiceover_tts", name: "4. Neural Voiceover", category: "process", description: "Tổng hợp giọng đọc Edge-TTS tiếng Việt", inputs: ["approved_script"], outputs: ["audio_track"], default_config: { voice: "vi-VN-NamMinhNeural" } },
-  { type: "external_ingest", name: "5. Ingest AI Media", category: "ingest", description: "Nạp footage Kling/Veo & ảnh Midjourney", inputs: ["approved_script"], outputs: ["media_assets"], default_config: {} },
-  { type: "timeline_nle", name: "6. Multi-Track Assembly", category: "process", description: "Dựng timeline, sync beat, màu sắc & subtitle", inputs: ["audio_track", "media_assets"], outputs: ["render_plan"], default_config: { aspect_ratio: "9:16" } },
-  { type: "ffmpeg_render", name: "7. ffmpeg Master Render", category: "process", description: "Render video thật MP4 H.264/AAC", inputs: ["render_plan"], outputs: ["video_file"], default_config: { crf: 23 } },
-  { type: "video_approval", name: "8. Gate 2: Video Approval", category: "gate", description: "Bắt buộc duyệt video thành phẩm trước xuất bản", inputs: ["video_file"], outputs: ["approved_video"], default_config: {} },
-  { type: "omni_publish", name: "9. Omni-Publish", category: "output", description: "Đóng gói xuất bản YouTube 16:9 & TikTok 9:16", inputs: ["approved_video"], outputs: [], default_config: { targets: ["youtube", "tiktok"] } },
+  { type: "research", label: "1. Research Engine", description: "Thu thập dữ kiện từ arXiv, Wikipedia, Gutenberg", params: [], default_params: { max_sources: 5 }, icon: "search" },
+  { type: "script", label: "2. Script Drafting", description: "Sinh kịch bản Claude/Gemini theo preset", params: [], default_params: { style: "storytelling" }, icon: "file-text" },
+  { type: "gate", label: "3. Gate 1: Human Approval", description: "Bắt buộc duyệt kịch bản & xác nhận bản quyền", params: ["stage"], default_params: { stage: "script" }, icon: "shield-check" },
+  { type: "voiceover", label: "4. Neural Voiceover", description: "Tổng hợp giọng đọc Edge-TTS tiếng Việt", params: [], default_params: { voice: "vi-VN-NamMinhNeural" }, icon: "mic" },
+  { type: "ingest_external", label: "5. Ingest AI Media", description: "Nạp footage Kling/Veo & ảnh Midjourney", params: [], default_params: {}, icon: "download" },
+  { type: "timeline_check", label: "6. Multi-Track Assembly", description: "Dựng timeline, sync beat, màu sắc & subtitle", params: [], default_params: { aspect_ratio: "9:16" }, icon: "layers" },
+  { type: "render_plan", label: "7. ffmpeg Master Render", description: "Render video thật MP4 H.264/AAC", params: [], default_params: { crf: 23 }, icon: "film" },
+  { type: "gate", label: "8. Gate 2: Video Approval", description: "Bắt buộc duyệt video thành phẩm trước xuất bản", params: ["stage"], default_params: { stage: "video" }, icon: "shield-check" },
+  { type: "publish", label: "9. Omni-Publish", description: "Đóng gói xuất bản YouTube 16:9 & TikTok 9:16", params: [], default_params: { targets: ["youtube", "tiktok"] }, icon: "send" },
 ];
 
 const INITIAL_NODES: WorkflowNode[] = [
-  { id: "node-research", block_type: "research", name: "Research Engine", x: 40, y: 80, config: {} },
-  { id: "node-script", block_type: "script_draft", name: "Script Drafting", x: 230, y: 80, config: {} },
-  { id: "node-gate1", block_type: "script_approval", name: "Gate 1: Review", x: 420, y: 80, config: {} },
-  { id: "node-tts", block_type: "voiceover_tts", name: "Neural TTS", x: 610, y: 40, config: {} },
-  { id: "node-media", block_type: "external_ingest", name: "Ingest AI Footage", x: 610, y: 150, config: {} },
-  { id: "node-timeline", block_type: "timeline_nle", name: "Assembly NLE", x: 800, y: 90, config: {} },
-  { id: "node-render", block_type: "ffmpeg_render", name: "ffmpeg Render", x: 990, y: 90, config: {} },
-  { id: "node-gate2", block_type: "video_approval", name: "Gate 2: Review", x: 1180, y: 90, config: {} },
-  { id: "node-publish", block_type: "omni_publish", name: "Omni-Publish", x: 1370, y: 90, config: {} },
+  { id: "node-research", type: "research", label: "Research Engine", x: 40, y: 80, enabled: true, params: {} },
+  { id: "node-script", type: "script", label: "Script Drafting", x: 230, y: 80, enabled: true, params: {} },
+  { id: "node-gate1", type: "gate", label: "Gate 1: Review", x: 420, y: 80, enabled: true, params: { stage: "script" } },
+  { id: "node-tts", type: "voiceover", label: "Neural TTS", x: 610, y: 40, enabled: true, params: {} },
+  { id: "node-media", type: "ingest_external", label: "Ingest AI Footage", x: 610, y: 150, enabled: true, params: {} },
+  { id: "node-timeline", type: "timeline_check", label: "Assembly NLE", x: 800, y: 90, enabled: true, params: {} },
+  { id: "node-render", type: "render_plan", label: "ffmpeg Render", x: 990, y: 90, enabled: true, params: {} },
+  { id: "node-gate2", type: "gate", label: "Gate 2: Review", x: 1180, y: 90, enabled: true, params: { stage: "video" } },
+  { id: "node-publish", type: "publish", label: "Omni-Publish", x: 1370, y: 90, enabled: true, params: {} },
 ];
 
 const INITIAL_EDGES: WorkflowEdge[] = [
@@ -87,15 +97,30 @@ export function DAGWorkflowStudio() {
   const palette = blocksQuery.data && blocksQuery.data.length > 0 ? blocksQuery.data : DEFAULT_PALETTE_BLOCKS;
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
+  /**
+   * The whole DAG in one object.
+   *
+   * Both the checklist and the save wrap the flow in ``{workflow, force}`` — the
+   * canvas used to post ``{nodes, edges}`` and the backend answered 422.
+   */
+  const workflow: Workflow = {
+    name: workflowQuery.data?.name ?? "studio-draft",
+    nodes,
+    edges,
+    version: workflowQuery.data?.version ?? 1,
+    updated_at: new Date().toISOString(),
+  };
+
   const handleAddBlock = (blockDef: WorkflowBlockDef) => {
     const newId = `node-${Date.now()}`;
     const newNode: WorkflowNode = {
       id: newId,
-      block_type: blockDef.type,
-      name: blockDef.name,
+      type: blockDef.type,
+      label: blockDef.label,
       x: 100 + (nodes.length % 5) * 60,
       y: 120 + (nodes.length % 3) * 50,
-      config: { ...blockDef.default_config },
+      enabled: true,
+      params: { ...blockDef.default_params },
     };
     setNodes((prev) => [...prev, newNode]);
     setSelectedNodeId(newId);
@@ -111,7 +136,7 @@ export function DAGWorkflowStudio() {
   const handleRunChecklist = async () => {
     setExecutionLogs((prev) => [...prev, "[Audit]: Running pre-save DAG validation checklist..."]);
     try {
-      const res = await validateChecklistMutation.mutateAsync({ nodes, edges });
+      const res = await validateChecklistMutation.mutateAsync({ workflow });
       setChecklistStatus(res);
       setExecutionLogs((prev) => [
         ...prev,
@@ -125,7 +150,7 @@ export function DAGWorkflowStudio() {
 
   const handleSaveDAG = async () => {
     try {
-      await saveWorkflowMutation.mutateAsync({ nodes, edges });
+      await saveWorkflowMutation.mutateAsync({ workflow });
       setExecutionLogs((prev) => [...prev, "💾 [Saved]: DAG workflow layout successfully saved to project."]);
     } catch (e: any) {
       setExecutionLogs((prev) => [...prev, `💾 [Save status]: Layout saved locally (${nodes.length} nodes, ${edges.length} links)`]);
@@ -143,7 +168,7 @@ export function DAGWorkflowStudio() {
       await new Promise((r) => setTimeout(r, 600));
       setExecutionLogs((prev) => [
         ...prev,
-        `[Block RUN]: Executing ${node.name} (${node.block_type})... OK ✓`,
+        `[Block RUN]: Executing ${node.label} (${node.type})... OK ✓`,
       ]);
     }
 
@@ -234,7 +259,7 @@ export function DAGWorkflowStudio() {
                 >
                   <div className="space-y-0.5 min-w-0 pr-2">
                     <span className="text-xs font-bold text-gray-200 group-hover:text-white truncate block">
-                      {block.name}
+                      {block.label}
                     </span>
                     <span className="text-[10px] text-gray-400 truncate block">
                       {block.description}
@@ -308,7 +333,7 @@ export function DAGWorkflowStudio() {
           <div className="relative w-full h-full overflow-auto p-4 min-h-[360px]">
             {nodes.map((node) => {
               const isSelected = selectedNodeId === node.id;
-              const isGate = node.block_type.includes("approval");
+              const isGate = node.type === "gate";
 
               return (
                 <div
@@ -334,7 +359,7 @@ export function DAGWorkflowStudio() {
                   </div>
 
                   <span className="text-[11px] font-bold text-white block mt-1 truncate">
-                    {node.name}
+                    {node.label}
                   </span>
 
                   <div className="flex justify-between items-center text-[8px] text-gray-500 font-mono mt-1 pt-1 border-t border-nle-border/40">
@@ -378,10 +403,10 @@ export function DAGWorkflowStudio() {
                   <label className="text-gray-400 text-[10px]">Tên khối:</label>
                   <input
                     type="text"
-                    value={selectedNode.name}
+                    value={selectedNode.label}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, name: val } : n)));
+                      setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, label: val } : n)));
                     }}
                     className="w-full bg-nle-base border border-nle-border rounded px-2 py-1 text-xs text-white"
                   />
@@ -390,18 +415,18 @@ export function DAGWorkflowStudio() {
                 <div>
                   <label className="text-gray-400 text-[10px]">Loại block:</label>
                   <div className="font-mono text-nle-cyan bg-nle-panel px-2 py-1 rounded border border-nle-border text-[11px]">
-                    {selectedNode.block_type}
+                    {selectedNode.type}
                   </div>
                 </div>
 
                 <div>
                   <label className="text-gray-400 text-[10px]">Cấu hình tham số (JSON):</label>
                   <textarea
-                    value={JSON.stringify(selectedNode.config, null, 2)}
+                    value={JSON.stringify(selectedNode.params, null, 2)}
                     onChange={(e) => {
                       try {
                         const parsed = JSON.parse(e.target.value);
-                        setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, config: parsed } : n)));
+                        setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, params: parsed } : n)));
                       } catch {}
                     }}
                     rows={4}

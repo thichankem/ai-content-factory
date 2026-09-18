@@ -60,9 +60,13 @@ export function useWorkflowDAG(projectId?: string) {
   });
 
   const runWorkflowMutation = useMutation({
-    mutationFn: (options?: { background?: boolean }) => {
+    mutationFn: (options?: { inputs?: Record<string, unknown>; background?: boolean }) => {
       if (!projectId) throw new Error("No project selected");
-      return workflowApi.runWorkflow(projectId, {}, options?.background ?? true);
+      return workflowApi.runWorkflow(
+        projectId,
+        options?.inputs ?? {},
+        options?.background ?? true
+      );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workflowRuns(projectId) });

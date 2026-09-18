@@ -26,7 +26,8 @@ import { Badge } from "@/components/ui/badge";
 import { useUIStore } from "@/stores/useUIStore";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { useProjects } from "@/hooks/useProjects";
-import { useWorkflowCampaign } from "@/hooks/useWorkflowCampaign";
+import { useCampaign } from "@/hooks/useCampaign";
+import { useWorkflowDAG } from "@/hooks/useWorkflowDAG";
 import {
   CheckCircle2,
   Sparkles,
@@ -53,31 +54,21 @@ export default function StudioPage() {
     aiAssistMutation,
   } = useProjects();
 
-  const {
-    runWorkflowMutation,
-    checklistQuery,
-    generateCampaignMutation,
-  } = useWorkflowCampaign(currentProject?.id);
+  const { runWorkflowMutation, checklistQuery } = useWorkflowDAG(currentProject?.id);
+  const { generateCampaignMutation } = useCampaign(currentProject?.id);
 
   const [workflowStatus, setWorkflowStatus] = useState<string | null>(null);
   const [campaignStatus, setCampaignStatus] = useState<string | null>(null);
   const [workflowSubMode, setWorkflowSubMode] = useState<"dag" | "fusion">("dag");
 
   useEffect(() => {
+    // Only a project the API actually returned may be selected. An empty or failed
+    // list is shown as such: a locally invented "demo" project used to be injected
+    // here with `status: "video_review"` and `source_rights_confirmed: true`, which
+    // both faked a finished render and auto-confirmed source rights — an invariant
+    // `AGENTS.md` forbids on every code path.
     if (projectsQuery.data && projectsQuery.data.length > 0 && !currentProject) {
       setCurrentProject(projectsQuery.data[0]);
-    } else if (!currentProject) {
-      setCurrentProject({
-        id: "demo-project-01",
-        name: "Bí mật 3 giây đầu giữ chân khán giả",
-        topic: "Short-form video retention hack",
-        target_language: "vi",
-        duration_target_seconds: 45,
-        status: "video_review",
-        source_rights_confirmed: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
     }
   }, [projectsQuery.data, currentProject, setCurrentProject]);
 
@@ -93,7 +84,7 @@ export default function StudioPage() {
 
   const handlePublish = async () => {
     if (!currentProject) return;
-    await publishMutation.mutateAsync(currentProject.id);
+    await publishMutation.mutateAsync({ projectId: currentProject.id });
   };
 
   const handleVoiceover = async () => {
@@ -110,19 +101,19 @@ export default function StudioPage() {
     setWorkflowStatus("Đang khởi chạy luồng DAG trên nền...");
     try {
       const res = await runWorkflowMutation.mutateAsync();
-      setWorkflowStatus(`✅ Đã thực thi workflow thành công (${res?.executed_blocks?.length || 1} blocks)!`);
+      setWorkflowStatus(`✅ Đã thực thi workflow thành công (${res?.steps?.length || 1} blocks)!`);
     } catch (e: any) {
-      setWorkflowStatus(`Hoàn tất chạy workflow: ${e.message}`);
+      setWorkflowStatus(` Chạy workflow thất bại: ${e.message}`);
     }
   };
 
   const handleGenerateCampaign = async () => {
     setCampaignStatus("Đang tổng hợp pillar content thành 5 shorts...");
     try {
-      const res = await generateCampaignMutation.mutateAsync();
+      const res = await generateCampaignMutation.mutateAsync({});
       setCampaignStatus(`✅ Đã tạo thành công chiến dịch ${res?.shorts?.length || 5} micro-shorts đa kênh!`);
     } catch (e: any) {
-      setCampaignStatus(`Đã tạo chiến dịch 5 shorts thành công!`);
+      setCampaignStatus(`❌ Tạo chiến dịch thất bại: ${e.message}`);
     }
   };
 

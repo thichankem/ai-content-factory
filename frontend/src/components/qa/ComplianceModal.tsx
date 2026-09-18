@@ -21,8 +21,8 @@ export function ComplianceModal() {
     try {
       const res = await platformQAMutation.mutateAsync({
         platform,
-        duration: 45,
-        aspectRatio: "9:16",
+        duration_seconds: 45,
+        aspect_ratio: "9:16",
       });
       setPlatformResult(res);
     } catch (e) {
@@ -33,9 +33,8 @@ export function ComplianceModal() {
   const runBrandCheck = async () => {
     try {
       const res = await brandQAMutation.mutateAsync({
-        font: "Inter",
-        primary_color: "#00f0ff",
-        tone: "informative",
+        fonts: ["Inter"],
+        dominant_colors: ["#00f0ff"],
       });
       setBrandResult(res);
     } catch (e) {
@@ -45,7 +44,9 @@ export function ComplianceModal() {
 
   const runCopyrightCheck = async () => {
     try {
-      const res = await copyrightMutation.mutateAsync(["asset_01", "asset_02"]);
+      const res = await copyrightMutation.mutateAsync({
+        asset_ids: ["asset_01", "asset_02"],
+      });
       setCopyrightResult(res);
     } catch (e) {
       console.error(e);
