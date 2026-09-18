@@ -36,7 +36,7 @@ def test_upload_and_retrieve_text_document(library: MediaLibrary) -> None:
     assert item.kind == MediaKind.DOCUMENT
     assert item.size_bytes == len(b"Hello world.\nSecond line.")
     assert library.get(item.id) is not None
-    assert item in library.list()
+    assert item in library.list_items()
 
 
 def test_extract_text_from_document(library: MediaLibrary) -> None:
@@ -194,7 +194,7 @@ def test_upload_stream_rejects_oversize_and_keeps_index_clean(tmp_path) -> None:
     lib = MediaLibrary(tmp_path / "media", max_bytes=10)
     with pytest.raises(UploadTooLargeError):
         lib.upload_stream("clip.mp4", io.BytesIO(b"x" * 11))
-    assert lib.list() == []
+    assert lib.list_items() == []
     index = lib._index_path
     assert not index.exists() or json.loads(index.read_text(encoding="utf-8")) == []
     assert list((lib._dir / "files").glob("*")) == []

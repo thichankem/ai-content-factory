@@ -179,9 +179,6 @@ class HardwareProfile:
     def has_gpu(self) -> bool:
         return bool(self.gpus)
 
-    def has_encoder(self, name: str) -> bool:
-        return name in self.encoders
-
     def hardware_video_encoder(self) -> str | None:
         """Discrete-class hardware H.264 encoder this build exposes, if any.
 
@@ -200,10 +197,6 @@ class HardwareProfile:
             if item.path == path:
                 return item
         return None
-
-    def encoder_builds(self, encoder: str) -> tuple[FfmpegBuild, ...]:
-        """Every discovered build that even lists ``encoder``, best first."""
-        return tuple(item for item in self.binaries if encoder in item.encoders)
 
     def to_dict(self) -> dict[str, Any]:
         return {

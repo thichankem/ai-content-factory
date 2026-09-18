@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .. import media_tools as engine
+from .. import voice_engine
 from ..sandbox import Sandbox, SandboxError
 from .errors import NotFoundError
 from .media import MediaMixin
@@ -299,6 +300,32 @@ class MediaToolsMixin(MediaMixin):
             before_lufs=report["before_lufs"],
             after_lufs=report["after_lufs"],
         )
+
+    def audio_denoise(
+        self,
+        ref: str,
+        strength: float = 0.8,
+        noise_profile_ref: str | None = None,
+        format: str = "mp3",
+    ) -> dict[str, Any]:
+        """Remove background noise via spectral gating.
+
+        ``strength`` (0–1) controls how aggressively noise is suppressed.
+        ``noise_profile_ref`` is an optional second asset holding a pure-noise
+        sample to learn the noise spectrum from; when omitted the noise floor is
+        auto-estimated from the quietest frames of the signal itself.
+        """
+        source = self.resolve_media_ref(ref)
+        data = source.read_bytes()
+        profile = None
+        if noise_profile_ref:
+            profile = self.resolve_media_ref(noise_profile_ref).read_bytes()
+        audio, report = voice_engine.denoise_audio(
+            data, strength=strength, noise_profile=profile, export_format=format
+        )
+        asset_id, target = self._new_asset(format)
+        target.write_bytes(audio)
+        return self._asset_report(asset_id, target, source=ref, **report)
 
     def audio_retime(
         self, ref: str, factor: float, format: str = "mp3"

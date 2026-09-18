@@ -19,6 +19,8 @@ from typing import Any
 
 import numpy as np
 
+from .hardware import require_ffmpeg
+
 __all__ = [
     "KNOWN_CHAIN_STEPS",
     "VoiceChain",
@@ -36,12 +38,8 @@ class VoiceError(ValueError):
 
 
 def _ffmpeg() -> str:
-    import shutil
-
-    binary = shutil.which("ffmpeg")
-    if binary is None:
-        raise VoiceError("ffmpeg is required for audio processing.")
-    return binary
+    """The ffmpeg every decode/encode step in this module shells out to."""
+    return require_ffmpeg(purpose="audio processing", error=VoiceError)
 
 
 def decode_to_pcm(data: bytes) -> tuple[np.ndarray, int]:
@@ -217,6 +215,119 @@ def _fade(samples: np.ndarray, sr: int, fade_in: float, fade_out: float) -> np.n
     return out
 
 
+# --- Spectral noise reduction --------------------------------------------------
+
+
+def _stft(samples: np.ndarray, frame: int, hop: int) -> tuple[np.ndarray, int]:
+    """Short-time Fourier transform: (n_frames, frame//2+1) complex spectrum."""
+    n = len(samples)
+    n_frames = max(1, 1 + (n - frame) // hop)
+    window = np.hanning(frame)
+    idx = hop * np.arange(n_frames)[:, None] + np.arange(frame)[None, :]
+    padded = np.pad(samples, (0, frame), mode="reflect")
+    frames = padded[idx] * window
+    return np.fft.rfft(frames, axis=1), n_frames
+
+
+def _istft(spec: np.ndarray, frame: int, hop: int, n: int) -> np.ndarray:
+    """Overlap-add inverse STFT back to ``n`` samples.
+
+    Samples where the window-overlap sum is too small (the first and last
+    ``frame`` samples, where only the tapered edge of a window contributes) are
+    zeroed rather than divided by a near-zero denominator — that division is what
+    produces the huge edge transients a naive reconstruction suffers from.
+    """
+    window = np.hanning(frame)
+    frames = np.fft.irfft(spec, axis=1)
+    out = np.zeros(n + frame)
+    winsum = np.zeros(n + frame)
+    for i, f in enumerate(frames):
+        start = i * hop
+        out[start : start + frame] += f * window
+        winsum[start : start + frame] += window**2
+    valid = winsum > 0.5 * winsum.max()
+    rebuilt = np.where(valid, out / np.maximum(winsum, 1e-8), 0.0)
+    return rebuilt[:n]
+
+
+def _estimate_noise_spectrum(
+    samples: np.ndarray, sr: int, frame: int, hop: int
+) -> np.ndarray:
+    """Average magnitude spectrum of a pure-noise sample."""
+    spec, _ = _stft(samples, frame, hop)
+    return np.asarray(np.mean(np.abs(spec), axis=0) + 1e-8)
+
+
+def _spectral_gate(
+    samples: np.ndarray,
+    sr: int,
+    strength: float,
+    noise_profile: np.ndarray | None = None,
+    frame_ms: float = 25.0,
+) -> np.ndarray:
+    """Spectral-gating denoise: suppress broadband noise under the speech.
+
+    Learns the noise spectrum from ``noise_profile`` (a pure-noise sample) or,
+    when absent, from the quietest frames of the signal itself. Then attenuates
+    each STFT bin toward the noise floor — the classic Audacity/Audition
+    "remove noise" behaviour, in pure numpy with no heavy dependencies.
+
+    A 50% overlap (hop = frame/2) is used so the Hann-window overlap-add
+    reconstructs cleanly without the transients a non-COLA hop would introduce.
+    """
+    frame = int(sr * frame_ms / 1000)
+    frame = frame if frame % 2 == 0 else frame + 1
+    hop = frame // 2
+    spec, n_frames = _stft(samples, frame, hop)
+    mag = np.abs(spec)
+    if noise_profile is not None:
+        noise_mag = _estimate_noise_spectrum(noise_profile, sr, frame, hop)
+    else:
+        energies = np.sum(mag**2, axis=1)
+        k = max(1, int(0.1 * n_frames))
+        quiet = np.argsort(energies)[:k]
+        noise_mag = np.mean(mag[quiet], axis=0) + 1e-8
+    # Wiener-style gain: speech bins (mag >> noise) keep ~1, noise bins collapse.
+    gain = np.clip(1.0 - strength * noise_mag / (mag + 1e-8), 0.0, 1.0)
+    out = _istft(spec * gain, frame, hop, len(samples))
+    peak = np.max(np.abs(out)) or 1.0
+    if peak > 0.99:
+        out = out * (0.99 / peak)
+    return out.astype(np.float32)
+
+
+def denoise_audio(
+    data: bytes,
+    *,
+    strength: float = 0.8,
+    noise_profile: bytes | None = None,
+    export_format: str = "mp3",
+) -> tuple[bytes, dict[str, Any]]:
+    """Remove background noise from audio bytes via spectral gating.
+
+    ``strength`` (0–1) is how aggressively noise is suppressed. ``noise_profile``
+    is an optional pure-noise sample to learn the noise spectrum from; when
+    omitted the noise floor is auto-estimated from the quietest frames.
+    """
+    samples, sr = decode_to_pcm(data)
+    original_peak = float(np.max(np.abs(samples)))
+    profile = None
+    if noise_profile:
+        profile, _ = decode_to_pcm(noise_profile)
+    denoised = _spectral_gate(samples, sr, float(np.clip(strength, 0.0, 1.0)), profile)
+    out = encode_pcm(denoised, sr, export_format)
+    report = {
+        "strength": float(np.clip(strength, 0.0, 1.0)),
+        "noise_profile": bool(noise_profile),
+        "method": "spectral_gating",
+        "duration_seconds": round(len(samples) / sr, 3),
+        "input_peak": round(original_peak, 4),
+        "output_peak": round(float(np.max(np.abs(denoised))), 4),
+        "format": export_format,
+    }
+    return out, report
+
+
 # --- Chain configuration --------------------------------------------------------
 
 
@@ -225,6 +336,7 @@ class VoiceChain:
     """Declarative description of the processing chain (agent-editable)."""
 
     highpass_hz: float = 80.0
+    denoise_strength: float = 0.0
     gate_db: float | None = -42.0
     de_ess: float = 0.4
     eq_low: float = 1.0
@@ -244,6 +356,7 @@ def _from_params(params: dict[str, Any]) -> VoiceChain:
     chain = VoiceChain()
     mapping = {
         "highpass_hz": float,
+        "denoise_strength": float,
         "gate_db": float,
         "de_ess": float,
         "eq_low": float,
@@ -271,6 +384,7 @@ def _from_params(params: dict[str, Any]) -> VoiceChain:
 #: Exposed for the tools manifest / agent discoverability.
 KNOWN_CHAIN_STEPS = [
     "highpass_hz",
+    "denoise_strength",
     "gate_db",
     "de_ess",
     "eq_low",
@@ -290,6 +404,7 @@ CHAIN_PRESETS: dict[str, dict[str, Any]] = {
     "podcast": {"target_lufs": -16.0, "eq_high": 1.3, "compressor_ratio": 3.0},
     "voiceover": {"target_lufs": -14.0, "eq_high": 1.35, "de_ess": 0.5},
     "soft": {"compressor_ratio": 2.0, "eq_high": 1.1, "gate_db": -50.0},
+    "denoise": {"denoise_strength": 0.8, "gate_db": -50.0},
     "telephone": {"telephone": True, "target_lufs": -18.0},
     "raw": {},
 }
@@ -303,6 +418,7 @@ def process_voice(
     *,
     params: dict[str, Any] | None = None,
     preset: str | None = None,
+    noise_profile: bytes | None = None,
     export_format: str = "mp3",
 ) -> tuple[bytes, dict[str, Any]]:
     """Run the enhancement chain over audio bytes; return (audio, report)."""
@@ -323,6 +439,11 @@ def process_voice(
 
     if chain.highpass_hz > 0:
         samples = _highpass(samples, chain.highpass_hz, sr)
+    if chain.denoise_strength > 0:
+        profile = None
+        if noise_profile:
+            profile, _ = decode_to_pcm(noise_profile)
+        samples = _spectral_gate(samples, sr, min(1.0, chain.denoise_strength), profile)
     if chain.gate_db is not None:
         samples = _noise_gate(samples, chain.gate_db)
     if chain.de_ess > 0:
@@ -353,6 +474,7 @@ def process_voice(
             name
             for name, active in [
                 ("highpass", chain.highpass_hz > 0),
+                ("denoise", chain.denoise_strength > 0),
                 ("gate", chain.gate_db is not None),
                 ("de_ess", chain.de_ess > 0),
                 ("eq", (chain.eq_low, chain.eq_mid, chain.eq_high) != (1.0, 1.0, 1.0)),

@@ -45,6 +45,193 @@ def build_router(service: ContentFactoryService) -> APIRouter:
             "filters": KNOWN_FILTERS,
         }
 
+    @router.get("/studio/image/ops")
+    def image_ops_catalog() -> dict[str, Any]:
+        """Full op catalogue grouped by category, with plain-language docs."""
+        return service.image_op_catalog()
+
+    # --- video & audio effects + accessibility -------------------------------
+
+    @router.get("/studio/video/effects")
+    def video_effects_catalog() -> dict[str, Any]:
+        """Every video frame effect with a plain-language description."""
+        return service.video_effect_catalog()
+
+    @router.post("/studio/video/effect")
+    async def apply_video_effect_studio(
+        file: UploadFile = File(...),  # noqa: B008
+        name: str = Form(...),
+        params: str | None = Form(None),
+        format: str = Form("png"),
+    ) -> dict[str, Any]:
+        """Apply a frame effect to an image (or a video frame)."""
+        import json as _json
+
+        data = await file.read()
+        parsed = _json.loads(params) if params else None
+        try:
+            return service.apply_video_effect(data, name, parsed, export_format=format)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/studio/audio/effects")
+    def audio_effects_catalog() -> dict[str, Any]:
+        """Every audio effect with a plain-language description."""
+        return service.audio_effect_catalog()
+
+    @router.post("/studio/audio/effect")
+    async def apply_audio_effect_studio(
+        file: UploadFile = File(...),  # noqa: B008
+        name: str = Form(...),
+        params: str | None = Form(None),
+        format: str = Form("mp3"),
+    ) -> dict[str, Any]:
+        """Apply a DSP effect to audio bytes."""
+        import json as _json
+
+        data = await file.read()
+        parsed = _json.loads(params) if params else None
+        try:
+            return service.apply_audio_effect(data, name, parsed, export_format=format)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/studio/video/ops")
+    def video_ops_catalog() -> dict[str, Any]:
+        """Every video/audio operation grouped by category, with descriptions."""
+        return service.video_operation_catalog()
+
+    @router.post("/studio/video/describe-op")
+    def describe_video_op_studio(
+        name: str = Form(...),
+    ) -> dict[str, Any]:
+        """Explain one video/audio operation in plain language."""
+        try:
+            return service.describe_video_operation(name)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/projects/{project_id}/timeline/describe")
+    def describe_video_timeline_studio(project_id: str) -> dict[str, Any]:
+        """Summarise a project's timeline in natural language."""
+        try:
+            return service.describe_video_timeline(project_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/projects/{project_id}/timeline/suggest")
+    def suggest_video_edits_studio(project_id: str) -> dict[str, Any]:
+        """Turn the timeline report into concrete edit suggestions."""
+        try:
+            return service.suggest_video_edits(project_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/image/analyze")
+    async def analyze_image_studio(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
+        """Describe an image from its pixel statistics (vision-free)."""
+        data = await file.read()
+        return service.analyze_image(data)
+
+    @router.post("/studio/image/suggest")
+    async def suggest_image_studio(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
+        """Histogram-based auto-suggestions for an image."""
+        data = await file.read()
+        return service.suggest_image_edits(data)
+
+    @router.post("/studio/image/describe-op")
+    def describe_image_op_studio(
+        name: str = Form(...),
+        params: str | None = Form(None),
+    ) -> dict[str, Any]:
+        """Explain a single op in plain language."""
+        import json as _json
+
+        parsed = _json.loads(params) if params else None
+        try:
+            return service.describe_image_op(name, parsed)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/image/batch")
+    async def batch_edit_image_studio(
+        files: list[UploadFile] = File(...),  # noqa: B008
+        ops: str | None = Form(None),
+        preset: str | None = Form(None),
+        format: str = Form("png"),
+    ) -> dict[str, Any]:
+        """Apply the same pipeline to several images (batch / sync settings)."""
+        import json as _json
+
+        if not files:
+            raise HTTPException(
+                status_code=422, detail="At least one file is required."
+            )
+        parsed_ops = _json.loads(ops) if ops else None
+        datas = [await f.read() for f in files]
+        try:
+            return service.batch_edit_image(
+                datas, ops=parsed_ops, preset=preset, export_format=format
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/image/session/begin")
+    async def begin_image_session_studio(
+        file: UploadFile = File(...),  # noqa: B008
+    ) -> dict[str, Any]:
+        """Start a non-destructive edit session around an image."""
+        data = await file.read()
+        try:
+            return service.begin_image_session(data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/image/session/{session_id}/edit")
+    async def edit_image_session_studio(
+        session_id: str,
+        ops: str = Form(...),
+        format: str = Form("png"),
+    ) -> dict[str, Any]:
+        """Apply a step to a session and record it in the undo stack."""
+        import json as _json
+
+        try:
+            parsed = _json.loads(ops)
+            return service.edit_image_session(session_id, parsed, export_format=format)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/image/session/{session_id}/undo")
+    def undo_image_session_studio(
+        session_id: str,
+        format: str = Form("png"),
+    ) -> dict[str, Any]:
+        """Undo the last edit step."""
+        try:
+            return service.undo_image_session(session_id, export_format=format)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/image/session/{session_id}/redo")
+    def redo_image_session_studio(
+        session_id: str,
+        format: str = Form("png"),
+    ) -> dict[str, Any]:
+        """Redo the last undone edit step."""
+        try:
+            return service.redo_image_session(session_id, export_format=format)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/studio/image/session/{session_id}")
+    def image_session_state_studio(session_id: str) -> dict[str, Any]:
+        """Current state of a session (version, undo/redo availability)."""
+        try:
+            return service.image_session_state(session_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @router.post("/studio/image/edit")
     async def edit_image_studio(
         file: UploadFile = File(...),  # noqa: B008

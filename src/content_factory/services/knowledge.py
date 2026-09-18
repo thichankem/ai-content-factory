@@ -11,18 +11,25 @@ from .. import rag
 from ..models import (
     Chunk,
     ChunkEdit,
+    GroundingBundle,
     GroundRequest,
+    KBAskRequest,
+    KBAskResponse,
     KBCreate,
     KBDocument,
     KBDocumentStatus,
     KBIngestText,
+    KBIngestUrl,
+    KBTurn,
     KBUpdate,
     KnowledgeBase,
     Project,
+    RetrievalHit,
     RetrievalRequest,
     RetrievalResponse,
     utcnow,
 )
+from ..providers import ProviderUnavailableError
 from ..rag import KnowledgeRetriever
 from .context import ServiceContext
 from .errors import (
@@ -364,8 +371,144 @@ class KnowledgeMixin(ServiceContext):
         project.grounding = rag.build_grounding(query, hits, kb_id=kb_id)
         return self._store.save(project)
 
-    def _grounding_context(self, project: Project) -> str | None:
-        """Grounded citation context for prompts, or None when absent."""
-        if project.grounding and project.grounding.context_text:
-            return project.grounding.context_text
-        return None
+    # --- NotebookLM-style grounded Q&A --------------------------------------
+
+    async def ask_kb(self, kb_id: str, request: KBAskRequest) -> KBAskResponse:
+        """Answer a question from the KB's sources, with citations.
+
+        Retrieves the top chunks, hands the grounded context to the provider
+        chain, and returns a synthesized answer whose claims carry ``[n]``
+        citations back to the sources. When no provider is available the
+        offline extractive fallback answers from the top hits instead, so the
+        endpoint never fails just because an API key is missing.
+        """
+        self.get_kb(kb_id)
+        scoped = KnowledgeRetriever()
+        scoped.replace_all([c for c in self._chunks.values() if c.kb_id == kb_id])
+        hits = scoped.retrieve(
+            request.query,
+            top_k=request.top_k,
+            use_vector=request.use_vector,
+            use_keywords=request.use_keywords,
+            rerank=request.rerank,
+        )
+        grounding = rag.build_grounding(request.query, hits, kb_id=kb_id)
+        prompt = self._build_ask_prompt(request.query, grounding, request.history)
+        try:
+            result = await self._providers.generate(prompt)
+        except ProviderUnavailableError:
+            answer = self._extractive_answer(hits)
+            provider = "template"
+            grounded = False
+        else:
+            if result.provider == "template":
+                # The built-in template provider drafts *scripts*, not answers;
+                # the extractive fallback is a more honest grounded answer when
+                # only it is available offline.
+                answer = self._extractive_answer(hits)
+                provider = "template"
+                grounded = False
+            else:
+                answer = result.text.strip()
+                provider = result.provider
+                grounded = True
+        return KBAskResponse(
+            query=request.query,
+            answer=answer,
+            citations=grounding.citations,
+            hits=hits,
+            provider=provider,
+            grounded=grounded,
+        )
+
+    def _build_ask_prompt(
+        self,
+        query: str,
+        grounding: GroundingBundle,
+        history: list[KBTurn],
+    ) -> str:
+        """Render a NotebookLM-style grounded-Q&A prompt for the provider."""
+        lines = [
+            "You are a grounded research assistant.",
+            "Answer the question using ONLY the retrieved knowledge below.",
+            "Cite the source of each claim inline as [n], matching the labels.",
+            "If the knowledge does not contain the answer, say so plainly.",
+            "Keep the answer concise and factual.",
+            "",
+        ]
+        if history:
+            lines.append("Prior conversation (for context only):")
+            for turn in history:
+                lines.append(f"{turn.role}: {turn.content}")
+            lines.append("")
+        lines.append(grounding.context_text)
+        lines.append("")
+        lines.append(f"Question: {query}")
+        lines.append("Answer (with [n] citations):")
+        return "\n".join(lines)
+
+    def _extractive_answer(self, hits: list[RetrievalHit]) -> str:
+        """Offline fallback: answer from the top hits, each labelled [n]."""
+        if not hits:
+            return "No relevant knowledge found in the sources."
+        lines = ["Based on the retrieved sources:"]
+        for index, hit in enumerate(hits, start=1):
+            text = re.sub(r"\s+", " ", hit.text).strip()
+            lines.append(f"[{index}] {hit.document_name}: {text}")
+        return "\n\n".join(lines)
+
+    def ingest_url(self, kb_id: str, data: KBIngestUrl) -> KBDocument:
+        """Ingest a web page as a source (NotebookLM web-source addition).
+
+        The document is created first so an unreachable or unreadable page is
+        recorded as a ``FAILED`` source rather than aborting the request —
+        exactly how a failed text ingest behaves.
+        """
+        kb = self.get_kb(kb_id)
+        doc = KBDocument(
+            id=uuid.uuid4().hex[:12],
+            kb_id=kb.id,
+            name=data.title or self._guess_title_from_url(data.url),
+            source_type="url",
+            template=kb.template,
+        )
+        self._kb_documents[doc.id] = doc
+        try:
+            text = self._fetch_url_text(data.url)
+            self._chunk_and_store(kb, doc.id, text)
+            doc.status = KBDocumentStatus.PARSED
+        except Exception as err:  # noqa: BLE001 - a failed fetch is recorded on the document
+            doc.status = KBDocumentStatus.FAILED
+            doc.error = str(err)
+        self._refresh_kb_counts(kb)
+        self._sync_retriever()
+        return doc
+
+    def _fetch_url_text(self, url: str) -> str:
+        """Fetch a URL and strip markup down to readable text."""
+        import urllib.request
+
+        request = urllib.request.Request(
+            url, headers={"User-Agent": "Mozilla/5.0 (AI Content Factory)"}
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read().decode("utf-8", errors="ignore")
+        except Exception as exc:  # surface the network error to the document
+            raise StateConflictError(f"Could not fetch '{url}': {exc}") from exc
+        text = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            raise StateConflictError(f"No readable text extracted from '{url}'.")
+        return text
+
+    def _guess_title_from_url(self, url: str) -> str:
+        """Derive a sensible document title from the URL's last path segment."""
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        path = parsed.path.rsplit("/", 1)[-1]
+        stem = path.rsplit(".", 1)[0] if "." in path else path
+        title = stem.replace("-", " ").replace("_", " ").strip() or parsed.netloc
+        return title[:200] or "web-source"

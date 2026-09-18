@@ -14,6 +14,8 @@ from __future__ import annotations
 import contextlib
 import threading
 import time
+from pathlib import Path
+from typing import Any
 
 from .. import script_engine
 from ..config import Settings
@@ -140,8 +142,23 @@ class ServiceContext:
                         governor=self._governor,
                         transcribe_model=self._settings.transcribe_model,
                         transcribe_device=self._settings.transcribe_device,
+                        storage=self._build_media_storage(),
                     )
         return self._media_cache
+
+    def _build_media_storage(self) -> Any:
+        """Pick the media storage backend from settings (S3 when configured)."""
+        from ..cloud import build_media_storage
+
+        return build_media_storage(
+            local_root=Path(self._settings.media_dir) / "files",
+            s3_bucket=self._settings.s3_bucket or None,
+            s3_endpoint=self._settings.s3_endpoint or None,
+            s3_region=self._settings.s3_region or None,
+            s3_access_key=self._settings.s3_access_key or None,
+            s3_secret_key=self._settings.s3_secret_key or None,
+            s3_prefix=self._settings.s3_prefix,
+        )
 
     @property
     def _recook(self) -> RecookPipeline:

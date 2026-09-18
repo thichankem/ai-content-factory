@@ -13,9 +13,12 @@ from ...models import (
     Chunk,
     ChunkEdit,
     ChunkTemplate,
+    KBAskRequest,
+    KBAskResponse,
     KBCreate,
     KBDocument,
     KBIngestText,
+    KBIngestUrl,
     KBUpdate,
     KnowledgeBase,
     RetrievalRequest,
@@ -107,5 +110,15 @@ def build_router(service: ContentFactoryService) -> APIRouter:
     def retrieve_kb_scoped(kb_id: str, payload: RetrievalRequest) -> RetrievalResponse:
         """Hybrid retrieval scoped to one knowledge base."""
         return guard_value(lambda: service.retrieve_kb(payload, kb_id))
+
+    @router.post("/kb/{kb_id}/ask", response_model=KBAskResponse)
+    async def ask_kb(kb_id: str, payload: KBAskRequest) -> KBAskResponse:
+        """NotebookLM-style grounded Q&A: answer with citations from the KB."""
+        return await service.ask_kb(kb_id, payload)
+
+    @router.post("/kb/{kb_id}/ingest-url", response_model=KBDocument)
+    def ingest_kb_url(kb_id: str, payload: KBIngestUrl) -> KBDocument:
+        """Ingest a web page as a source (NotebookLM web-source addition)."""
+        return guard_value(lambda: service.ingest_url(kb_id, payload))
 
     return router

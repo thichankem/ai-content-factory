@@ -89,7 +89,8 @@ Chưa có (ưu tiên các phase dưới):
 - Phân tích **video mẫu** để rút blueprint phong cách (yêu cầu 9).
 - **Text-to-video / image-to-video** (yêu cầu 4, 5).
 - **Clone giọng** và lồng tiếng nhiều nhân vật (yêu cầu 4, 6).
-- **Chỉnh ảnh** (yêu cầu 15).
+- **Chỉnh ảnh nâng cao bằng ML** (tách chủ thể rembg, panorama, HDR, RAW,
+  upscale Real-ESRGAN) — phần lõi chỉnh ảnh thuần PIL/numpy đã xong (yêu cầu 15).
 - Hàng đợi tác vụ bền vững (hiện dùng thread + store trong RAM).
 
 ## 4. Kiến trúc pipeline chuẩn mục tiêu
@@ -180,10 +181,20 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
 
 ### P6 — Chỉnh ảnh & chỉnh video nâng cao (yêu cầu 14, 15)
 
-- [ ] Lớp chỉnh ảnh: crop, curves, LUT, retouch, xoá vật thể (rembg + inpaint),
-      upscale (Real-ESRGAN), ổn định (stabilize)
+- [x] **Lớp chỉnh ảnh toàn diện** (`photo_ops.py` + `image_engine.py`): crop,
+      curves, LUT, exposure/highlights/shadows/levels, white balance/vibrance/
+      HSL/color grade/split toning, noise/clarity/dehaze, local mask (radial/
+      gradient/brush), retouch (spot heal/clone/red-eye/liquify/dodge-burn/freq
+      sep), transform (straighten/perspective/lens), effects (grain/watermark/
+      motion/lens blur), inpaint, remove background
+- [x] **Tầng trợ năng** (`photo_assist.py`): mô tả ảnh bằng lời, mô tả từng op,
+      gợi ý tự động theo histogram — dùng được bởi cả người có/nhìn và không nhìn
+      được, và AI agent
+- [x] **Undo/redo phiên chỉnh ảnh không phá hủy** (session trong RAM)
+- [ ] Adapter ML pluggable: tách chủ thể (rembg), panorama, HDR merge, RAW decode,
+      upscale (Real-ESRGAN), stabilize
+- [ ] Version history bền vững trên đĩa (hiện session lưu trong RAM)
 - [ ] Hiệu ứng chuyển cảnh, speed ramp, motion tracking, keyframe đa điểm
-- [ ] Undo/redo bền vững theo project, lịch sử phiên bản (version history)
 - [ ] "Auto-edit giống editor chuyên nghiệp": cắt theo nhịp, chọn B-roll khớp
 
 ### P7 — Tự động hoá & vận hành
@@ -308,6 +319,311 @@ không được là hằng số trong code.
    chạy ComfyUI/Ollama/XTTS local.
 
 ## 9. Nhật ký thay đổi
+
+### 2026-09-18 — Phiên Chỉnh ảnh toàn diện + tầng trợ năng (yêu cầu 15)
+
+- **Mục tiêu phiên:** đưa backend lên đủ **toàn bộ chức năng chỉnh ảnh** chủ dự
+  án liệt kê (thao tác cơ bản, ánh sáng, màu sắc, chi tiết, chỉnh cục bộ,
+  retouch, layer/hiệu ứng, chuyển đổi/xuất, quản lý/quy trình) — ưu tiên thuật
+  toán thuần PIL/numpy chạy offline, ML/heavy để adapter pluggable — **và** một
+  tầng trợ năng để **cả người có thị giác lẫn người không có thị giác (và AI
+  agent)** đều hiểu và dùng được mọi chức năng.
+- **Đã làm:**
+  - `src/content_factory/photo_ops.py` (mới) — **34 op chỉnh ảnh mở rộng**,
+    thuần PIL+numpy, đăng ký vào cùng dispatcher `apply_ops` của `image_engine`:
+    - **Ánh sáng:** `exposure` (EV), `highlights`, `shadows`, `whites`, `blacks`,
+      `levels` (black/gamma/white).
+    - **Màu:** `white_balance` (temperature+tint), `temperature`, `tint`,
+      `vibrance` (giữ da), `hsl` (mixer 8 kênh màu: hue/sat/lum),
+      `color_grade` (shadows/midtones/highlights), `split_toning`.
+    - **Chi tiết:** `noise_reduce` (fastNlMeans → fallback median), `clarity`,
+      `texture`, `dehaze`.
+    - **Cục bộ:** `local_adjust` / `radial_filter` / `gradient_filter` / `brush`
+      (mask mềm feather theo shape radial/gradient/rect).
+    - **Retouch:** `spot_heal`, `clone_stamp`, `red_eye`, `liquify` (bulge/pinch),
+      `dodge_burn`, `frequency_separation` (làm mịn da giữ kết cấu).
+    - **Transform:** `straighten` (auto-detect tilt qua Hough), `perspective`
+      (keystone), `lens_correction` (méo ống kính).
+    - **Hiệu ứng:** `grain`, `watermark`, `motion_blur`, `lens_blur`.
+  - `src/content_factory/photo_assist.py` (mới) — **tầng trợ năng**:
+    - `histogram(img)` — histogram kênh + luminance + thống kê.
+    - `describe_image(img)` — mô tả ảnh bằng lời từ pixel stats (độ sáng, tương
+      phản, ám màu, bão hoà, độ nét) — **không cần nhìn ảnh vẫn biết ảnh ra sao**.
+    - `describe_op(name, params)` — giải thích bằng lời từng op + tham số.
+    - `suggest_edits(img)` — gợi ý công thức chỉnh tự động dựa trên histogram
+      (thiếu sáng → exposure, ám vàng → white_balance, mờ → sharpen…).
+    - `catalog()` — toàn bộ op phân nhóm theo category kèm mô tả.
+  - `image_engine.py` — đăng ký `photo_ops.PHOTO_OPS` vào `_OPS` (48 op tổng).
+  - `image_voice_service.py` — thêm **phiên chỉnh sửa không phá hủy** (undo/redo/
+    history): `begin_image_session`, `edit_image_session`, `undo_image_session`,
+    `redo_image_session`, `image_session_state`; thêm `analyze_image_bytes`,
+    `image_op_catalog`, `describe_image_op`, `suggest_image_edits`,
+    `batch_edit_images`.
+  - `services/production.py` — expose toàn bộ qua `ProductionMixin`.
+  - `api/routers/studio_media.py` — endpoint mới: `GET /studio/image/ops`,
+    `POST /studio/image/analyze`, `POST /studio/image/suggest`,
+    `POST /studio/image/describe-op`, `POST /studio/image/batch`,
+    `POST /studio/image/session/begin`, `.../session/{id}/edit`,
+    `.../session/{id}/undo`, `.../session/{id}/redo`, `GET .../session/{id}`.
+  - `agent_photo.py` (mới) — 10 agent tool mới (registry giờ **89 tool**), gọi
+    được qua `/tools/call` và MCP: `analyze_image`, `image_op_catalog`,
+    `describe_image_op`, `suggest_image_edits`, `batch_edit_image`,
+    `begin_image_session`, `edit_image_session`, `undo_image_session`,
+    `redo_image_session`, `image_session_state`. Tách module riêng để
+    `agent_tools.py` dưới ngân sách dòng.
+  - Test mới: `tests/test_photo_ops.py`, `tests/test_photo_assist.py`,
+    `tests/test_image_session.py`.
+- **Kiểm chứng:** ruff + format + mypy sạch trên mọi file đổi; 94 test (mới +
+  architecture + image_engine + mcp) xanh. Toàn bộ op chạy offline (numpy/PIL);
+  `perspective`/`lens_correction` cần OpenCV (có sẵn) và tự báo lỗi rõ nếu thiếu.
+- **Việc tiếp theo:** nối tầng trợ năng vào UI Photo Lab (panel mô tả ảnh + gợi
+  ý + undo/redo), thêm adapter ML pluggable cho tách chủ thể (rembg), panorama,
+  HDR merge, RAW decode, upscale (Real-ESRGAN), và version history bền vững trên
+  đĩa (hiện lưu session trong RAM).
+
+### 2026-09-18 — Phiên Cloud Storage: đưa media database lên cloud
+
+- **Mục tiêu phiên:** cho phép media database dùng **object storage S3-compatible**
+  làm nơi lưu chính, trong khi mặc định vẫn là local để không phá vỡ gì.
+- **Đã làm:**
+  - `src/content_factory/cloud.py` — backend `MediaStorage` pluggable:
+    - `LocalMediaStorage` — file dưới một thư mục gốc (mặc định).
+    - `S3MediaStorage` — S3-compatible qua `boto3` (lazy import; key ánh xạ
+      `<prefix>/media/<id>/<filename>`).
+    - `MemoryMediaStorage` — in-memory, dùng cho test.
+    - `build_media_storage(...)` — chọn S3 khi có bucket, ngược lại local.
+  - `MediaLibrary` nhận thêm `storage` backend. `media_dir/files/` vẫn là cache
+    cục bộ để xử lý (ffmpeg/phiên âm/cắt), còn bản *chính thức* nằm ở backend:
+    upload ghi vào storage, `path_for` tải object về cache khi thiếu, `delete`
+    xóa cả storage.
+  - Config (`Settings`): `s3_bucket`, `s3_endpoint`, `s3_region`,
+    `s3_access_key`, `s3_secret_key`, `s3_prefix`. Đặt `s3_bucket` (+ cài
+    `boto3`) là lên cloud; để trống là local.
+  - Test: `tests/test_cloud.py` (7 test) — CRUD local/memory, `path_for` fetch-back,
+    chọn backend, và S3 delegation với boto3 giả lập.
+- **Kiểm chứng:** upload → storage, `path_for` fetch-back, delete-from-storage
+  đều hoạt động với in-memory backend; đường S3 delegate đúng (mock). Smoke 64/64,
+  `ruff`/`mypy` sạch.
+- **Việc tiếp theo:** khi có creds thật, thêm test tích hợp với MinIO/S3; cân nhắc
+  chuyển index JSON sang DB cloud (Postgres/SQLite-on-object) khi cần scale.
+
+### 2026-09-18 — Phiên Media Database: cơ sở dữ liệu cho toàn bộ audio/ảnh/video
+
+- **Mục tiêu phiên:** biến media library thành một **cơ sở dữ liệu truy vấn được**
+  cho toàn bộ âm thanh, ảnh, video, tài liệu — không chỉ là danh sách phẳng.
+- **Đã làm:**
+  - `MediaItem.tags` — item có thể mang tag (chuẩn hóa: bỏ khoảng trắng, lowercase,
+    de-dupe).
+  - `MediaLibrary.query(...)` — lọc theo `kind`, `tag`, text tự do `q` (trên
+    filename + transcription + text_content + source + tags), `source`,
+    `min/max_duration`, `date_from/to`, và `sort` (newest|oldest|name|size|duration).
+  - Quản lý tag: `set_tags`/`add_tag`/`remove_tag`/`all_tags`.
+  - `stats()` — số lượng theo kind, tổng dung lượng, danh sách tag.
+  - Endpoint: `GET /media` (thêm filter params), `GET /media/stats`,
+    `GET /media/tags`, `POST /media/{id}/tags`, `POST /media/{id}/tags/{tag}`,
+    `DELETE /media/{id}/tags/{tag}`.
+  - UI (Media Studio): filter bar (kind/tag/sort + nút Lọc), dòng thống kê live
+    (số mục, MB, đếm theo kind), và nút **🏷 Tag** trên mỗi media card.
+- **Kiểm chứng:** query theo tag/kind/text, tag CRUD, stats, all-tags đều hoạt
+  động qua HTTP. Smoke 64/64, `node --check` sạch, `ruff`/`mypy` sạch.
+- **Việc tiếp theo:** nếu cần scale lớn, cân nhắc chuyển index JSON sang SQLite
+  (giữ interface `MediaLibrary` để không phá callers); thêm dedup tự động theo
+  perceptual hash khi upload.
+
+### 2026-09-18 — Phiên Tải audio bất kỳ: tải đoạn âm thanh từ URL
+
+- **Mục tiêu phiên:** cho người vận hành tải **bất kỳ đoạn âm thanh nào** từ URL
+  (YouTube, podcast, file MP3 trực tiếp, SoundCloud…) và có thể cắt một đoạn
+  (clip) theo khoảng thời gian.
+- **Đã làm:**
+  - `POST /media/audio-clip` — `{url, start_seconds, end_seconds, language}`:
+    tải audio từ URL bất kỳ (`extract_audio=True`), nếu có khoảng
+    `end_seconds > start_seconds` thì cắt đúng đoạn đó và đăng ký thành media
+    item riêng. Dựa trên `MediaMixin.download_audio_clip` (tái dùng
+    `media_from_url` + `media_tools.trim_audio`).
+  - Agent tool + MCP: `download_audio_clip` (registry giờ 79 tool).
+  - UI: ô "⬇ Tải bất kỳ đoạn âm thanh từ URL" ở đầu Audio Editor — dán URL, tùy
+    chọn khoảng thời gian, bấm **⬇ Tải audio** (đầy đủ) hoặc **✂ Tải đoạn (clip)**.
+- **Kiểm chứng (live HTTP):** `POST /media/audio-clip` với URL YouTube thật và
+  `start=30, end=40` trả media item 10 giây `clip_Rick_Astley_...webm`. Smoke
+  64/64, `node --check` sạch, `ruff`/`mypy` sạch.
+- **Việc tiếp theo:** thêm waveform hiển thị để chọn điểm cắt trực quan, và nút
+  "Tải audio từ URL" trong luồng re-cook.
+
+### 2026-09-18 — Phiên Audio Editor: edit âm thanh + beat nhạc trong UI
+
+- **Mục tiêu phiên:** cho người vận hành chỉnh sửa âm thanh toàn diện ngay trong
+  UI — cắt, fade, normalize, retime, giảm ồn, dò beat/BPM, mix nhạc nền, tách
+  audio. Tận dụng các audio tool backend đã có, gọi qua `/tools/call`.
+- **Đã làm — panel "🎚 Audio Editor" trong Media Studio** (`frontend/index.html`
+  + `frontend/app.js`):
+  - Chọn asset audio/video → hiện metadata.
+  - **✂ Trim** (`audio_trim`), **🌊 Fade** (`audio_fade`),
+    **🔊 Normalize** (`audio_normalize`), **⏩ Retime** (`audio_retime`),
+    **🎛 Giảm ồn** với slider cường độ (`audio_denoise`),
+    **🥁 Dò BPM & Beat** (`music_beat_grid`), **🎵 Mix với nhạc nền**
+    (`audio_mix` — chọn music bed + gain + duck), **🎞 Tách audio từ video**
+    (`extract_audio_track`).
+  - Mỗi thao tác hiện asset_id, thời lượng, link tải; lưu vào Edited Assets.
+  - JS: `loadAudioEditor`, `aeCall`, `setupAudioEditorListeners`; gọi khi vào
+    workspace Media Studio.
+- **Kiểm chứng (live HTTP):** cả 8 audio tool trả 200 và tạo asset — trim, fade,
+  normalize, retime, denoise, extract, beat grid (BPM 163, 4 beats trên tone tổng
+  hợp), mix. Smoke 64/64, `node --check` sạch, `ruff`/`mypy` sạch.
+- **Việc tiếp theo:** thêm waveform hiển thị + scrub để chọn điểm cắt trực quan,
+  và nút "Giảm ồn"/"Lấy transcript" trong luồng re-cook.
+
+### 2026-09-18 — Phiên Nối vào sản phẩm: YouTube + transcript + giảm ồn
+
+- **Mục tiêu phiên:** đưa các tính năng YouTube (tìm/tải/transcript) và giảm ồn
+  vào cả backend chain lẫn UI studio, để người vận hành dùng được trực tiếp.
+- **Backend — chain:**
+  - **Auto-denoise trong re-cook:** `ReCookRequest` thêm `denoise` + `denoise_strength`.
+    `RecookPipeline.prepare_source` khi `denoise=True` sẽ giảm ồn audio *trước*
+    khi phiên âm (qua `voice_engine.denoise_audio` + `MediaLibrary.transcribe_file`
+    — chạy faster-whisper trên file audio bất kỳ). Bản ghi ồn → transcript sạch hơn.
+  - **Auto-transcribe sau YouTube download:** `YouTubeDownloadRequest` thêm
+    `auto_transcribe`; `youtube_download` phiên âm ngay sau khi tải (phụ đề trước,
+    rồi faster-whisper).
+  - Refactor: `MediaLibrary.list` → `list_items` (tránh shadow builtin `list`),
+    tách `_run_whisper` khỏi `transcribe`.
+- **Frontend (vanilla studio, `frontend/`):**
+  - **Panel YouTube** trong Media Studio: tìm theo từ khóa → danh sách kết quả →
+    nút **⬇ Tải** (kèm checkbox "tự phiên âm") và **📜 Transcript**.
+  - **Hiển thị transcript:** nút "📜 Transcript" trên card media nguồn YouTube gọi
+    `/youtube/transcript` và hiện text (kèm nguồn + số từ).
+  - **🎛 Giảm ồn** trên mỗi card video/audio: mở modal với **slider cường độ** +
+    **dropdown noise profile** (chọn asset khác làm mẫu ồn thuần); gọi tool
+    `audio_denoise` qua `/tools/call`, lưu vào Edited Assets.
+- **Kiểm chứng (live HTTP):** `/youtube/search` (2 kết quả), `/youtube/transcript`
+  (source=subtitles, 2089 ký tự), upload + `audio_denoise` qua `/tools/call`
+  (method=spectral_gating, asset tạo thành công). Smoke 64/64, `node --check` sạch.
+- **Việc tiếp theo:** thêm nút "Giảm ồn" vào luồng re-cook trong UI (checkbox
+  denoise khi re-cook), và tự động lấy transcript khi tải video YouTube làm nguồn
+  re-cook/blueprint.
+
+### 2026-09-18 — Phiên Giảm ồn: bỏ tiếng ồn bằng spectral gating
+
+- **Mục tiêu phiên:** thêm tính năng giảm ồn / bỏ tiếng ồn thật sự cho giọng
+  nói và audio. Noise gate cũ chỉ xóa khoảng lặng; tính năng mới **spectral
+  gating** nén tiếng ồn nền (hiss, hum, room tone) nằm *dưới* giọng nói — giống
+  DeNoise của Audacity/Audition.
+- **Đã làm (thuần numpy, không cần dependency nặng):**
+  - `_stft`/`_istft` — STFT cửa sổ Hann với **overlap 50%** để tái tạo sạch
+    (hop không COLA gây transient rìa; đồng thời zero hóa vùng winsum quá nhỏ).
+  - `_spectral_gate(samples, sr, strength, noise_profile)` — học phổ tiếng ồn từ
+    mẫu ồn thuần hoặc tự ước lượng từ 10% frame nhỏ nhất, rồi áp gain Wiener
+    từng bin: bin giọng nói (mag ≫ noise) giữ ~1, bin ồn bị nén. Output được
+    chuẩn hóa peak để không clip.
+  - `denoise_audio(data, strength, noise_profile, export_format)` — decode →
+    gate → encode, trả `(bytes, report)`.
+  - `process_voice` thêm `denoise_strength` (+ param `noise_profile`), nên chain
+    enhance có thể giảm ồn; thêm preset `"denoise"`.
+- **Bề mặt mới:**
+  - Service `audio_denoise(ref, strength, noise_profile_ref, format)` trong
+    `MediaToolsMixin` — resolve asset, tùy chọn asset thứ hai làm noise profile,
+    lưu kết quả vào `library/edited/`.
+  - Agent tool + MCP: `audio_denoise` (registry giờ 78 tool), nằm ở module mới
+    `agent_audio.py` để `agent_tools.py` không vượt ngân sách dòng.
+  - Test: `tests/test_denoise.py` (7 test) — giữ tone/nén ồn trên tín hiệu tổng
+    hợp 220 Hz + noise, report shape, auto-estimation, `process_voice` với
+    `denoise_strength`, preset, agent dispatch.
+- **Kiểm chứng (tín hiệu tổng hợp):** tone 220 Hz giữ ~93% năng lượng, ồn băng
+  rộng bị nén, sai số so với tone sạch giảm ~34%, không clip. Full pytest
+  **956 passed**, `ruff`+`format`+`mypy` sạch, smoke 64/64, MCP live OK.
+- **Quyết định:** dùng spectral gating thuần numpy (không cần model nặng) làm
+  tầng "bỏ tiếng ồn", kết hợp noise gate + highpass có sẵn. Cho phép cung cấp
+  noise profile để học phổ ồn chính xác hơn; nếu không có thì tự ước lượng.
+- **Việc tiếp theo:** nối vào UI (nút "Giảm ồn" trong studio voice, kèm slider
+  strength + chọn noise profile), và thêm vào chuỗi re-cook trước khi phiên âm.
+
+### 2026-09-18 — Phiên Transcript: lấy transcript video "bằng mọi giá"
+
+- **Mục tiêu phiên:** lấy transcript từ video (đặc biệt video YouTube tải về)
+  bằng mọi cách, không bao giờ bị chặn vì thiếu model.
+- **Đã làm — cascade 2 chiến lược:**
+  1. **Phụ đề có sẵn (tức thì, miễn phí):** `MediaLibrary.fetch_subtitles` tái
+     dùng caption thủ công/tự động của video qua yt-dlp — không cần model, không
+     tải video, mili-giây. `POST /media/{id}/transcribe` giờ thử nhánh này trước
+     cho item có nguồn YouTube (trước cả bước kiểm tra file, vì phụ đề chỉ cần
+     URL nguồn).
+  2. **faster-whisper (local):** nếu không có phụ đề, tải audio rồi phiên âm
+     local bằng faster-whisper (đã cài, chạy CPU được).
+- **Bề mặt mới:**
+  - `POST /youtube/transcript` — `{url, language}` → `YouTubeTranscriptResult`
+    với `source` (`subtitles`|`whisper`), `text`, `segments`, `media_id`.
+  - `MediaLibrary.transcribe_youtube(url, language)` — cascade, cùng shape.
+  - Agent tool + MCP: `youtube_transcript` (registry giờ 77 tool), gọi qua
+    `POST /tools/call` và MCP `factory_call_tool`.
+  - Models mới: `YouTubeTranscriptRequest`, `YouTubeTranscriptResult`.
+  - Test: `tests/test_youtube.py` lên 16 test (VTT parsing, tái dùng phụ đề,
+    fallback whisper, API, agent tool).
+- **Kiểm chứng (mạng thật):** `transcribe_youtube(".../watch?v=dQw4w9WgXcQ","en")`
+  trả `source=subtitles` với toàn bộ lời bài hát (auto-caption) tức thì, không
+  chạy model. Full pytest **949 passed**, `ruff`+`format`+`mypy` sạch, MCP live OK.
+- **Quyết định:** ưu tiên phụ đề có sẵn (nhanh + chính xác + không tốn tài nguyên),
+  chỉ chạy faster-whisper khi không có phụ đề.
+- **Việc tiếp theo:** nối transcript vào UI (hiển thị transcript + nút "lấy
+  transcript" cho video tải về), và dùng transcript làm nguồn re-cook/blueprint.
+
+### 2026-09-18 — Phiên YouTube: tìm kiếm + tải video YouTube
+
+- **Mục tiêu phiên:** bổ sung chức năng tìm kiếm video trên YouTube và tải về
+  vào media library (cho cả người dùng lẫn AI agent).
+- **Đã làm:**
+  - `GET /youtube/search?q=...&limit=N` — tìm video YouTube theo truy vấn (chỉ
+    metadata, không tải). Dùng extractor `ytsearch` của yt-dlp nên tìm và tải
+    khớp nhau. Trả `YouTubeSearchResult` (id, title, url, duration, uploader,
+    thumbnail, description, view_count). Query rỗng → 422.
+  - `POST /youtube/download` — tải video YouTube (URL hoặc id) vào media library,
+    tái dùng `download_from_url` (yt-dlp + fallback ffmpeg/urllib). Hỗ trợ
+    `extract_audio` để chỉ lấy audio.
+  - Đăng ký agent tool `youtube_search` + `youtube_download` (registry giờ 76
+    tool), gọi qua `POST /tools/call` và MCP `factory_call_tool`. Handler nằm ở
+    module mới `agent_youtube.py` để `agent_tools.py` không vượt ngân sách dòng.
+  - Models mới: `YouTubeSearchResult`, `YouTubeSearchRequest`,
+    `YouTubeSearchResponse`, `YouTubeDownloadRequest`.
+  - Test mới: `tests/test_youtube.py` (9 test).
+- **Kiểm chứng (mạng thật):**
+  - `GET /youtube/search?q=morning+light+city` → 3 video thật (title, uploader, url).
+  - `POST /youtube/download` (audio-only) tải "Rick Astley - Never Gonna Give
+    You Up" → 3.4 MB webm, 213s, `kind=video`.
+  - Full pytest **943 passed**, `ruff` + `format` + `mypy` sạch, smoke 64/64,
+    MCP live connectivity OK.
+- **Quyết định:** tận dụng yt-dlp (đã cài sẵn) cho cả tìm và tải; giữ tìm kiếm
+  chỉ metadata để nhanh và nhẹ, tải khi người dùng/agent chọn video.
+- **Việc tiếp theo:** có thể nối vào UI (workspace tìm kiếm video mẫu → tải →
+  dùng làm nguồn re-cook / blueprint), và thêm transcribe tự động sau khi tải.
+
+### 2026-09-18 — Phiên NotebookLM: Knowledge Q&A có trích dẫn + test MCP
+
+- **Mục tiêu phiên:** bổ sung khả năng tìm kiếm kiểu Google NotebookLM cho
+  backend (hỏi → trả lời có trích dẫn nguồn `[n]`), và kiểm chứng kết nối MCP.
+- **Đã làm:**
+  - `POST /kb/{id}/ask` — Q&A grounded: retrieve top chunks → đưa context có
+    trích dẫn vào provider chain → trả câu trả lời tổng hợp kèm `[n]` citations.
+    Hỗ trợ `history` (các lượt trước) cho câu hỏi tiếp nối. Khi không có provider
+    (offline) tự fallback sang **câu trả lời trích xuất** từ top hits — không bao
+    giờ lỗi vì thiếu API key; flag `grounded` phân biệt hai nhánh.
+  - `POST /kb/{id}/ingest-url` — thêm nguồn web (giống "add a web source" của
+    NotebookLM): fetch URL, bỏ markup, chunk theo template KB. URL lỗi được ghi
+    là document `FAILED` thay vì làm hỏng request.
+  - Đăng ký agent tool `kb_ask` + `kb_ingest_url` (registry giờ 74 tool), gọi được
+    qua `POST /tools/call` và qua MCP `factory_call_tool`. Handler nằm ở module
+    mới `agent_knowledge.py` để `agent_tools.py` không vượt ngân sách dòng.
+  - Models mới: `KBAskRequest`, `KBAskResponse`, `KBTurn`, `KBIngestUrl`.
+  - Test mới: `tests/test_knowledge_qa.py` (10 test), `tests/test_mcp_connectivity.py`
+    (4 test). Script live `scripts/test_mcp_live.py` spawn server MCP thật qua
+    stdio, kết nối bằng MCP client thật, round-trip tool call.
+- **Kiểm chứng:**
+  - Full pytest xanh (919 + 14 test mới), `ruff` + `format` + `mypy` sạch.
+  - **MCP LIVE CONNECTIVITY OK** — 23 MCP tools, `kb_ask`/`kb_ingest_url` có trong
+    manifest, `factory_call_tool(list_kbs)` round-trip thành công.
+- **Quyết định:** giữ nền tảng RAG hiện có (chunking 8 template + hybrid retrieval
+  + grounding), chỉ thêm tầng Q&A tổng hợp câu trả lời; offline luôn có đường lui
+  trích xuất để không phụ thuộc API key.
+- **Việc tiếp theo:** có thể nối Q&A này vào UI (workspace "Notebook" để hỏi đáp
+  trên nguồn của project), và thêm ingest từ PDF/URL vào project trực tiếp.
 
 ### 2026-09-16 — Phiên 1: kịch bản, đa AI, cầu nối agent
 - Ghi lại toàn bộ yêu cầu gốc vào file này (mục 1).
@@ -1048,8 +1364,8 @@ có thể nối LLM sau. Phụ đề rút gọn dùng synonym map + cắt câu, 
 6. **Sửa 2 lỗi tìm được khi tự test:** (a) concat demuxer của ffmpeg hiểu nhầm `C:` trên Windows thành protocol → thêm tiền tố `file:`; (b) route `/edited/{name}` hardcode `audio/mpeg` nên video tải về sai content-type → thay bằng bảng MIME.
 
 **Kiểm chứng:**
-- Engine: `python scratch/verify_media_tools.py` → **24/24** trên media thật do ffmpeg sinh ra.
-- HTTP thật: `python scratch/live_media_tools.py` → **20/20** (upload → describe → beat grid → cut → chain theo asset_id → split → join → audio_mix → fade → frame → contact sheet → compose → collage → 404/422 → tải asset).
+- Engine: `python scripts/qa_media_tools_engine.py` → **24/24** trên media thật do ffmpeg sinh ra.
+- HTTP thật: `python scripts/qa_media_tools_http.py` → **20/20** (upload → describe → beat grid → cut → chain theo asset_id → split → join → audio_mix → fade → frame → contact sheet → compose → collage → 404/422 → tải asset).
 - `pytest` → **520 passed** (thêm `tests/test_media_tools.py`); `ruff` + `mypy` sạch; `scripts/smoke.py` → **64 checks PASS**.
 
 **Quyết định:** Tool là hợp đồng tự mô tả — model nào cũng đọc được schema mà không cần đọc source. Chưa làm: parity đầy đủ cho `mcp_server.py` (hiện vẫn giữ bản cut/concat riêng) — nên chuyển sang dùng `media_tools` ở vòng sau.
@@ -1291,9 +1607,9 @@ mọi agent dùng được.
   treo ở `test_media_tools.py` vì easyocr/torch nạp model lần đầu — sau khi
   model đã cache thì qua bình thường.
 - `scripts/smoke.py --port 8160`: **64/64 checks PASS** trên server mới.
-- `scratch/live_seo_tools.py` (HTTP thật, đúng đường agent đi): **22/22 PASS**,
+- `scripts/qa_seo_tools_http.py` (HTTP thật, đúng đường agent đi): **22/22 PASS**,
   gồm cả kiểm tra "gói optimizer trả về chấm lại đúng bằng điểm đã hứa".
-- `scratch/seo_sanity.py`: gói yếu 68 → 83 sau tối ưu (gain 15, đo được).
+- `scripts/qa_seo_sanity.py`: gói yếu 68 → 83 sau tối ưu (gain 15, đo được).
 
 **Quyết định:**
 
@@ -1427,7 +1743,7 @@ build thứ hai. Nếu chỉ liệt kê tên encoder như trước, máy này s�
 
 **Kiểm chứng:**
 
-- `scratch/verify_nvenc_path.py`: **17/17 PASS** trên máy thật — encode 8s 1080x1920
+- `scripts/qa_nvenc_path.py`: **17/17 PASS** trên máy thật — encode 8s 1080x1920
   bằng NVENC qua build 7.1 trong **3.01s**, fallback phần mềm ghi nhận đúng
   `libx264`, watchdog ngắt process thật sau **0.26s** và nêu đúng lý do.
 - Số đo encode (600 frame 1080x1920, `render_threads=1` như pipeline thật):
@@ -1574,3 +1890,41 @@ Người vận hành yêu cầu thiết kế lại Bước 1 trong phần fronte
 - `tests/test_frontend_contract.py` (mới): chạy pipeline thật qua HTTP bằng đúng payload của hai client và khẳng định đúng các field chúng đọc — 11 test, chốt lại toàn bộ hợp đồng trên.
 - `tests/test_resources.py`: test watchdog timeout trước đây phụ thuộc RAM thật (chạy full suite là tụt dưới ngưỡng 350MB nên báo sai nguyên nhân). Nay cô lập bằng governor có áp lực tiêm vào.
 - `ruff check` / `ruff format --check` / `mypy src`: sạch. `pytest` toàn bộ: **1049 test, 0 fail**. `scripts/smoke.py`: **64/64 PASSED**.
+
+## 2026-09-18 — Tối ưu hóa toàn diện Bước 1 (Script Studio & Storyboard): Chuẩn 1 cột & AI Copilot bên trái
+
+**1. Gỡ bỏ thanh banner `AIAgentBar` phía trên:**
+- Loại bỏ thanh banner `AIAgentBar` ở đầu trang (Chief Storyteller & Viral Script Director) cùng các phím lệnh và ô prompt trùng lặp, giải phóng >140px chiều dọc giúp giao diện thông thoáng.
+
+**2. Quy chuẩn 1 cột duy nhất & Đơn giản hóa còn đúng 2 Tab:**
+- Đề bài 10 tiêu chí (`ScriptBriefSettingsPanel.tsx`) được căn chỉnh theo 1 cột duy nhất (`max-w-4xl mx-auto w-full space-y-4`).
+- Chế độ Storyboard (`ScriptEditorView.tsx`) chuyển từ bảng lưới 12 cột chật hẹp thành thẻ phân cảnh dọc (Vertical Card Feed) 1 cột chuyên nghiệp, hiển thị từng cảnh quay riêng biệt gồm Cảnh #, Section, Time range, Voiceover và Visual Cue.
+- Rút gọn tối đa thành **đúng 2 Tab** theo đúng chỉ đạo:
+  1. `1. 10 Tiêu Chí`: Mẫu nhập liệu đề bài 10 chiều kích.
+  2. `2. Kịch Bản`: Trình soạn thảo đánh số dòng, Storyboard Feed 1 cột, xem lịch sử các phiên bản, phân tích điểm số Virality Score trực tiếp trên đầu kịch bản, và cụm kiểm duyệt Gate 1 ở chân trang.
+
+**3. Bố trí AI Copilot Chatbot ở bên trái (`ScriptChatbot.tsx`):**
+- Đưa Chatbot sang cột bên trái (Persistent Left Panel) theo đúng thói quen thị giác tự nhiên: ra lệnh ở bên trái -> kịch bản xuất hiện và cập nhật tại cột soạn thảo bên phải.
+- Tích hợp tính năng **Tự sinh kịch bản** trực tiếp từ ô chat (nút *"✨ Tự sinh kịch bản"* hoặc lệnh chat bất kỳ) tổng hợp đầy đủ 10 tiêu chí thành kịch bản 4 phần chuẩn.
+- Tích hợp kiểm tra bản quyền *"🛡️ Quét bản quyền (100% Unique)"*.
+- Giữ nguyên bộ chọn dòng theo phạm vi đánh dấu, thẻ so sánh diff (Before/After) và nút **Hoàn tác (Undo)**.
+- Thêm nút `[Ẩn Chatbot]` / `[Mở Chatbot]` linh hoạt để mở rộng trình soạn thảo toàn chiều rộng khi cần.
+
+**4. Mở rộng đính kèm nhiều file, nhiều URL và lưu lịch sử phiên bản từng phần:**
+- Mục 08 đính kèm không giới hạn: hỗ trợ file PDF, DOCX, XLSX, TXT, MD với chip thông tin, dung lượng và nút xóa.
+- Nạp nhiều URL trang web / bài báo kèm ghi chú tóm tắt và link ngoài.
+- Tích hợp `ScriptSectionHistoryModal.tsx`: tự động ghi nhớ snapshot khi sinh / sửa kịch bản, lưu snapshot thủ công cho từng phân đoạn (`[Hook]`, `[Turn]`, `[CTA]` hoặc toàn văn) và khôi phục (Restore) với 1 click.
+
+**5. Thanh Pacing Bar điều chỉnh tốc độ đọc linh hoạt (Adjustable WPM Slider & Stepper):**
+- Giữ nguyên 4 nút bấm nhanh: `Chậm (130)`, `Chuẩn (160)`, `Nhanh (195)`, `Cực (230)`.
+- Bổ sung thanh trượt **Slider (80 - 300 WPM)** kéo thả điều chỉnh nhịp đọc mượt mà.
+- Bổ sung bộ nút tăng/giảm **Stepper (`[-] [WPM] [+]`)** kèm ô nhập số trực tiếp, hỗ trợ tinh chỉnh chính xác từng 5 từ/phút hoặc gõ thẳng số mong muốn.
+- Tự động hiển thị nhãn `Tùy biến ({wpm})`, hệ số tốc độ tương đối (ví dụ `1.06x`) và tức thì cập nhật dự đoán thời lượng của kịch bản (`56s / Mục tiêu 60s`).
+
+**6. Kiểm chứng:**
+- `npm run type-check`: **0 errors (100% pass)**.
+- `python scripts/frontend_imports.py`: **clean (98 files)**.
+- Visual Inspection Playwright & Multimodal Vision: Kiểm tra thành công luồng tự sinh kịch bản từ ô chat bên trái sang trình soạn thảo bên phải, Pacing Bar cập nhật trực tiếp `1m 0s`, thanh Virality Score `55/100 Điểm Virality`, tính năng ẩn/hiện chatbot, thanh chỉnh tốc độ Slider/Stepper và chuyển đổi sang Thẻ phân cảnh dọc 1 cột.
+- Cả hai server `http://localhost:3000` (Next.js) và `http://127.0.0.1:8080` (FastAPI) đang chạy liên tục cho Operator kiểm thử.
+
+

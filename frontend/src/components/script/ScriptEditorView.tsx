@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { SpeechPacingConfig, TargetScope } from "@/types/studio";
+import { ViralityResult } from "@/types/qa";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,8 @@ interface ScriptEditorViewProps {
   onApproveGate1: () => void;
   isApproving?: boolean;
   onScoreVirality?: () => void;
+  viralityResult?: ViralityResult | null;
+  isScoringVirality?: boolean;
   onOpenHistory?: () => void;
   historyCount?: number;
   topic: string;
@@ -65,6 +68,8 @@ export function ScriptEditorView({
   onApproveGate1,
   isApproving = false,
   onScoreVirality,
+  viralityResult,
+  isScoringVirality = false,
   onOpenHistory,
   historyCount,
   topic,
@@ -197,7 +202,7 @@ export function ScriptEditorView({
   return (
     <Card className="flex-1 flex flex-col min-h-0 border-nle-border bg-nle-panel overflow-hidden shadow-xl">
       {/* Top Header */}
-      <CardHeader className="py-2.5 px-3.5 border-b border-nle-border flex flex-row items-center justify-between shrink-0">
+      <CardHeader className="py-2 px-3 border-b border-nle-border flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="min-w-0">
           <CardTitle className="text-xs font-bold text-white flex items-center space-x-1.5 truncate">
             <BookOpen className="w-4 h-4 text-nle-cyan shrink-0" />
@@ -214,7 +219,7 @@ export function ScriptEditorView({
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
           {/* View Mode Toggle */}
           <div className="flex items-center space-x-1 bg-nle-surface p-0.5 rounded-lg border border-nle-border text-xs">
             <button
@@ -223,7 +228,7 @@ export function ScriptEditorView({
                 viewMode === "raw" ? "bg-nle-panel text-white font-bold shadow-sm" : "text-gray-400 hover:text-white"
               }`}
             >
-              Văn bản (Đánh số dòng)
+              Văn bản (Số dòng)
             </button>
             <button
               onClick={() => setViewMode("storyboard")}
@@ -231,7 +236,7 @@ export function ScriptEditorView({
                 viewMode === "storyboard" ? "bg-nle-panel text-nle-cyan font-bold shadow-sm" : "text-gray-400 hover:text-white"
               }`}
             >
-              Thẻ phân cảnh (Storyboard Feed)
+              Storyboard Feed
             </button>
           </div>
 
@@ -263,10 +268,15 @@ export function ScriptEditorView({
               variant="neon"
               size="sm"
               onClick={onScoreVirality}
+              disabled={isScoringVirality}
               className="text-[11px] h-7 px-2.5 font-semibold"
             >
-              <Flame className="w-3.5 h-3.5 mr-1 fill-current" />
-              Chấm Điểm Virality
+              {isScoringVirality ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+              ) : (
+                <Flame className="w-3.5 h-3.5 mr-1 fill-current" />
+              )}
+              {isScoringVirality ? "Đang quét..." : "Chấm Virality"}
             </Button>
           )}
         </div>
@@ -274,6 +284,32 @@ export function ScriptEditorView({
 
       {/* Editor Main Content Area */}
       <CardContent className="flex-1 p-3 flex flex-col justify-between min-h-0 overflow-hidden">
+        {/* Compact Virality Score Banner (if scored) */}
+        {viralityResult && (
+          <div className="mb-2.5 p-2 rounded-lg bg-gradient-to-r from-amber-500/15 via-nle-surface to-nle-panel border border-amber-500/30 flex flex-wrap items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center space-x-2.5">
+              <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 font-bold text-xs">
+                <Flame className="w-3.5 h-3.5 fill-current text-amber-400" />
+                <span>{viralityResult.score}/100 Điểm Virality</span>
+              </div>
+              <div className="flex items-center space-x-2 text-[10px] font-mono text-gray-300">
+                <span>Hook: <b className="text-nle-cyan">{viralityResult.hook_score}%</b></span>
+                <span>•</span>
+                <span>Pacing: <b className="text-nle-violet">{viralityResult.pacing_score}%</b></span>
+                <span>•</span>
+                <span>Thời lượng: <b className="text-emerald-400">{viralityResult.duration_score}%</b></span>
+                <span>•</span>
+                <span>CTA: <b className="text-amber-400">{viralityResult.cta_score}%</b></span>
+              </div>
+            </div>
+            {viralityResult.advice && viralityResult.advice.length > 0 && (
+              <span className="text-[11px] text-gray-300 truncate max-w-sm hidden xl:inline">
+                💡 <span className="text-gray-400">{viralityResult.advice[0]}</span>
+              </span>
+            )}
+          </div>
+        )}
+
         {viewMode === "raw" ? (
           <div className="flex-1 flex overflow-hidden border border-nle-border rounded-lg bg-nle-surface/50 relative">
             {/* Line Number Gutter */}

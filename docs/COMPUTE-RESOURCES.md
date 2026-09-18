@@ -151,7 +151,7 @@ the machine being watched.
 
 Both are covered by tests that abort a real process
 (`tests/test_resources.py::test_the_watchdog_kills_a_long_render_under_pressure`)
-and by `scratch/verify_nvenc_path.py`.
+and by `scripts/qa_nvenc_path.py`.
 
 ---
 

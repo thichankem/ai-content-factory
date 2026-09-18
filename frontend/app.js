@@ -1030,6 +1030,7 @@ function switchWorkspace(wsName) {
     loadEmpireCampaign();
   } else if (wsName === "mediastudio") {
     loadMediaStudio();
+    loadAudioEditor();
   }
 }
 
@@ -3204,8 +3205,48 @@ async function loadMediaStudio() {
   try {
     const items = await api("/media");
     renderMediaGrid(items);
+    loadMediaDbFilters();
   } catch (err) {
     showError("Media Studio: " + err.message);
+  }
+}
+
+// ---- Media database filters & stats -----------------------------------------
+
+async function loadMediaDbFilters() {
+  const tagSel = $("ms-filter-tag");
+  const statsEl = $("ms-db-stats");
+  try {
+    const tags = await api("/media/tags");
+    if (tagSel) {
+      const current = tagSel.value;
+      tagSel.innerHTML = '<option value="">Tag: tất cả</option>' +
+        tags.map((t) => `<option value="${esc(t)}">#${esc(t)}</option>`).join("");
+      if (current) tagSel.value = current;
+    }
+    if (statsEl) {
+      const s = await api("/media/stats");
+      const kinds = Object.entries(s.by_kind || {})
+        .map(([k, n]) => `${k}: ${n}`).join(" · ");
+      statsEl.textContent = `${s.total_items} mục · ${(s.total_bytes / 1048576).toFixed(1)} MB · ${kinds}`;
+    }
+  } catch (_) { /* non-fatal */ }
+}
+
+async function applyMediaFilter() {
+  const params = new URLSearchParams();
+  const kind = ($("ms-filter-kind") || {}).value;
+  const tag = ($("ms-filter-tag") || {}).value;
+  const sort = ($("ms-filter-sort") || {}).value;
+  if (kind) params.set("kind", kind);
+  if (tag) params.set("tag", tag);
+  if (sort) params.set("sort", sort);
+  try {
+    const items = await api(`/media?${params.toString()}`);
+    renderMediaGrid(items);
+    loadMediaDbFilters();
+  } catch (err) {
+    showError("Lọc media: " + err.message);
   }
 }
 
@@ -3216,7 +3257,10 @@ function renderMediaGrid(items) {
     grid.innerHTML = '<div class="media-empty">No media yet — upload something to begin.</div>';
     return;
   }
-  grid.innerHTML = items.map((m) => `
+  grid.innerHTML = items.map((m) => {
+    const isAv = m.kind === "video" || m.kind === "audio";
+    const isYt = (m.source || "").indexOf("youtube.com") !== -1 || (m.source || "").indexOf("youtu.be") !== -1;
+    return `
     <div class="media-card" data-id="${esc(m.id)}">
       <div class="media-card-kind">${esc(m.kind)}</div>
       <div class="media-card-name" title="${esc(m.filename)}">${esc(m.filename)}</div>
@@ -3225,6 +3269,9 @@ function renderMediaGrid(items) {
         <button class="media-btn" onclick="msTranscribe('${esc(m.id)}')">🧠 Transcribe</button>
         <button class="media-btn" onclick="msRecook('${esc(m.id)}')">♻ Re-cook</button>
         <button class="media-btn" onclick="msDetail('${esc(m.id)}')">👁 View</button>
+        <button class="media-btn" onclick="msTag('${esc(m.id)}')">🏷 Tag</button>
+        ${isAv ? `<button class="media-btn" onclick="msDenoise('${esc(m.id)}')">🎛 Giảm ồn</button>` : ""}
+        ${isYt ? `<button class="media-btn" onclick="msYtTranscriptById('${esc(m.id)}')">📜 Transcript</button>` : ""}
       </div>
       <div class="media-card-convert">
         <select class="media-fmt" data-id="${esc(m.id)}">
@@ -3237,7 +3284,25 @@ function renderMediaGrid(items) {
         </select>
         <button class="media-btn" onclick="msConvert(this)">🔁 Convert</button>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
+}
+
+async function msTag(id) {
+  const tags = prompt("Nhập tags, phân cách bằng dấu phẩy (ví dụ: voice, demo, viral):", "");
+  if (tags === null) return;
+  try {
+    const list = tags.split(",").map((t) => t.trim()).filter(Boolean);
+    const m = await api(`/media/${id}/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(list),
+    });
+    showToast(`Tags: ${m.tags.join(", ") || "(trống)"}`, "success");
+    loadMediaStudio();
+  } catch (err) {
+    showError("Tag: " + err.message);
+  }
 }
 
 async function msTranscribe(id) {
@@ -3328,6 +3393,354 @@ function setupMediaStudioListeners() {
       if (status) status.textContent = "";
       showError("Upload: " + err.message);
     }
+  });
+
+  // YouTube search
+  const ytSearchBtn = $("btn-yt-search");
+  const ytQ = $("yt-q");
+  if (ytSearchBtn && ytQ) {
+    const run = () => ytSearch();
+    ytSearchBtn.addEventListener("click", run);
+    ytQ.addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
+  }
+  // Media database filters
+  const filterBtn = $("btn-ms-filter");
+  const filterClear = $("btn-ms-filter-clear");
+  if (filterBtn) filterBtn.addEventListener("click", () => applyMediaFilter());
+  if (filterClear) filterClear.addEventListener("click", () => {
+    const kind = $("ms-filter-kind"); if (kind) kind.value = "";
+    const tag = $("ms-filter-tag"); if (tag) tag.value = "";
+    const sort = $("ms-filter-sort"); if (sort) sort.value = "newest";
+    loadMediaStudio();
+  });
+  // Denoise modal
+  const denoiseCancel = $("btn-denoise-cancel");
+  const denoiseApply = $("btn-denoise-apply");
+  const denoiseStrength = $("denoise-strength");
+  if (denoiseStrength) {
+    denoiseStrength.addEventListener("input", () => {
+      const val = $("denoise-strength-val");
+      if (val) val.textContent = denoiseStrength.value;
+    });
+  }
+  if (denoiseCancel) denoiseCancel.addEventListener("click", () => closeDenoise());
+  if (denoiseApply) denoiseApply.addEventListener("click", () => applyDenoise());
+}
+
+// ---- YouTube panel -----------------------------------------------------------
+
+async function ytSearch() {
+  const q = ($("yt-q") || {}).value || "";
+  if (!q.trim()) { showToast("Nhập từ khóa tìm video.", "info"); return; }
+  const limit = parseInt(($("yt-limit") || {}).value || "8", 10) || 8;
+  const box = $("yt-results");
+  if (box) box.innerHTML = '<div class="muted small">Đang tìm trên YouTube…</div>';
+  try {
+    const r = await api(`/youtube/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+    if (!box) return;
+    if (!r.results || !r.results.length) {
+      box.innerHTML = '<div class="muted small">Không tìm thấy video nào.</div>';
+      return;
+    }
+    box.innerHTML = r.results.map((v) => `
+      <div class="yt-result" style="display:flex; gap:10px; align-items:center; padding:8px; border-bottom:1px solid var(--border,#333);">
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(v.title || "(untitled)")}</div>
+          <div class="muted small">${esc(v.uploader || "")}${v.duration_seconds ? " · " + Math.round(v.duration_seconds / 60) + " phút" : ""}</div>
+        </div>
+        <button class="btn sm" onclick="ytDownload('${esc(v.url)}', ${!!($("yt-auto-transcribe")||{}).checked})">⬇ Tải</button>
+        <button class="btn sm" onclick="ytTranscript('${esc(v.url)}')">📜 Transcript</button>
+      </div>`).join("");
+  } catch (err) {
+    if (box) box.innerHTML = "";
+    showError("YouTube search: " + err.message);
+  }
+}
+
+async function ytDownload(url, autoTranscribe) {
+  try {
+    const m = await api("/youtube/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, language: "vi", extract_audio: false, auto_transcribe: !!autoTranscribe }),
+    });
+    showToast(`Đã tải ${m.filename} (${m.kind})${m.transcription ? " + transcript" : ""}`, "success");
+    loadMediaStudio();
+  } catch (err) {
+    showError("YouTube download: " + err.message);
+  }
+}
+
+async function ytTranscript(url) {
+  try {
+    const t = await api("/youtube/transcript", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, language: "en" }),
+    });
+    const words = (t.text || "").split(/\s+/).filter(Boolean).length;
+    showToast(`Transcript (${t.source}) — ${words} từ`, "success");
+    // Show the transcript in the detail panel.
+    const detail = $("ms-detail");
+    const title = $("ms-detail-title");
+    const body = $("ms-detail-body");
+    if (detail && title && body) {
+      title.textContent = "Transcript — " + url;
+      body.innerHTML = `
+        <p class="muted small">Nguồn: <strong>${esc(t.source)}</strong> · ${words} từ</p>
+        <pre class="media-reading">${esc(t.text || "(trống)")}</pre>
+        <p style="margin-top:10px;"><button class="btn sm" onclick="msDetailClose()">✕ Đóng</button></p>`;
+      detail.hidden = false;
+    }
+  } catch (err) {
+    showError("YouTube transcript: " + err.message);
+  }
+}
+
+async function msYtTranscriptById(id) {
+  try {
+    const m = await api(`/media/${id}`);
+    const url = (m.source || "").replace(/^url:/, "");
+    if (!url) { showToast("Video này không có nguồn YouTube.", "info"); return; }
+    await ytTranscript(url);
+  } catch (err) {
+    showError("Transcript: " + err.message);
+  }
+}
+
+function msDetailClose() {
+  const detail = $("ms-detail");
+  if (detail) detail.hidden = true;
+}
+
+// ---- Denoise -----------------------------------------------------------------
+
+async function msDenoise(id) {
+  // Populate the noise-profile dropdown with audio/video items (excluding self).
+  const sel = $("denoise-profile");
+  if (sel) {
+    try {
+      const items = await api("/media");
+      sel.innerHTML = '<option value="">— Tự ước lượng từ khoảng lặng —</option>' +
+        items.filter((m) => m.id !== id && (m.kind === "audio" || m.kind === "video"))
+          .map((m) => `<option value="${esc(m.id)}">${esc(m.filename)}</option>`).join("");
+    } catch (_) { /* keep default */ }
+  }
+  const modal = $("denoise-modal");
+  if (modal) {
+    modal.dataset.target = id;
+    modal.hidden = false;
+  }
+}
+
+function closeDenoise() {
+  const modal = $("denoise-modal");
+  if (modal) modal.hidden = true;
+}
+
+async function applyDenoise() {
+  const modal = $("denoise-modal");
+  if (!modal) return;
+  const id = modal.dataset.target;
+  const strength = parseFloat(($("denoise-strength") || {}).value || "0.8");
+  const profile = ($("denoise-profile") || {}).value || null;
+  try {
+    const r = await api("/tools/call", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tool: "audio_denoise",
+        args: { ref: id, strength, noise_profile_ref: profile, format: "mp3" },
+      }),
+    });
+    closeDenoise();
+    showToast(`Đã giảm ồn → asset ${r.asset_id} (${r.method})`, "success");
+    loadMediaStudio();
+  } catch (err) {
+    showError("Giảm ồn: " + err.message);
+  }
+}
+
+// ---- Audio Editor ------------------------------------------------------------
+
+async function loadAudioEditor() {
+  const source = $("ae-source");
+  const music = $("ae-music");
+  if (!source) return;
+  try {
+    const items = await api("/media");
+    const av = items.filter((m) => m.kind === "video" || m.kind === "audio");
+    const audioOnly = items.filter((m) => m.kind === "audio");
+    source.innerHTML = av.map((m) =>
+      `<option value="${esc(m.id)}">${esc(m.filename)} (${m.kind}, ${m.duration_seconds || "?"}s)</option>`).join("");
+    if (music) {
+      music.innerHTML = '<option value="">— Chọn nhạc nền —</option>' +
+        audioOnly.map((m) => `<option value="${esc(m.id)}">${esc(m.filename)}</option>`).join("");
+    }
+    if (av.length) aeRefreshMeta(av[0].id);
+  } catch (err) {
+    showError("Audio Editor: " + err.message);
+  }
+}
+
+async function aeRefreshMeta(id) {
+  const meta = $("ae-meta");
+  if (!meta) return;
+  try {
+    const m = await api(`/media/${id}`);
+    meta.textContent = `${m.filename} · ${m.duration_seconds || "?"}s · ${m.kind}`;
+  } catch (_) { /* ignore */ }
+}
+
+async function aeCall(tool, args) {
+  const box = $("ae-result");
+  if (box) box.innerHTML = '<div class="muted small">Đang xử lý…</div>';
+  try {
+    const r = await api("/tools/call", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool, args }),
+    });
+    if (box) {
+      const dur = r.duration_seconds != null ? ` · ${r.duration_seconds}s` : "";
+      const bpm = r.bpm != null ? ` · BPM ${r.bpm}` : "";
+      box.innerHTML =
+        `<div class="media-result" style="padding:8px; border:1px solid var(--border,#333); border-radius:8px;">
+          <strong>✓ ${tool}</strong> → asset <code>${esc(r.asset_id || r.path || "")}</code>${dur}${bpm}
+          ${r.url ? ` · <a href="${r.url}" target="_blank" rel="noopener">⬇ tải</a>` : ""}
+          ${r.beats ? ` · ${r.beats.length} beats` : ""}
+        </div>`;
+    }
+    showToast(`${tool} xong`, "success");
+    loadMediaStudio();
+    return r;
+  } catch (err) {
+    if (box) box.innerHTML = "";
+    showError(`${tool}: ` + err.message);
+    return null;
+  }
+}
+
+async function aeDownloadFromUrl(clip) {
+  const url = ($("ae-url") || {}).value || "";
+  if (!url.trim()) { showToast("Dán URL vào ô trước khi tải.", "info"); return; }
+  const status = $("ae-dl-status");
+  if (status) status.textContent = "Đang tải audio…";
+  try {
+    const start = parseFloat(($("ae-clip-start") || {}).value || "0");
+    const end = parseFloat(($("ae-clip-end") || {}).value || "0");
+    let m;
+    if (clip && end > start) {
+      m = await api("/media/audio-clip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim(), start_seconds: start, end_seconds: end, language: "vi" }),
+      });
+    } else {
+      m = await api("/media/from-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim(), language: "vi", extract_audio: true }),
+      });
+    }
+    if (status) status.textContent = "";
+    showToast(`Đã tải ${m.filename} (${m.kind}, ${m.duration_seconds || "?"}s)`, "success");
+    loadMediaStudio();
+    loadAudioEditor();
+  } catch (err) {
+    if (status) status.textContent = "";
+    showError("Tải audio: " + err.message);
+  }
+}
+
+function setupAudioEditorListeners() {
+  const src = $("ae-source");
+  if (src) src.addEventListener("change", () => aeRefreshMeta(src.value));
+
+  const dn = $("ae-dn");
+  if (dn) dn.addEventListener("input", () => {
+    const v = $("ae-dn-val");
+    if (v) v.textContent = dn.value;
+  });
+
+  const bind = (btnId, fn) => {
+    const btn = $(btnId);
+    if (btn) btn.addEventListener("click", fn);
+  };
+
+  // Download audio from any URL (full or a clip range)
+  bind("btn-ae-dl-url", () => aeDownloadFromUrl(false));
+  bind("btn-ae-dl-clip", () => aeDownloadFromUrl(true));
+
+  bind("btn-ae-trim", () => {
+    const ref = ($("ae-source") || {}).value; if (!ref) return;
+    aeCall("audio_trim", {
+      ref,
+      start_seconds: parseFloat(($("ae-trim-start") || {}).value || "0"),
+      end_seconds: parseFloat(($("ae-trim-end") || {}).value || "0"),
+      format: "mp3",
+    });
+  });
+  bind("btn-ae-fade", () => {
+    const ref = ($("ae-source") || {}).value; if (!ref) return;
+    aeCall("audio_fade", {
+      ref,
+      fade_in_seconds: parseFloat(($("ae-fade-in") || {}).value || "0"),
+      fade_out_seconds: parseFloat(($("ae-fade-out") || {}).value || "0.15"),
+      format: "mp3",
+    });
+  });
+  bind("btn-ae-normalize", () => {
+    const ref = ($("ae-source") || {}).value; if (!ref) return;
+    aeCall("audio_normalize", {
+      ref,
+      target_lufs: parseFloat(($("ae-lufs") || {}).value || "-14"),
+      format: "mp3",
+    });
+  });
+  bind("btn-ae-retime", () => {
+    const ref = ($("ae-source") || {}).value; if (!ref) return;
+    aeCall("audio_retime", {
+      ref,
+      factor: parseFloat(($("ae-factor") || {}).value || "1.0"),
+      format: "mp3",
+    });
+  });
+  bind("btn-ae-denoise", () => {
+    const ref = ($("ae-source") || {}).value; if (!ref) return;
+    aeCall("audio_denoise", {
+      ref,
+      strength: parseFloat(($("ae-dn") || {}).value || "0.8"),
+      noise_profile_ref: null,
+      format: "mp3",
+    });
+  });
+  bind("btn-ae-beats", async () => {
+    const ref = ($("ae-source") || {}).value; if (!ref) return;
+    const bpmVal = ($("ae-bpm") || {}).value;
+    const args = { ref };
+    if (bpmVal) args.bpm = parseFloat(bpmVal);
+    const r = await aeCall("music_beat_grid", args);
+    const out = $("ae-beats-out");
+    if (out && r) {
+      out.textContent = `BPM ${r.bpm} · beat ${r.beat_seconds}s · bar ${r.bar_seconds}s · ${r.beats.length} beats`;
+    }
+  });
+  bind("btn-ae-extract", () => {
+    const ref = ($("ae-source") || {}).value; if (!ref) return;
+    aeCall("extract_audio_track", { ref, format: "mp3" });
+  });
+  bind("btn-ae-mix", () => {
+    const ref = ($("ae-source") || {}).value; if (!ref) return;
+    const musicRef = ($("ae-music") || {}).value; if (!musicRef) return;
+    const gain = parseFloat(($("ae-music-gain") || {}).value || "0.18");
+    aeCall("audio_mix", {
+      tracks: [{ ref, gain: 1.0 }, { ref: musicRef, gain }],
+      duration_seconds: null,
+      duck: true,
+      duck_db: -12.0,
+      format: "mp3",
+    });
   });
 }
 
@@ -3996,6 +4409,7 @@ function initApp() {
   setupExternalIngestListeners();
   setupHistoryNicheListeners();
   setupMediaStudioListeners();
+  setupAudioEditorListeners();
   setupProSuiteExtensions();
   if (typeof initStudioMenuBar === "function") initStudioMenuBar();
   setInterval(refreshHealth, 15000);

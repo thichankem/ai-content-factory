@@ -10,9 +10,10 @@ fully offline and testable.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from dataclasses import dataclass
+
+from .hardware import require_ffmpeg
 
 
 @dataclass(frozen=True)
@@ -26,10 +27,7 @@ class DuckSettings:
 
 def ffmpeg_binary() -> str:
     """Locate the ``ffmpeg`` executable, raising if it is not on PATH."""
-    binary = shutil.which("ffmpeg")
-    if binary is None:
-        raise RuntimeError("ffmpeg is required for music ducking.")
-    return binary
+    return require_ffmpeg(purpose="music ducking")
 
 
 def duck_music_under_speech(

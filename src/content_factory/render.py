@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 import threading
@@ -26,6 +25,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from .hardware import require_ffmpeg
 from .models import RenderPlan
 from .resources import CodecChoice, ResourceGovernor, default_governor
 
@@ -127,9 +127,9 @@ def _render_scenes(
     """Render the per-scene path: colour cards or per-scene images + audio."""
     import tempfile
 
-    binary = ffmpeg_binary or shutil.which("ffmpeg")
-    if binary is None:
-        raise RenderError("ffmpeg is required for server-side rendering.")
+    binary = require_ffmpeg(
+        ffmpeg_binary, purpose="server-side rendering", error=RenderError
+    )
     if not plan.steps:
         raise RenderError("Cannot render an empty timeline.")
 
@@ -314,9 +314,9 @@ def _render_with_background_video(
     """
     import tempfile
 
-    binary = ffmpeg_binary or shutil.which("ffmpeg")
-    if binary is None:
-        raise RenderError("ffmpeg is required for server-side rendering.")
+    binary = require_ffmpeg(
+        ffmpeg_binary, purpose="server-side rendering", error=RenderError
+    )
     if not plan.steps:
         raise RenderError("Cannot render an empty timeline.")
 

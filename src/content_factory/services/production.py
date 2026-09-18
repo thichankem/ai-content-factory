@@ -37,6 +37,148 @@ class ProductionMixin(MediaToolsMixin):
             data, ops=ops, preset=preset, export_format=export_format
         )
 
+    # --- image analysis & accessibility --------------------------------------
+
+    def analyze_image(self, data: bytes) -> dict:
+        """Describe an image from its pixel statistics (vision-free)."""
+        return self._studio.analyze_image_bytes(data)
+
+    def image_op_catalog(self) -> dict:
+        """Full op catalogue grouped by category, with plain-language docs."""
+        return self._studio.image_op_catalog()
+
+    def describe_image_op(self, name: str, params: dict | None = None) -> dict:
+        """Explain a single op in plain language."""
+        return self._studio.describe_image_op(name, params)
+
+    def suggest_image_edits(self, data: bytes) -> dict:
+        """Histogram-based auto-suggestions for an image."""
+        return self._studio.suggest_image_edits(data)
+
+    def batch_edit_image(
+        self,
+        images: list[bytes],
+        *,
+        ops: list[dict] | None = None,
+        preset: str | None = None,
+        export_format: str = "png",
+    ) -> dict:
+        """Apply the same pipeline to several images (batch / sync settings)."""
+        return self._studio.batch_edit_images(
+            images, ops=ops, preset=preset, export_format=export_format
+        )
+
+    # --- non-destructive edit sessions (undo / redo / history) ---------------
+
+    def begin_image_session(self, data: bytes) -> dict:
+        """Start a non-destructive edit session around an image."""
+        return self._studio.begin_image_session(data)
+
+    def edit_image_session(
+        self, session_id: str, ops: list[dict], *, export_format: str = "png"
+    ) -> dict:
+        """Apply a step to a session and record it in the undo stack."""
+        return self._studio.edit_image_session(
+            session_id, ops, export_format=export_format
+        )
+
+    def undo_image_session(
+        self, session_id: str, *, export_format: str = "png"
+    ) -> dict:
+        """Undo the last edit step."""
+        return self._studio.undo_image_session(session_id, export_format=export_format)
+
+    def redo_image_session(
+        self, session_id: str, *, export_format: str = "png"
+    ) -> dict:
+        """Redo the last undone edit step."""
+        return self._studio.redo_image_session(session_id, export_format=export_format)
+
+    def image_session_state(self, session_id: str) -> dict:
+        """Current state of a session (version, undo/redo availability)."""
+        return self._studio.image_session_state(session_id)
+
+    # --- video & audio effects + accessibility -------------------------------
+
+    def video_effect_catalog(self) -> dict:
+        """Every video frame effect with a plain-language description."""
+        from .. import video_effects
+
+        return video_effects.effect_catalog()
+
+    def apply_video_effect(
+        self,
+        data: bytes,
+        name: str,
+        params: dict | None = None,
+        *,
+        export_format: str = "png",
+    ) -> dict:
+        """Apply a frame effect to an image (or a video frame) and persist it."""
+        import numpy as np
+        from PIL import Image as PILImage
+
+        from .. import image_engine, video_effects
+
+        img = image_engine.load_image(data)
+        frame = np.asarray(img.convert("RGB"))
+        result = video_effects.apply_frame_effect(frame, name, params)
+        out = PILImage.fromarray(result, mode="RGB")
+        blob = image_engine.export_bytes(out, export_format)
+        return self._studio.edit_image_bytes(blob, ops=[], export_format=export_format)
+
+    def audio_effect_catalog(self) -> dict:
+        """Every audio effect with a plain-language description."""
+        from .. import audio_effects
+
+        return audio_effects.audio_effect_catalog()
+
+    def apply_audio_effect(
+        self,
+        data: bytes,
+        name: str,
+        params: dict | None = None,
+        *,
+        export_format: str = "mp3",
+    ) -> dict:
+        """Apply a DSP effect to audio bytes and persist the result."""
+        from .. import audio_effects, voice_engine
+
+        samples, sr = voice_engine.decode_to_pcm(data)
+        processed = audio_effects.apply_audio_effect(samples, sr, name, params)
+        blob = voice_engine.encode_pcm(processed, sr, export_format)
+        return self._studio.persist_audio_bytes(blob, export_format)
+
+    def video_operation_catalog(self) -> dict:
+        """Every video/audio operation grouped by category, with descriptions."""
+        from .. import video_assist
+
+        return video_assist.catalog()
+
+    def describe_video_operation(self, name: str) -> dict:
+        """Explain one video/audio operation in plain language."""
+        from .. import video_assist
+
+        return video_assist.describe_operation(name)
+
+    def describe_video_timeline(self, project_id: str) -> dict:
+        """Summarise a project's timeline in natural language."""
+        from .. import video_assist
+
+        project = self.get_project(project_id)
+        if project.video_project is None:
+            raise StateConflictError("No video project yet.")
+        return video_assist.describe_timeline(project.video_project)
+
+    def suggest_video_edits(self, project_id: str) -> dict:
+        """Turn the timeline report into concrete edit suggestions."""
+        from .. import video_assist
+
+        project = self.get_project(project_id)
+        if project.video_project is None:
+            raise StateConflictError("No video project yet.")
+        return video_assist.suggest_edits(project.video_project)
+
     def image_presets(self) -> list[str]:
         """Named one-click photo looks."""
         return sorted(IMAGE_PRESETS)

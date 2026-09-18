@@ -12,22 +12,8 @@ exercised in tests and called from the MCP server without any model or network.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import cv2
 import numpy as np
-
-
-@dataclass(frozen=True)
-class DuplicateGroup:
-    """A cluster of media items whose hashes are near-duplicates.
-
-    ``members`` holds the media ids (or paths) that landed in one cluster, and
-    ``max_distance`` records the Hamming threshold that was used to join them.
-    """
-
-    members: tuple[str, ...]
-    max_distance: int
 
 
 def perceptual_hash(image: np.ndarray, hash_size: int = 8) -> str:

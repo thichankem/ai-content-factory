@@ -201,13 +201,6 @@ def total_seconds(project: VideoProject) -> float:
     return round(sum(scene_seconds(scene) for scene in project.scenes), 2)
 
 
-def scene_characters(scene: VideoScene) -> int:
-    """Characters of on-screen text plus narration for this scene."""
-    on_screen = scene.text or ""
-    spoken = scene.narration or scene.text or ""
-    return len(on_screen) + len(spoken)
-
-
 def measure(project: VideoProject) -> TimelineStats:
     """Compute the measurable properties of a timeline."""
     scenes = project.scenes

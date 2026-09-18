@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+from content_factory import voice_engine
 from content_factory.media import MediaLibrary
 from content_factory.models import (
     MediaItem,
@@ -89,3 +92,47 @@ def test_pipeline_prepares_document_text(settings) -> None:
     )
     assert result.script
     assert result.project_id
+
+
+def test_pipeline_denoise_transcribes_clean_audio(settings) -> None:
+    """denoise=True denoises the source audio before transcribing it."""
+    media = MediaLibrary(settings.media_dir)
+    pipeline = RecookPipeline(settings, media)
+    item = media.upload(
+        "noisy.mp3",
+        b"\xff\xfb\x90\x64" * 4096,  # any bytes; denoise+transcribe are mocked
+        language="en",
+    )
+    item.kind = MediaKind.VIDEO
+    media.update(item)
+
+    denoised_wav = voice_engine.encode_pcm(
+        (0.5 * __import__("numpy").ones(1600)).astype("float32"), 44100, "wav"
+    )
+    with (
+        patch.object(
+            voice_engine,
+            "denoise_audio",
+            return_value=(denoised_wav, {"method": "spectral_gating"}),
+        ) as denoise_mock,
+        patch.object(
+            media, "transcribe_file", return_value=("Clean transcript.", [])
+        ) as transcribe_mock,
+    ):
+        prepared = pipeline.prepare_source(item.id, ReCookRequest(denoise=True))
+
+    denoise_mock.assert_called_once()
+    transcribe_mock.assert_called_once()
+    assert prepared.transcription == "Clean transcript."
+
+
+def test_pipeline_without_denoise_skips_it(settings) -> None:
+    """denoise defaults to False: the normal transcribe path is used."""
+    media = MediaLibrary(settings.media_dir)
+    pipeline = RecookPipeline(settings, media)
+    item = media.upload("plain.mp3", b"\xff\xfb\x90\x64" * 4096, language="en")
+    item.kind = MediaKind.VIDEO
+    media.update(item)
+    with patch.object(media, "transcribe", return_value=item) as transcribe_mock:
+        pipeline.prepare_source(item.id, ReCookRequest())
+    transcribe_mock.assert_called_once()

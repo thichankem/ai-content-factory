@@ -834,18 +834,6 @@ def _default_params(node_type: WorkflowNodeType) -> dict[str, Any]:
     return {}
 
 
-def make_node(node_type: WorkflowNodeType, x: float, y: float) -> WorkflowNode:
-    """Create a ready-to-place block of the given type."""
-    return WorkflowNode(
-        id=uuid.uuid4().hex[:8],
-        type=node_type,
-        label=NODE_LABELS[node_type],
-        x=float(x),
-        y=float(y),
-        params=_default_params(node_type),
-    )
-
-
 def project_flow(project: Project) -> Workflow:
     """The project's own flow, or a fresh copy of the default one."""
     if project.workflow is None:

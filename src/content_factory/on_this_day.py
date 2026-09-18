@@ -8,7 +8,6 @@ and automated anniversary topic recommendation.
 from __future__ import annotations
 
 import datetime
-from collections.abc import Sequence
 
 from .models import OnThisDayEvent
 
@@ -274,8 +273,3 @@ def search_historical_events(query: str) -> list[OnThisDayEvent]:
         if q in text:
             matched.append(ev)
     return matched
-
-
-def list_all_events() -> Sequence[OnThisDayEvent]:
-    """Return the entire dataset of curated events."""
-    return _HISTORICAL_EVENTS

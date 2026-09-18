@@ -62,9 +62,9 @@ class FusionGraphPayload(BaseModel):
 
     project_id: str
     nodes: list[FusionNode] = Field(default_factory=list)
-    output_resolution: Literal[
-        "1080x1920", "1920x1080", "2160x3840", "3840x2160"
-    ] = "1080x1920"
+    output_resolution: Literal["1080x1920", "1920x1080", "2160x3840", "3840x2160"] = (
+        "1080x1920"
+    )
     color_space: Literal["Rec.709", "DaVinci Wide Gamut", "sRGB"] = "Rec.709"
     bit_depth: Literal["8-bit", "10-bit", "16-bit float", "32-bit float"] = "10-bit"
 

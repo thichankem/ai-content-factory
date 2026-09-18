@@ -80,7 +80,7 @@ that restate the platform facts used.
 The response's `pack` is the exact pack that was scored, so a caller can rebuild
 it, re-score it, and get the identical number back. That is asserted in
 `tests/test_seo_engine.py::test_optimizer_gain_is_measured_not_claimed` and
-end-to-end in `scratch/live_seo_tools.py`.
+end-to-end in `scripts/qa_seo_tools_http.py`.
 
 ## 4. Testing a change like an experiment
 
@@ -140,7 +140,7 @@ recomputed against measured performance instead of metadata hygiene.
 | `tests/test_seo_engine.py`, `test_seo_validation.py` | 110 tests green, incl. deterministic engine snapshot |
 | `ruff check` + `format --check` + `mypy src` | clean (115 files) |
 | `scripts/smoke.py` | 64/64 checks PASS on a fresh server |
-| `scratch/live_seo_tools.py` (real HTTP, agent path) | 22/22 checks PASS |
+| `scripts/qa_seo_tools_http.py` (real HTTP, agent path) | 22/22 checks PASS |
 | Optimiser round-trip | weak pack 68 → 83 on YouTube; the returned pack re-scores to exactly 83 |
 | Score responsiveness | a 4-minute pack with a short title and no hashtags is no longer capped; the same pack with an empty title still is |
 

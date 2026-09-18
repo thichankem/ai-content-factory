@@ -18,14 +18,6 @@ class QCCheckStatus(enum.StrEnum):
     PASS = "pass"
     WARN = "warn"
     FAIL = "fail"
-
-
-class QCCheckStatus(enum.StrEnum):
-    """Outcome of one automated pre-flight check."""
-
-    PASS = "pass"
-    WARN = "warn"
-    FAIL = "fail"
     INFO = "info"
 
 

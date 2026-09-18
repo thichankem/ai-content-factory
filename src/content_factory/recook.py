@@ -10,7 +10,10 @@ so the normal two-gate human approval flow still applies.
 from __future__ import annotations
 
 import re
+import tempfile
+from pathlib import Path
 
+from . import voice_engine
 from .config import Settings
 from .media import MediaLibrary
 from .models import (
@@ -239,14 +242,47 @@ class RecookPipeline:
         self._settings = settings
         self._media = media
 
-    def prepare_source(self, media_id: str) -> MediaItem:
-        """Ensure the source item is readable by an AI agent."""
+    def prepare_source(
+        self, media_id: str, request: ReCookRequest | None = None
+    ) -> MediaItem:
+        """Ensure the source item is readable by an AI agent.
+
+        When ``request.denoise`` is set and the source is video/audio, the audio
+        is spectrally denoised *before* transcription so a noisy recording yields
+        a cleaner transcript.
+        """
         item = self._media.require(media_id)
         if item.kind in ("video", "audio") and not item.transcription:
+            if request and request.denoise:
+                return self._denoise_then_transcribe(item, request)
             return self._media.transcribe(media_id, language=item.language or "en")
         if item.kind == "document" and not item.text_content:
             return self._media.extract_text(media_id)
         return item
+
+    def _denoise_then_transcribe(
+        self, item: MediaItem, request: ReCookRequest
+    ) -> MediaItem:
+        """Denoise the source audio, transcribe the cleaned audio, attach it."""
+        path = self._media.path_for(item)
+        if path is None:
+            raise FileNotFoundError(f"media file for '{item.id}' is missing")
+        language = item.language or request.language or "en"
+        data = Path(path).read_bytes()
+        denoised, _report = voice_engine.denoise_audio(
+            data, strength=request.denoise_strength, export_format="wav"
+        )
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp.write(denoised)
+            tmp_path = tmp.name
+        try:
+            text, cues = self._media.transcribe_file(Path(tmp_path), language)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+        item.transcription = text
+        item.transcript_segments = cues
+        item.language = language
+        return self._media.update(item)
 
     def _source_text(self, item: MediaItem) -> str:
         if item.transcription:
@@ -298,7 +334,7 @@ class RecookPipeline:
 
     def run(self, media_id: str, request: ReCookRequest, store: Store) -> ReCookResult:
         """Run the full re-cook: read -> re-word -> new project."""
-        item = self.prepare_source(media_id)
+        item = self.prepare_source(media_id, request)
         script = self.build_script(item, request)
         project = self.create_project(item, request, script, store)
         return ReCookResult(

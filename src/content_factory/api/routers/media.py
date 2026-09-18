@@ -3,22 +3,29 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from fastapi import (
     APIRouter,
     File,
     Form,
     HTTPException,
+    Query,
     UploadFile,
 )
 from fastapi.responses import FileResponse
 
 from ...media import UploadTooLargeError
 from ...models import (
+    AudioClipRequest,
     MediaIngestUrlRequest,
     MediaItem,
     ReCookRequest,
     ReCookResult,
+    YouTubeDownloadRequest,
+    YouTubeSearchResponse,
+    YouTubeTranscriptRequest,
+    YouTubeTranscriptResult,
 )
 from ...service import ContentFactoryService, NotFoundError
 from ..deps import guard_value
@@ -50,6 +57,52 @@ def build_router(service: ContentFactoryService) -> APIRouter:
                 language=payload.language,
                 extract_audio=payload.extract_audio,
             )
+        )
+
+    @router.post("/media/audio-clip", response_model=MediaItem, status_code=201)
+    def media_audio_clip(payload: AudioClipRequest) -> MediaItem:
+        """Download any audio by URL, optionally cutting a specific clip range."""
+        return guard_value(
+            lambda: service.download_audio_clip(
+                payload.url,
+                start_seconds=payload.start_seconds,
+                end_seconds=payload.end_seconds,
+                language=payload.language,
+            )
+        )
+
+    @router.get("/youtube/search", response_model=YouTubeSearchResponse)
+    def youtube_search(
+        q: str = Query(..., min_length=1, max_length=200),
+        limit: int = Query(8, ge=1, le=25),
+    ) -> YouTubeSearchResponse:
+        """Search YouTube for videos matching ``q`` (metadata only)."""
+        results = service.search_youtube(q, limit)
+        return YouTubeSearchResponse(query=q, count=len(results), results=results)
+
+    @router.post("/youtube/download", response_model=MediaItem, status_code=201)
+    def youtube_download(payload: YouTubeDownloadRequest) -> MediaItem:
+        """Download a YouTube video (by URL or id) into the media library."""
+        return guard_value(
+            lambda: service.youtube_download(
+                payload.url,
+                language=payload.language,
+                extract_audio=payload.extract_audio,
+                auto_transcribe=payload.auto_transcribe,
+            )
+        )
+
+    @router.post("/youtube/transcript", response_model=YouTubeTranscriptResult)
+    def youtube_transcript(
+        payload: YouTubeTranscriptRequest,
+    ) -> YouTubeTranscriptResult:
+        """Get a transcript for a YouTube video by any means.
+
+        Reuses the video's own subtitles when available (instant, no model);
+        otherwise downloads the audio and runs faster-whisper locally.
+        """
+        return guard_value(
+            lambda: service.youtube_transcript(payload.url, payload.language)
         )
 
     @router.post("/ai-editor/edit")
@@ -108,8 +161,54 @@ def build_router(service: ContentFactoryService) -> APIRouter:
         return FileResponse(path, media_type="video/mp4")
 
     @router.get("/media", response_model=list[MediaItem])
-    def media_list() -> list[MediaItem]:
-        """List every item in the universal media library."""
+    def media_list(
+        kind: str | None = Query(None, description="video|audio|image|document"),
+        tag: str | None = Query(None, description="Filter by a tag"),
+        q: str | None = Query(None, description="Free-text over name/transcript/tags"),
+        source: str | None = Query(None, description="Filter by source"),
+        min_duration: float | None = Query(None, ge=0),
+        max_duration: float | None = Query(None, ge=0),
+        date_from: str | None = Query(None, description="ISO date, inclusive"),
+        date_to: str | None = Query(None, description="ISO date, inclusive"),
+        sort: str = Query("newest", description="newest|oldest|name|size|duration"),
+    ) -> list[MediaItem]:
+        """Query the media database with rich filters."""
+        return service.media_query(
+            kind=kind,
+            tag=tag,
+            q=q,
+            source=source,
+            min_duration=min_duration,
+            max_duration=max_duration,
+            date_from=date_from,
+            date_to=date_to,
+            sort=sort,
+        )
+
+    @router.get("/media/stats")
+    def media_stats() -> dict[str, Any]:
+        """Aggregate counts and sizes across the library."""
+        return service.media_stats()
+
+    @router.get("/media/tags")
+    def media_tags() -> list[str]:
+        """Every distinct tag across the library."""
+        return service.media_all_tags()
+
+    @router.post("/media/{media_id}/tags", response_model=MediaItem)
+    def media_set_tags(media_id: str, tags: list[str]) -> MediaItem:
+        """Replace an item's tags."""
+        return guard_value(lambda: service.media_set_tags(media_id, tags))
+
+    @router.post("/media/{media_id}/tags/{tag}", response_model=MediaItem)
+    def media_add_tag(media_id: str, tag: str) -> MediaItem:
+        """Add one tag to an item (idempotent)."""
+        return guard_value(lambda: service.media_add_tag(media_id, tag))
+
+    @router.delete("/media/{media_id}/tags/{tag}", response_model=MediaItem)
+    def media_remove_tag(media_id: str, tag: str) -> MediaItem:
+        """Remove one tag from an item (idempotent)."""
+        return guard_value(lambda: service.media_remove_tag(media_id, tag))
         return service.media_list()
 
     @router.get("/media/{media_id}", response_model=MediaItem)

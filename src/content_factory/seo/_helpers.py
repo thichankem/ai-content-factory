@@ -126,10 +126,6 @@ def _front_load(text: str, phrase: str, zone: int) -> float | None:
     return max(0.35, 1.0 - (index - zone) / max(1.0, float(zone)))
 
 
-def _first_words(text: str, limit: int) -> str:
-    return " ".join(_words(text)[:limit])
-
-
 _SENTENCE_RE = re.compile(r"[.!?\n]+")
 
 

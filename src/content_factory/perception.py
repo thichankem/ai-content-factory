@@ -41,6 +41,7 @@ from typing import Protocol
 import numpy as np
 
 from .config import Settings
+from .hardware import require_ffmpeg
 
 # --- Data structures ----------------------------------------------------------
 
@@ -214,12 +215,8 @@ def _resample(samples: np.ndarray, source_rate: int, target_rate: int) -> np.nda
 
 
 def _ffmpeg() -> str:
-    import shutil
-
-    binary = shutil.which("ffmpeg")
-    if binary is None:
-        raise RuntimeError("ffmpeg is required to decode non-WAV audio.")
-    return binary
+    """The ffmpeg used to decode audio formats ``wave`` cannot read."""
+    return require_ffmpeg(purpose="decoding non-WAV audio")
 
 
 def _db(value: float) -> float:

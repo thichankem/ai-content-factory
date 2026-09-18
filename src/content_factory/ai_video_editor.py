@@ -32,7 +32,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
 import cv2
 import numpy as np
@@ -563,8 +563,3 @@ def _demo_vision_planner(
         h=box_h,
         reason="vision demo: upper-right quadrant",
     )
-
-
-def build_editor(vision: Any | None = None, **kwargs: Any) -> AiVideoEditor:
-    """Build an editor, wiring a vision planner when one is available."""
-    return AiVideoEditor(vision=vision, **kwargs)

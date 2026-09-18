@@ -1225,6 +1225,46 @@
               </div>
             </div>
 
+            <!-- Media database filter bar -->
+            <div class="media-db-bar" style="display:flex; gap:8px; margin:10px 0; align-items:center; flex-wrap:wrap;">
+              <select id="ms-filter-kind" class="ed-select" style="width:auto;">
+                <option value="">Loại: tất cả</option>
+                <option value="video">🎞 Video</option>
+                <option value="audio">🎧 Audio</option>
+                <option value="image">🖼 Ảnh</option>
+                <option value="document">📄 Tài liệu</option>
+              </select>
+              <select id="ms-filter-tag" class="ed-select" style="width:auto;">
+                <option value="">Tag: tất cả</option>
+              </select>
+              <select id="ms-filter-sort" class="ed-select" style="width:auto;">
+                <option value="newest">Mới nhất</option>
+                <option value="oldest">Cũ nhất</option>
+                <option value="name">Tên A–Z</option>
+                <option value="size">Kích thước</option>
+                <option value="duration">Thời lượng</option>
+              </select>
+              <button id="btn-ms-filter" class="btn primary">Lọc</button>
+              <button id="btn-ms-filter-clear" class="btn sm">✕</button>
+              <span id="ms-db-stats" class="muted small" style="margin-left:auto;"></span>
+            </div>
+
+            <!-- YouTube search / download / transcript -->
+            <div class="youtube-panel" style="border: 1px dashed var(--border,#444); border-radius: 10px; padding: 12px; margin: 12px 0;">
+              <details open>
+                <summary style="cursor:pointer; font-weight:600;">📺 YouTube — tìm, tải về &amp; lấy transcript</summary>
+                <div style="display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap;">
+                  <input type="text" id="yt-q" placeholder="Nhập từ khóa tìm video YouTube..." class="ed-select" style="flex:1; min-width:220px;">
+                  <input type="number" id="yt-limit" value="8" min="1" max="25" style="width:64px;" title="Số kết quả">
+                  <button id="btn-yt-search" class="btn primary">🔍 Tìm</button>
+                  <label style="display:flex; align-items:center; gap:4px; font-size:12px;">
+                    <input type="checkbox" id="yt-auto-transcribe"> Tự phiên âm khi tải
+                  </label>
+                </div>
+                <div id="yt-results" style="margin-top:10px;"></div>
+              </details>
+            </div>
+
             <div class="media-upload-row">
               <input type="file" id="ms-file-input" multiple />
               <select id="ms-language"><option value="en">English</option><option value="vi">Tiếng Việt</option></select>
@@ -1239,6 +1279,107 @@
             <div class="media-detail" id="ms-detail" hidden>
               <h3 id="ms-detail-title"></h3>
               <div id="ms-detail-body"></div>
+            </div>
+
+            <!-- Denoise modal -->
+            <div id="denoise-modal" class="modal-overlay" hidden>
+              <div class="modal" style="max-width:460px;">
+                <h3>🎛 Giảm ồn (Spectral Gating)</h3>
+                <p class="muted small">Nén tiếng ồn nền (hiss/hum/room tone) dưới giọng nói. Kết quả lưu vào Edited Assets.</p>
+                <label class="muted small">Cường độ giảm ồn: <strong id="denoise-strength-val">0.8</strong></label>
+                <input type="range" id="denoise-strength" min="0" max="1" step="0.05" value="0.8" style="width:100%;">
+                <label class="muted small" style="margin-top:8px; display:block;">Noise profile (mẫu tiếng ồn thuần — tùy chọn):</label>
+                <select id="denoise-profile" class="ed-select" style="width:100%; margin-top:4px;">
+                  <option value="">— Tự ước lượng từ khoảng lặng —</option>
+                </select>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+                  <button id="btn-denoise-cancel" class="btn">Hủy</button>
+                  <button id="btn-denoise-apply" class="btn primary">Áp dụng</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Audio Editor panel -->
+            <div class="audio-editor-panel" style="border:1px dashed var(--border,#444); border-radius:10px; padding:12px; margin:12px 0;">
+              <details>
+                <summary style="cursor:pointer; font-weight:600;">🎚 Audio Editor — tải audio từ URL, cắt, fade, normalize, retime, giảm ồn, beat, mix nhạc</summary>
+                <div style="margin-top:10px;">
+                  <!-- Download any audio from a URL -->
+                  <div style="border:1px solid var(--border,#333); border-radius:8px; padding:10px; margin-bottom:12px;">
+                    <h4 style="margin:0 0 6px;">⬇ Tải bất kỳ đoạn âm thanh từ URL</h4>
+                    <p class="muted small">Dán URL bất kỳ (YouTube, podcast, file MP3 trực tiếp, SoundCloud…) — hệ thống tự tải và tách audio. Có thể cắt một đoạn (clip) theo khoảng thời gian.</p>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                      <input type="text" id="ae-url" placeholder="https://... (YouTube / podcast / MP3 trực tiếp)" class="ed-select" style="flex:1; min-width:240px;">
+                      <label class="muted small">Từ (s)</label>
+                      <input type="number" id="ae-clip-start" value="0" min="0" step="0.1" class="ed-select" style="width:70px;">
+                      <label class="muted small">Đến (s)</label>
+                      <input type="number" id="ae-clip-end" value="0" min="0" step="0.1" class="ed-select" style="width:70px;">
+                      <button id="btn-ae-dl-url" class="btn sm primary">⬇ Tải audio</button>
+                      <button id="btn-ae-dl-clip" class="btn sm">✂ Tải đoạn (clip)</button>
+                    </div>
+                    <div id="ae-dl-status" class="muted small" style="margin-top:6px;"></div>
+                  </div>
+                  <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <select id="ae-source" class="ed-select" style="flex:1; min-width:220px;"></select>
+                    <span id="ae-meta" class="muted small"></span>
+                  </div>
+                  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:12px;">
+                    <div class="ae-group">
+                      <h4 style="margin:0 0 6px;">✂ Cắt (Trim)</h4>
+                      <label class="muted small">Start (s)</label>
+                      <input type="number" id="ae-trim-start" value="0" min="0" step="0.1" class="ed-select" style="width:100%;">
+                      <label class="muted small">End (s)</label>
+                      <input type="number" id="ae-trim-end" value="0" min="0" step="0.1" class="ed-select" style="width:100%;">
+                      <button id="btn-ae-trim" class="btn sm" style="margin-top:6px;">✂ Cắt</button>
+                    </div>
+                    <div class="ae-group">
+                      <h4 style="margin:0 0 6px;">🌊 Fade</h4>
+                      <label class="muted small">Fade in (s)</label>
+                      <input type="number" id="ae-fade-in" value="0" min="0" step="0.05" class="ed-select" style="width:100%;">
+                      <label class="muted small">Fade out (s)</label>
+                      <input type="number" id="ae-fade-out" value="0.15" min="0" step="0.05" class="ed-select" style="width:100%;">
+                      <button id="btn-ae-fade" class="btn sm" style="margin-top:6px;">🌊 Fade</button>
+                    </div>
+                    <div class="ae-group">
+                      <h4 style="margin:0 0 6px;">🔊 Normalize</h4>
+                      <label class="muted small">Target LUFS</label>
+                      <input type="number" id="ae-lufs" value="-14" step="1" class="ed-select" style="width:100%;">
+                      <button id="btn-ae-normalize" class="btn sm" style="margin-top:6px;">🔊 Normalize</button>
+                    </div>
+                    <div class="ae-group">
+                      <h4 style="margin:0 0 6px;">⏩ Retime (tempo)</h4>
+                      <label class="muted small">Factor (0.5–2)</label>
+                      <input type="number" id="ae-factor" value="1.0" min="0.5" max="2" step="0.05" class="ed-select" style="width:100%;">
+                      <button id="btn-ae-retime" class="btn sm" style="margin-top:6px;">⏩ Retime</button>
+                    </div>
+                    <div class="ae-group">
+                      <h4 style="margin:0 0 6px;">🎛 Giảm ồn</h4>
+                      <label class="muted small">Cường độ: <strong id="ae-dn-val">0.8</strong></label>
+                      <input type="range" id="ae-dn" min="0" max="1" step="0.05" value="0.8" style="width:100%;">
+                      <button id="btn-ae-denoise" class="btn sm" style="margin-top:6px;">🎛 Giảm ồn</button>
+                    </div>
+                    <div class="ae-group">
+                      <h4 style="margin:0 0 6px;">🥁 Beat / BPM</h4>
+                      <label class="muted small">BPM (để trống = tự dò)</label>
+                      <input type="number" id="ae-bpm" value="" placeholder="auto" step="1" class="ed-select" style="width:100%;">
+                      <button id="btn-ae-beats" class="btn sm" style="margin-top:6px;">🥁 Dò BPM &amp; Beat</button>
+                      <div id="ae-beats-out" class="muted small" style="margin-top:4px;"></div>
+                    </div>
+                    <div class="ae-group">
+                      <h4 style="margin:0 0 6px;">🎵 Mix với nhạc nền</h4>
+                      <select id="ae-music" class="ed-select" style="width:100%;"></select>
+                      <label class="muted small">Music gain</label>
+                      <input type="number" id="ae-music-gain" value="0.18" min="0" max="1" step="0.01" class="ed-select" style="width:100%;">
+                      <button id="btn-ae-mix" class="btn sm" style="margin-top:6px;">🎵 Mix</button>
+                    </div>
+                    <div class="ae-group">
+                      <h4 style="margin:0 0 6px;">🎞 Tách audio từ video</h4>
+                      <button id="btn-ae-extract" class="btn sm" style="margin-top:6px;">🎞 Tách audio (mp3)</button>
+                    </div>
+                  </div>
+                  <div id="ae-result" style="margin-top:12px;"></div>
+                </div>
+              </details>
             </div>
           </div>
         </section>

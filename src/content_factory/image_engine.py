@@ -366,6 +366,13 @@ _OPS: dict[str, Any] = {
     "inpaint": _op_inpaint,
 }
 
+#: Extended toolbox (light, colour, detail, local, retouch, transform, effects)
+#: lives in :mod:`content_factory.photo_ops` and is merged into the same
+#: dispatcher so every op flows through :func:`apply_ops` identically.
+from . import photo_ops  # noqa: E402  (registered after the core registry)
+
+_OPS.update(photo_ops.PHOTO_OPS)
+
 #: Public list used by the agent tools manifest for discoverability.
 KNOWN_OPS = sorted(_OPS)
 KNOWN_FILTERS = sorted(_FILTERS)

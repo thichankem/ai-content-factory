@@ -1,6 +1,321 @@
 # Problem Report
 
-Updated: 2026-09-16
+Updated: 2026-09-18
+
+## Latest Full Test Run (2026-09-18)
+
+A complete re-test of the whole system was run on this date. **Every gate is
+green** — the current state is healthy. Two real defects were found and fixed,
+and two non-blocking issues remain (documentation drift + a tooling edge case).
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| `python -m pytest -q` | PASS | **919 passed**, 16 upstream deprecation warnings, ~146 s. |
+| `python scripts/smoke.py --port <fresh>` | PASS | **64 end-to-end checks** passed on a fresh server. |
+| `python -m ruff check src tests` | PASS | All checks passed (0 findings). |
+| `python -m ruff format --check src tests` | PASS | 183 files already formatted. |
+| `python -m mypy src` | PASS | 0 issues in 129 source files. |
+| `python scripts/frontend_imports.py` | PASS | clean, 98 files. |
+| `cd frontend && npm run type-check` | PASS | `tsc --noEmit` clean. |
+| `cd frontend && npm run build` | PASS | Next.js 14.2.35 build succeeded. |
+
+### Fixed this run
+
+1. **P1 — syntax error broke `photo_compositor.py` (module could not import).**
+   `src/content_factory/photo_compositor.py` had a duplicated `def blend_images(`
+   line (lines 85–86), producing `invalid-syntax: Expected ')', found newline`
+   and `Expected an indented block after function definition`. This made the
+   whole module unparseable and would have failed any import of the package.
+   Removed the duplicate line; the module now imports cleanly (26 blend modes).
+   This was the only syntax-level defect found.
+2. **P2 — mypy type errors (fixed).**
+   - `photo_compositor.py:49` and `:61` — `Returning Any from function declared
+     to return "ndarray"` in `_saturation_of` and `_soft_light` (numpy `.max()/
+     .min()` and scalar arithmetic return `Any` under the installed stubs).
+     Wrapped both returns in `np.asarray(...)` (behavior-preserving, no copy).
+   - `models/audio.py:123` — `default_factory=lambda` returned `list[str]` where
+     the field type is `list[Literal["vocals","drums","bass","other"]]`. Replaced
+     the lambda with a typed module-level `_default_stems()` function.
+   After these fixes `mypy` reports 0 issues across all 129 source files, and the
+   full 919-test suite plus the 64-check smoke test still pass.
+
+### Remaining / non-blocking issues
+
+3. **Documentation drift — `README.md` *Status* table is stale.** It still
+   claims the Python gates are red (242 `ruff` findings, 13 unformatted files,
+   43 `mypy` errors in 7 files, 11 `pytest` failures). Re-measured on this date
+   all four are green (`ruff` 0, format 0, `mypy` 0, `pytest` 919/919 pass).
+   The table contradicts the actual state and should be updated to avoid
+   misleading future agents. **Action:** refresh the *Status* table in
+   `README.md`.
+4. **Tooling edge case — `scripts/smoke.ps1` does not forward a `--port` arg.**
+   When a server is already listening on `:8080`, `smoke.py` reuses it and prints
+   `[!!] reusing the server already listening on http://127.0.0.1:8080; pass
+   --port <free-port> to test the current code`. During this run a stale server
+   on `:8080` reset the connection on `GET /library` (`ConnectionResetError:
+   [WinError 10054]`), which looked like a smoke failure but was purely the dead
+   reused server. Running `smoke.py --port <fresh>` against the current code
+   passed 64/64. **Action:** forward `--port` through `smoke.ps1` (and/or detect
+   a stale listener) so the wrapper always tests the current code on a fresh
+   port.
+5. **Informational — 16 upstream deprecation warnings.** From `starlette`
+   (`anyio.abc.BlockingPortal` alias), `torch`/`easyocr` (`torch.ao.quantization`
+   and quantized-tensor deprecations), and `Pillow` (`mode` param). None are
+   project defects and none fail a test.
+
+## NotebookLM-style Knowledge Q&A (added 2026-09-18)
+
+The RAGFlow-style knowledge engine already existed (chunking, hybrid retrieval,
+grounding), but it could only *retrieve* — it could not answer a question with
+citations the way Google NotebookLM does. Added the missing layer:
+
+- **`POST /kb/{id}/ask`** — grounded Q&A. Retrieves the top chunks, hands the
+  grounded context to the provider chain, and returns a synthesized answer whose
+  claims carry `[n]` citations back to the sources. Supports a `history` of prior
+  turns for follow-up questions. When no provider is configured it falls back to
+  an **offline extractive answer** from the top hits (never fails on a missing
+  API key); `grounded` distinguishes the two.
+- **`POST /kb/{id}/ingest-url`** — add a web page as a source (NotebookLM
+  "add a web source"). Fetches the URL, strips markup, chunks it with the KB's
+  template. An unreachable/unreadable page is recorded as a `FAILED` document
+  rather than aborting the request.
+- **Agent tools + MCP**: registered `kb_ask` and `kb_ingest_url` in the tool
+  registry (now 74 tools), reachable through `POST /tools/call` and through the
+  MCP server's `factory_call_tool`. The handlers live in a new
+  `agent_knowledge.py` module so `agent_tools.py` stays under its line budget.
+- **Models**: `KBAskRequest`, `KBAskResponse`, `KBTurn`, `KBIngestUrl`.
+- **Tests**: `tests/test_knowledge_qa.py` (10 tests) and
+  `tests/test_mcp_connectivity.py` (4 tests).
+- **Live MCP check**: `scripts/test_mcp_live.py` spawns the real `mcp_server.py`
+  over stdio, connects with a genuine MCP client, and round-trips a tool call —
+  **MCP LIVE CONNECTIVITY OK** (23 MCP tools, `kb_ask`/`kb_ingest_url` present).
+
+Verification: full pytest suite green, `ruff` + `format` + `mypy` all clean.
+
+## YouTube Search & Download (added 2026-09-18)
+
+Added native YouTube search and download to the media library, so an operator
+(or an AI agent) can find reference videos and pull them into the pipeline.
+
+- **`GET /youtube/search?q=...&limit=N`** — search YouTube by query (metadata
+  only, no download). Backed by yt-dlp's `ytsearch` extractor, so search and
+  download agree on what a video is. Returns `YouTubeSearchResult`s (id, title,
+  url, duration, uploader, thumbnail, description, view_count). Empty query → 422.
+- **`POST /youtube/download`** — download a YouTube video (by URL or id) into the
+  media library, reusing the existing `download_from_url` path (yt-dlp, with an
+  ffmpeg/urllib fallback). Supports `extract_audio` for audio-only grabs.
+- **Agent tools + MCP**: registered `youtube_search` and `youtube_download`
+  (registry now 76 tools), reachable through `POST /tools/call` and the MCP
+  server's `factory_call_tool`. Handlers live in a new `agent_youtube.py` module
+  so `agent_tools.py` stays under its line budget.
+- **Models**: `YouTubeSearchResult`, `YouTubeSearchRequest`,
+  `YouTubeSearchResponse`, `YouTubeDownloadRequest`.
+- **Tests**: `tests/test_youtube.py` (9 tests).
+
+Live verification over the real network:
+- `GET /youtube/search?q=morning+light+city` returned 3 real videos (titles,
+  uploaders, URLs).
+- `POST /youtube/download` (audio-only) pulled "Rick Astley - Never Gonna Give
+  You Up" into the library: 3.4 MB webm, 213 s, `kind=video`.
+- Full pytest suite green (943 tests), `ruff` + `format` + `mypy` clean, smoke
+  64/64, MCP live connectivity OK.
+
+## YouTube Transcript — "by any means" (added 2026-09-18)
+
+Getting a transcript from a downloaded video now works **by any means**, in a
+two-strategy cascade that never blocks on a missing model:
+
+1. **Existing subtitles/captions (Strategy 1, instant & free).** For any video
+   pulled from a YouTube URL, `MediaLibrary.fetch_subtitles` reuses the video's
+   own manual or auto-generated captions via yt-dlp — no ML model, no download
+   of the full video, milliseconds. `POST /media/{id}/transcribe` now tries this
+   first for YouTube-sourced items (before the file check, since subtitles only
+   need the source URL).
+2. **faster-whisper (Strategy 2, local speech-to-text).** If no captions exist,
+   the audio is downloaded and transcribed locally with faster-whisper (already
+   installed, CPU-capable).
+
+New surface:
+- **`POST /youtube/transcript`** — `{url, language}` → `YouTubeTranscriptResult`
+  with `source` (`subtitles` or `whisper`), `text`, `segments`, and `media_id`
+  (set only when the whisper path downloaded audio).
+- **`MediaLibrary.transcribe_youtube(url, language)`** — the cascade, returns the
+  same shape.
+- **Agent tool + MCP**: `youtube_transcript` registered (registry now 77 tools),
+  reachable via `POST /tools/call` and MCP `factory_call_tool`.
+- **Models**: `YouTubeTranscriptRequest`, `YouTubeTranscriptResult`.
+- **Tests**: `tests/test_youtube.py` grew to 16 tests (VTT parsing, subtitle
+  reuse, whisper fallback, API, agent tool).
+
+Live verification: `transcribe_youtube(".../watch?v=dQw4w9WgXcQ", "en")` returned
+`source=subtitles` with the full auto-captioned lyrics instantly (no model run).
+Full pytest suite green (**949 tests**), `ruff` + `format` + `mypy` clean, MCP
+live connectivity OK.
+
+## Noise Reduction — spectral gating (added 2026-09-18)
+
+Real "remove noise" for voice/audio, in pure numpy (no heavy dependencies). The
+existing `_noise_gate` only silenced quiet gaps; the new **spectral gating**
+suppresses broadband noise (hiss, hum, room tone) that sits *under* the speech —
+the Audacity/Audition "DeNoise" behaviour.
+
+Core engine (`voice_engine.py`):
+- `_stft` / `_istft` — Hann-window STFT with a **50% overlap** so the overlap-add
+  reconstructs cleanly (a non-COLA hop produced edge transients; those are also
+  guarded by zeroing samples where the window-overlap sum is too small).
+- `_spectral_gate(samples, sr, strength, noise_profile)` — learns the noise
+  spectrum from a pure-noise sample or auto-estimates it from the quietest 10%
+  of frames, then applies a Wiener-style per-bin gain: speech bins (mag ≫ noise)
+  keep ~1, noise bins collapse. Output is peak-normalised so it never clips.
+- `denoise_audio(data, strength, noise_profile, export_format)` — the end-to-end
+  decode → gate → encode path, returning `(bytes, report)` with `method`,
+  `strength`, `noise_profile`, `input/output_peak`.
+- `process_voice` gained `denoise_strength` (and a `noise_profile` param), so the
+  existing enhance chain can denoise; a `"denoise"` preset was added.
+
+Surface:
+- **Service** `audio_denoise(ref, strength, noise_profile_ref, format)` in
+  `MediaToolsMixin` — resolves a media/edited asset, optionally a second asset as
+  the noise profile, persists the result under `library/edited/`.
+- **Agent tool + MCP**: `audio_denoise` registered (registry now 78 tools), in a
+  new `agent_audio.py` module so `agent_tools.py` stays under its line budget.
+- **Tests**: `tests/test_denoise.py` (7 tests) — tone-preservation/noise-suppression
+  on a synthetic 220 Hz tone buried in noise, report shape, auto-estimation,
+  `process_voice` with `denoise_strength`, preset registration, agent dispatch.
+
+Verified on a synthetic tone+noise signal: the 220 Hz tone keeps ~93% of its
+energy while the broadband noise collapses and the output error to the clean tone
+drops by ~34%; output never clips. Full pytest suite green (**956 tests**),
+`ruff` + `format` + `mypy` clean, smoke 64/64, MCP live connectivity OK.
+
+## Wiring into the product (added 2026-09-18)
+
+The YouTube, transcript and noise-reduction features are now reachable from the
+studio and from the re-cook pipeline, not just the API/agent tools.
+
+**Backend chain additions:**
+- **Auto-denoise in re-cook.** `ReCookRequest` gained `denoise` (bool) and
+  `denoise_strength` (0–1). `RecookPipeline.prepare_source` now, when
+  `denoise=True` and the source is video/audio, spectrally denoises the audio
+  *before* transcribing it (via `voice_engine.denoise_audio` + a new
+  `MediaLibrary.transcribe_file` that runs faster-whisper on an arbitrary audio
+  file). So a noisy recording yields a cleaner transcript and a better re-cook.
+- **Auto-transcribe after YouTube download.** `YouTubeDownloadRequest` gained
+  `auto_transcribe`; `youtube_download` transcribes the item right after pulling
+  it (subtitles first, then faster-whisper).
+- Refactor: `MediaLibrary.list` renamed to `list_items` (it shadowed the builtin
+  `list` type in annotations); `_run_whisper` extracted from `transcribe`.
+
+**Frontend (vanilla studio, `frontend/`):**
+- **YouTube panel** in Media Studio: search by keyword → list results (title,
+  uploader, duration) → **⬇ Tải** (with an "auto-transcribe" checkbox) and
+  **📜 Transcript** buttons per result.
+- **Transcript display**: a "📜 Transcript" button on YouTube-sourced media cards
+  fetches `/youtube/transcript` and shows the text (with source + word count);
+  the detail view already shows the AI reading.
+- **🎛 Giảm ồn** button on every video/audio media card opens a modal with a
+  **strength slider** and an optional **noise-profile dropdown** (picks another
+  audio/video asset as the pure-noise sample); it calls the `audio_denoise` tool
+  via `/tools/call` and saves the result to Edited Assets.
+
+Verified live over HTTP: `/youtube/search` (2 results), `/youtube/transcript`
+(source=subtitles, 2089 chars), upload + `audio_denoise` via `/tools/call`
+(method=spectral_gating, asset created). Smoke 64/64, `node --check` clean.
+
+## Audio Editor panel (added 2026-09-18)
+
+A dedicated **Audio Editor** in Media Studio so the operator can edit any
+audio/video asset without leaving the UI. It drives the existing audio tools via
+`/tools/call` and saves every result to Edited Assets.
+
+Pick an audio/video asset, then:
+- **✂ Trim** — cut to a start/end range (`audio_trim`).
+- **🌊 Fade** — fade in/out (`audio_fade`).
+- **🔊 Normalize** — loudness to a target LUFS (`audio_normalize`).
+- **⏩ Retime** — tempo change without pitch shift (`audio_retime`).
+- **🎛 Giảm ồn** — spectral denoise with a strength slider (`audio_denoise`).
+- **🥁 Beat/BPM** — detect tempo + beat/downbeat grid (`music_beat_grid`).
+- **🎵 Mix với nhạc nền** — mix the voice track with a chosen music-bed asset at a
+  set gain, with ducking (`audio_mix`).
+- **🎞 Tách audio** — pull the soundtrack out of a video (`extract_audio_track`).
+
+Each action shows the resulting asset id, duration, and a download link. The
+panel lives in `frontend/index.html` + `frontend/app.js`
+(`loadAudioEditor`, `aeCall`, `setupAudioEditorListeners`).
+
+Verified live over HTTP: all eight audio tools return 200 and produce an asset —
+trim, fade, normalize, retime, denoise, extract, beat grid (BPM 163, 4 beats on a
+synthetic tone), and mix. Smoke 64/64, `node --check` clean, `ruff`/`mypy` clean.
+
+## Download any audio clip (added 2026-09-18)
+
+A way to pull **any audio** (or a specific clip of it) into the library from a URL.
+
+- **`POST /media/audio-clip`** — `{url, start_seconds, end_seconds, language}`.
+  Downloads the audio from any URL (YouTube, podcast, direct MP3, SoundCloud,
+  etc.) with `extract_audio=True`, and when a valid `end_seconds > start_seconds`
+  range is given, trims it to that range and registers the clip as its own media
+  item. Backed by `MediaMixin.download_audio_clip` (reuses `media_from_url` +
+  `media_tools.trim_audio`).
+- **Agent tool + MCP**: `download_audio_clip` registered (registry now 79 tools).
+- **UI**: a "⬇ Tải bất kỳ đoạn âm thanh từ URL" box at the top of the Audio
+  Editor — paste any URL, optionally set a start/end range, and hit **⬇ Tải
+  audio** (full) or **✂ Tải đoạn (clip)**.
+
+Verified live over HTTP: `POST /media/audio-clip` with a real YouTube URL and
+`start=30, end=40` returned a 10-second `clip_Rick_Astley_...webm` item. Smoke
+64/64, `node --check` clean, `ruff`/`mypy` clean.
+
+## Media database (added 2026-09-18)
+
+Turned the media library into a proper queryable **database** for all audio,
+images, videos and documents — not just a flat list.
+
+- **`MediaItem.tags`** — items can carry tags (normalised: stripped, lowercased,
+  de-duped).
+- **`MediaLibrary.query(...)`** — rich filtering by `kind`, `tag`, free-text
+  `q` (over filename + transcription + text_content + source + tags), `source`,
+  `min_duration`/`max_duration`, `date_from`/`date_to`, and `sort`
+  (newest|oldest|name|size|duration).
+- **Tag management** — `set_tags`/`add_tag`/`remove_tag`/`all_tags`.
+- **`stats()`** — aggregate counts by kind, total bytes, and the tag list.
+- **Endpoints**:
+  - `GET /media` now accepts all the filter query params above.
+  - `GET /media/stats`, `GET /media/tags`.
+  - `POST /media/{id}/tags`, `POST /media/{id}/tags/{tag}`,
+    `DELETE /media/{id}/tags/{tag}`.
+- **UI (Media Studio)**: a filter bar (kind / tag / sort dropdowns + Lọc button),
+  a live stats line (item count, MB, counts by kind), and a **🏷 Tag** button on
+  every media card.
+
+Verified: query by tag/kind/free-text, tag CRUD, stats and all-tags all work over
+HTTP. Smoke 64/64, `node --check` clean, `ruff`/`mypy` clean.
+
+## Cloud media storage (added 2026-09-18)
+
+The media database can now be **cloud-backed** (S3-compatible object storage)
+while staying fully local by default.
+
+- **`src/content_factory/cloud.py`** — a pluggable `MediaStorage` backend:
+  - `LocalMediaStorage` — files under a root dir (the default).
+  - `S3MediaStorage` — S3-compatible via `boto3` (lazy import; keys map to
+    `<prefix>/media/<id>/<filename>` in the bucket).
+  - `MemoryMediaStorage` — in-memory, for tests.
+  - `build_media_storage(...)` — picks S3 when a bucket is configured, else local.
+- **`MediaLibrary`** now takes an optional `storage` backend. The local
+  `media_dir/files/` stays the working cache for in-place processing (ffmpeg,
+  transcription, trimming), while the *authoritative* copy lives in the backend:
+  uploads are written to storage, and `path_for` fetches the object back into the
+  local cache when it is missing. `delete` removes from storage too.
+- **Config** (`Settings`): `s3_bucket`, `s3_endpoint`, `s3_region`,
+  `s3_access_key`, `s3_secret_key`, `s3_prefix`. Set `s3_bucket` (+ install
+  `boto3`) to go cloud; leave empty for a purely local library.
+- **Tests**: `tests/test_cloud.py` (7 tests) — local/memory CRUD, `path_for`
+  fetch-back, backend selection, and S3 delegation against a mocked boto3 client.
+
+Verified: upload → storage, `path_for` fetch-back, delete-from-storage all work
+against the in-memory backend; S3 path delegates correctly (mocked). Smoke 64/64,
+`ruff`/`mypy` clean.
 
 > ## ⚠️ This report is a historical record. Its verdicts no longer hold.
 >

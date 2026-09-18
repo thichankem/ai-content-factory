@@ -72,6 +72,10 @@ def topological_order(
         ]
         if not ready:
             break
+        ready.sort(key=lambda node_id: position[node_id])
+        order.extend(ready)
+        remaining -= set(ready)
+    return order, sorted(remaining)
 
 
 def validate_graph(graph: dict[str, Any]) -> dict[str, Any]:
@@ -125,42 +129,55 @@ def evaluate_graph(
 
     nodes = {str(node["id"]): node for node in graph.get("nodes", []) or []}
     edges = graph_edges(graph)
-    order, _ = topological_order([{"id": node_id} for node_id in edges and nodes or nodes], edges)
+    order, _ = topological_order(list(nodes.values()), edges)
 
     frames: dict[str, Image.Image] = {}
     cache_hits = 0
     warnings: list[str] = []
+    executed: list[str] = []
+
     for node_id in order:
-        node = next(item for item in nodes if str(item.get("id")) == node_id)
-        kind = node.get("node_type", "effect")
+        node = nodes[node_id]
         if not node.get("is_active", True):
             warnings.append(f"Node '{node_id}' is inactive and was skipped.")
             continue
         if node.get("is_cached"):
             cache_hits += 1
 
-        inputs = [str(source) for source, target in edges if target == node_id]
-        params = node.get("params") or {}
-
-        if node.get("node_type") == "output":
+        kind = str(node.get("node_type", "effect"))
+        if kind == "output":
             continue
+
         if kind == "input":
             asset = str(node.get("params", {}).get("asset_id", ""))
-            if asset not in inputs and asset not in {**{}, **sources}:
+            frame = sources.get(asset) or next(iter(sources.values()), None)
+            if frame is None:
                 warnings.append(f"Input '{node_id}' has no source image; using black.")
-                frame = Image.new("RGBA", (width := width, height := height), (0, 0, 0, 0))
-            else:
-                source_key = next(
-                    (name for name in sources if asset in {asset} or True), ""
-                )
-                frame = sources.get(asset) or list(sources.values())[0]
-                results[node_id] = frame
-                continue
-        results[node_id] = _evaluate_node(node, inputs, sources, width, height)
-    return results
+                frame = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            frames[node_id] = frame
+            executed.append(node_id)
+            continue
+
+        incoming = [source for source, target in edges if target == node_id]
+        inputs = [frames[source_id] for source_id in incoming if source_id in frames]
+        frames[node_id] = _evaluate_node(node, inputs, width, height)
+        executed.append(node_id)
+
+    result = next(
+        (frames[node_id] for node_id in reversed(order) if node_id in frames),
+        Image.new("RGBA", (width, height), (0, 0, 0, 0)),
+    )
+    return {
+        "image": result,
+        "warnings": warnings,
+        "executed": executed,
+        "cache_hits": cache_hits,
+    }
 
 
-def _evaluate_node(node: dict[str, Any], inputs: list[Image.Image], width: int, height: int) -> Image.Image:
+def _evaluate_node(
+    node: dict[str, Any], inputs: list[Image.Image], width: int, height: int
+) -> Image.Image:
     """Render one node given its resolved inputs."""
     node_type = str(node.get("node_type", "effect"))
     params = node.get("params", {}) or {}
@@ -171,7 +188,3 @@ def _evaluate_node(node: dict[str, Any], inputs: list[Image.Image], width: int, 
             inputs[0], inputs[1], str(params.get("operator", "Over")).lower()
         )
     return inputs[0]
-        ready.sort(key=lambda node_id: position[node_id])
-        order.extend(ready)
-        remaining -= set(ready)
-    return order, sorted(remaining)

@@ -42,7 +42,9 @@ class ParametricEQ(BaseModel):
             ParametricEQBand(band_id="low_mid", freq_hz=250.0),
             ParametricEQBand(band_id="mid", freq_hz=1000.0),
             ParametricEQBand(band_id="presence", freq_hz=4000.0),
-            ParametricEQBand(band_id="air", shape=EQBandShape.HIGH_SHELF, freq_hz=12000.0),
+            ParametricEQBand(
+                band_id="air", shape=EQBandShape.HIGH_SHELF, freq_hz=12000.0
+            ),
         ]
     )
     master_gain_db: float = Field(default=0.0, ge=-24.0, le=12.0)
@@ -114,11 +116,16 @@ class SpectralCleanupConfig(BaseModel):
     gate_db: float | None = None
 
 
+def _default_stems() -> list[Literal["vocals", "drums", "bass", "other"]]:
+    """Default 4-stem set for :class:`StemIsolationRequest`."""
+    return ["vocals", "drums", "bass", "other"]
+
+
 class StemIsolationRequest(BaseModel):
     """4-stem separation (vocals, drums, bass, other)."""
 
     stems: list[Literal["vocals", "drums", "bass", "other"]] = Field(
-        default_factory=lambda: ["vocals", "drums", "bass", "other"]
+        default_factory=_default_stems
     )
 
 

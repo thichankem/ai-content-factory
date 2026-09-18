@@ -34,8 +34,8 @@ export function ScriptStudio() {
   const { viralityMutation } = useScriptEngine(currentProject?.id);
   const { approveScriptMutation, saveScriptMutation } = useProjects();
 
-  // Navigation mode for the main work area
-  const [activeSubTab, setActiveSubTab] = useState<"brief" | "editor" | "virality">("brief");
+  // Navigation mode for the main work area (2 tabs: 10 Tiêu Chí & Kịch Bản)
+  const [activeSubTab, setActiveSubTab] = useState<"brief" | "editor">("brief");
 
   // Briefing 10 dimensions state
   const [brief, setBrief] = useState<ScriptBriefSettings>(DEFAULT_BRIEF_SETTINGS);
@@ -184,7 +184,6 @@ ${brief.callToAction}`;
         topic: brief.topic || currentProject?.topic || "Viral script retention",
       });
       setViralityResult(res);
-      setActiveSubTab("virality");
     } catch (err) {
       console.error("Failed to calculate virality:", err);
     }
@@ -292,7 +291,7 @@ ${brief.callToAction}`;
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>1. Đề Bài (10 Tiêu Chí)</span>
+            <span>1. 10 Tiêu Chí</span>
           </button>
 
           <button
@@ -304,21 +303,9 @@ ${brief.callToAction}`;
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>2. Soạn Thảo & Visual Cues</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab("virality")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
-              activeSubTab === "virality"
-                ? "bg-nle-cyan text-black shadow-sm font-bold"
-                : "text-gray-400 hover:text-white hover:bg-nle-surface"
-            }`}
-          >
-            <Flame className="w-3.5 h-3.5" />
-            <span>3. Phân Tích & Duyệt Gate 1</span>
+            <span>2. Kịch Bản</span>
             {viralityResult && (
-              <Badge variant="amber" className="text-[9px] py-0 px-1">
+              <Badge variant="amber" className="text-[9px] py-0 px-1 ml-1">
                 {viralityResult.score}đ
               </Badge>
             )}
@@ -357,7 +344,7 @@ ${brief.callToAction}`;
       <div className="flex-1 flex space-x-3 min-h-0 overflow-hidden">
         {/* Left Side: ALWAYS-PRESENT AI CHATBOT (Tự sinh kịch bản & sửa theo dòng) */}
         {showChatbot && (
-          <div className="w-[360px] lg:w-[400px] shrink-0 h-full min-h-0 flex flex-col">
+          <div className="w-[320px] xl:w-[350px] shrink-0 h-full min-h-0 flex flex-col">
             <ScriptChatbot
               scriptText={scriptText}
               onScriptTextChange={setScriptText}
@@ -399,142 +386,14 @@ ${brief.callToAction}`;
                 onApproveGate1={handleApproveGate1}
                 isApproving={approveScriptMutation.isPending}
                 onScoreVirality={handleScoreVirality}
+                viralityResult={viralityResult}
+                isScoringVirality={viralityMutation.isPending}
                 onOpenHistory={() => setIsHistoryOpen(true)}
                 historyCount={historyEntries.length}
                 topic={brief.topic}
                 platform={brief.platform}
                 targetDuration={brief.targetDuration}
               />
-            </div>
-          )}
-
-          {/* TAB 4: Virality Analytics & Gate 1 */}
-          {activeSubTab === "virality" && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 min-h-0 overflow-y-auto">
-              <Card className="lg:col-span-2 flex flex-col min-h-0 border-nle-border bg-nle-panel">
-                <CardHeader className="py-2.5 px-3 border-b border-nle-border flex flex-row items-center justify-between">
-                  <CardTitle className="text-xs font-bold text-white flex items-center">
-                    <Flame className="w-4 h-4 text-amber-400 mr-1.5 fill-current" />
-                    <span>Báo Cáo Giữ Chân Khán Giả (Retention & Virality Score)</span>
-                  </CardTitle>
-                  <Button
-                    variant="neon"
-                    size="sm"
-                    onClick={handleScoreVirality}
-                    disabled={viralityMutation.isPending}
-                    className="text-xs h-7"
-                  >
-                    {viralityMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Quét Lại"}
-                  </Button>
-                </CardHeader>
-                <CardContent className="p-3 flex-1 flex flex-col space-y-3 min-h-0">
-                  {viralityResult ? (
-                    <>
-                      <div className="p-4 rounded-xl bg-gradient-to-r from-nle-panel via-nle-surface to-nle-panel border border-nle-border text-center">
-                        <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-nle-cyan via-emerald-400 to-nle-violet">
-                          {viralityResult.score}/100
-                        </span>
-                        <p className="text-xs text-gray-300 font-medium mt-1">
-                          Dự đoán tỷ lệ hoàn thành video trên {brief.platform.toUpperCase()}
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        <div className="p-2.5 rounded-lg bg-nle-surface border border-nle-border text-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-mono">Hook (3s đầu)</span>
-                          <p className="text-base font-bold text-nle-cyan">{viralityResult.hook_score}%</p>
-                        </div>
-                        <div className="p-2.5 rounded-lg bg-nle-surface border border-nle-border text-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-mono">Nhịp độ (Pacing)</span>
-                          <p className="text-base font-bold text-nle-violet">{viralityResult.pacing_score}%</p>
-                        </div>
-                        <div className="p-2.5 rounded-lg bg-nle-surface border border-nle-border text-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-mono">Thời lượng</span>
-                          <p className="text-base font-bold text-emerald-400">{viralityResult.duration_score}%</p>
-                        </div>
-                        <div className="p-2.5 rounded-lg bg-nle-surface border border-nle-border text-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-mono">Kêu gọi (CTA)</span>
-                          <p className="text-base font-bold text-amber-400">{viralityResult.cta_score}%</p>
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-lg bg-nle-surface border border-nle-border space-y-2">
-                        <span className="text-xs font-semibold text-white block">💡 Lời khuyên tối ưu từ Giám đốc Kịch bản AI:</span>
-                        <ul className="space-y-1.5">
-                          {viralityResult.advice.map((adv, idx) => (
-                            <li key={idx} className="text-xs text-gray-300 flex items-start">
-                              <span className="text-nle-cyan mr-2 font-bold">•</span>
-                              <span>{adv}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-400 border border-dashed border-nle-border rounded-lg">
-                      <Sparkles className="w-8 h-8 text-nle-cyan/40 mb-2" />
-                      <p className="text-xs">Bấm <strong>Chấm điểm Virality</strong> để AI phân tích toàn diện kịch bản.</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Gate 1 Review Card */}
-              <Card className="flex flex-col min-h-0 border-nle-border bg-nle-panel">
-                <CardHeader className="py-2.5 px-3 border-b border-nle-border">
-                  <CardTitle className="text-xs font-bold text-white flex items-center">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 mr-1.5" />
-                    <span>Cổng Duyệt Kịch Bản (Gate 1)</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 flex-1 flex flex-col justify-between space-y-3">
-                  <div className="space-y-2 text-xs text-gray-300">
-                    <div className="p-2.5 rounded bg-nle-surface border border-nle-border space-y-1">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-gray-400">Chủ đề:</span>
-                        <span className="font-semibold text-white truncate max-w-[160px]">{brief.topic}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-gray-400">Nền tảng:</span>
-                        <span className="text-amber-300 font-mono">{brief.platform.toUpperCase()}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-gray-400">Thời lượng:</span>
-                        <span className="text-nle-cyan font-mono">{brief.targetDuration}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-gray-400">Bản quyền nguồn:</span>
-                        <span className={currentProject?.source_rights_confirmed ? "text-emerald-400 font-bold" : "text-amber-400"}>
-                          {currentProject?.source_rights_confirmed ? "Đã xác nhận" : "Chưa xác nhận"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-gray-400 leading-normal">
-                      * Theo quy định bất biến của hệ thống, chỉ khi Operator duyệt Gate 1, pipeline mới được phép tiến hành tổng hợp giọng đọc và dựng video.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Button
-                      variant="default"
-                      onClick={handleApproveGate1}
-                      disabled={!currentProject?.source_rights_confirmed || approveScriptMutation.isPending}
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs h-9"
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                      Phê Duyệt Kịch Bản (Pass Gate 1)
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setActiveSubTab("editor")}
-                      className="w-full text-xs border-nle-border text-gray-300 h-8"
-                    >
-                      Quay Lại Sửa Kịch Bản
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           )}
         </div>

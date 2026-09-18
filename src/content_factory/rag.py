@@ -185,21 +185,6 @@ _SLIDE_RE = re.compile(
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
 
-def _heading_of(line: str) -> str | None:
-    m = _HEADING_RE.match(line.strip())
-    if m:
-        return m.group(2).strip()
-    stripped = line.strip()
-    if (
-        stripped
-        and len(stripped) <= 80
-        and not stripped.endswith((".", "!", "?", ",", ";", ":"))
-        and (stripped.isupper() or stripped.istitle())
-    ):
-        return stripped
-    return None
-
-
 def _split_paragraphs(text: str) -> list[str]:
     return [p.strip() for p in re.split(r"\n\s*\n", text or "") if p.strip()]
 

@@ -49,6 +49,7 @@ class MediaItem(BaseModel):
     text_content: str = ""
     language: str = "en"
     source: str = "upload"
+    tags: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -71,6 +72,8 @@ class ReCookRequest(BaseModel):
     change_music: bool = True
     script_style: str = "viral-short"
     platform: str = "youtube"
+    denoise: bool = False
+    denoise_strength: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
 class ReCookResult(BaseModel):
@@ -94,3 +97,71 @@ class MediaIngestUrlRequest(BaseModel):
     url: str
     language: str = "vi"
     extract_audio: bool = False
+
+
+class AudioClipRequest(BaseModel):
+    """Download any audio (by URL) and optionally cut a specific clip from it."""
+
+    url: str = Field(min_length=1)
+    start_seconds: float = Field(default=0.0, ge=0.0)
+    end_seconds: float = Field(default=0.0, ge=0.0)
+    language: str = "vi"
+
+
+class YouTubeSearchResult(BaseModel):
+    """One video returned by a YouTube search."""
+
+    id: str
+    title: str
+    url: str
+    duration_seconds: float | None = None
+    uploader: str = ""
+    thumbnail: str = ""
+    description: str = ""
+    view_count: int | None = None
+
+
+class YouTubeSearchRequest(BaseModel):
+    """Search YouTube for videos matching a query."""
+
+    query: str = Field(min_length=1, max_length=200)
+    limit: int = Field(default=8, ge=1, le=25)
+
+
+class YouTubeSearchResponse(BaseModel):
+    """Result of a YouTube search."""
+
+    query: str
+    count: int = 0
+    results: list[YouTubeSearchResult] = Field(default_factory=list)
+
+
+class YouTubeDownloadRequest(BaseModel):
+    """Download a YouTube video (by URL or id) into the media library."""
+
+    url: str = Field(min_length=1)
+    language: str = "vi"
+    extract_audio: bool = False
+    auto_transcribe: bool = False
+
+
+class YouTubeTranscriptRequest(BaseModel):
+    """Get a transcript for a YouTube video by any means."""
+
+    url: str = Field(min_length=1)
+    language: str = "en"
+
+
+class YouTubeTranscriptResult(BaseModel):
+    """A YouTube transcript, whatever strategy produced it.
+
+    ``source`` is ``subtitles`` (reused the video's own captions — instant, no
+    model) or ``whisper`` (fell back to local faster-whisper speech-to-text).
+    ``media_id`` is set only when the audio was downloaded and transcribed.
+    """
+
+    url: str
+    source: str = "subtitles"
+    text: str = ""
+    segments: list[TranscriptSegment] = Field(default_factory=list)
+    media_id: str | None = None

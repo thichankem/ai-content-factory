@@ -123,6 +123,24 @@ export function ScriptPacingBar({
     );
   }
 
+  const handleCustomWpm = (newWpm: number) => {
+    const clamped = Math.max(60, Math.min(350, newWpm));
+    const matchingPreset = PACING_PRESETS.find((p) => p.wpm === clamped);
+    if (matchingPreset) {
+      onPacingChange({
+        wpm: clamped,
+        label: matchingPreset.label,
+        preset: matchingPreset.preset,
+      });
+    } else {
+      onPacingChange({
+        wpm: clamped,
+        label: `Tùy chỉnh (${clamped} WPM)`,
+        preset: "custom",
+      });
+    }
+  };
+
   return (
     <div className="bg-nle-panel border border-nle-border rounded-xl p-2.5 px-3 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 shadow-md">
       {/* Left: Duration prediction & target comparison */}
@@ -163,8 +181,9 @@ export function ScriptPacingBar({
         )}
       </div>
 
-      {/* Right: Speech Rate Selector & Custom Slider */}
-      <div className="flex items-center space-x-2">
+      {/* Right: Speech Rate Selector & Custom Adjustable Slider / Stepper */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Presets buttons */}
         <div className="flex items-center space-x-1 bg-nle-surface p-0.5 rounded-lg border border-nle-border">
           <span className="text-[10px] text-gray-400 px-1.5 flex items-center font-mono">
             <Gauge className="w-3 h-3 mr-1 text-nle-violet" />
@@ -176,7 +195,7 @@ export function ScriptPacingBar({
               onClick={() => onPacingChange({ wpm: p.wpm, label: p.label, preset: p.preset })}
               title={p.description}
               className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                pacingConfig.preset === p.preset
+                pacingConfig.preset === p.preset && pacingConfig.wpm === p.wpm
                   ? "bg-nle-cyan text-black font-bold shadow-sm"
                   : "text-gray-300 hover:text-white hover:bg-nle-panel"
               }`}
@@ -184,6 +203,63 @@ export function ScriptPacingBar({
               {p.label.split(" ")[0]} ({p.wpm})
             </button>
           ))}
+          {pacingConfig.preset === "custom" && (
+            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono">
+              Tùy biến ({pacingConfig.wpm})
+            </span>
+          )}
+        </div>
+
+        {/* Custom Fine-Tuning Slider + Stepper */}
+        <div className="flex items-center space-x-1.5 bg-nle-surface/90 px-2 py-1 rounded-lg border border-nle-border">
+          <Sliders className="w-3.5 h-3.5 text-nle-cyan shrink-0" />
+          <input
+            type="range"
+            min="80"
+            max="300"
+            step="5"
+            value={pacingConfig.wpm}
+            onChange={(e) => handleCustomWpm(Number(e.target.value))}
+            className="w-16 sm:w-20 lg:w-24 h-1.5 bg-nle-panel rounded-lg appearance-none cursor-pointer accent-cyan-400"
+            title={`Kéo để điều chỉnh tốc độ đọc (${pacingConfig.wpm} WPM)`}
+          />
+          <div className="flex items-center space-x-0.5 bg-nle-panel rounded border border-nle-border px-1">
+            <button
+              type="button"
+              onClick={() => handleCustomWpm(pacingConfig.wpm - 5)}
+              className="text-gray-400 hover:text-white font-bold px-1 text-xs select-none hover:bg-nle-surface rounded"
+              title="Giảm 5 từ/phút"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              min="60"
+              max="350"
+              value={pacingConfig.wpm}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (!isNaN(val)) handleCustomWpm(val);
+              }}
+              className="w-10 bg-transparent text-center font-mono font-bold text-white text-xs focus:outline-none focus:ring-1 focus:ring-nle-cyan rounded"
+              title="Nhập số từ/phút chính xác"
+            />
+            <button
+              type="button"
+              onClick={() => handleCustomWpm(pacingConfig.wpm + 5)}
+              className="text-gray-400 hover:text-white font-bold px-1 text-xs select-none hover:bg-nle-surface rounded"
+              title="Tăng 5 từ/phút"
+            >
+              +
+            </button>
+          </div>
+          <span className="text-[10px] text-gray-400 font-mono">WPM</span>
+          <span
+            className="hidden xl:inline text-[9px] text-nle-cyan/90 font-mono bg-nle-cyan/10 px-1 py-0.5 rounded border border-nle-cyan/20"
+            title={`Tương đương ${(pacingConfig.wpm / 60).toFixed(1)} từ/giây (${(pacingConfig.wpm / 160).toFixed(2)}x so với tốc độ chuẩn)`}
+          >
+            {(pacingConfig.wpm / 160).toFixed(2)}x
+          </span>
         </div>
 
         {/* Mini progress bar of target time */}

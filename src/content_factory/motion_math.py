@@ -88,7 +88,9 @@ def evaluate_ramp(points: list[dict[str, Any]], position: float) -> float:
     return float(previous["speed_factor"])
 
 
-def ramp_duration(duration: float, points: list[dict[str, Any]], samples: int = 240) -> float:
+def ramp_duration(
+    duration: float, points: list[dict[str, Any]], samples: int = 240
+) -> float:
     """How long a clip of ``duration`` seconds takes once the ramp is applied.
 
     The ramp rescales time, so the rendered length is the integral of
@@ -121,7 +123,7 @@ def safe_zone_box(
     """
     if width <= 0 or height <= 0:
         raise ValueError("Safe zones need a non-zero canvas.")
-    top = int(round(height * max(0.0, min(50.0, top_percent)) / 100.0))
-    bottom = int(round(height * max(0.0, min(50.0, bottom_percent)) / 100.0))
-    right = int(round(width * max(0.0, min(50.0, right_percent)) / 100.0))
+    top = round(height * max(0.0, min(50.0, top_percent)) / 100.0)
+    bottom = round(height * max(0.0, min(50.0, bottom_percent)) / 100.0)
+    right = round(width * max(0.0, min(50.0, right_percent)) / 100.0)
     return {"left": 0, "top": top, "right": width - right, "bottom": height - bottom}

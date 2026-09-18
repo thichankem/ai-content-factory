@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -161,6 +162,52 @@ class KBIngestText(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     text: str = Field(min_length=1)
     source_type: str = "text"
+
+
+class KBIngestUrl(BaseModel):
+    """Ingest a web page as a source (NotebookLM lets you add web sources)."""
+
+    url: str = Field(min_length=1, max_length=2048)
+    title: str | None = Field(default=None, max_length=200)
+
+
+class KBTurn(BaseModel):
+    """One prior exchange in a NotebookLM-style grounded conversation."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+
+
+class KBAskRequest(BaseModel):
+    """Ask a grounded question against one knowledge base.
+
+    ``history`` carries the prior turns of the same conversation so follow-up
+    questions keep their context, exactly like NotebookLM's chat.
+    """
+
+    query: str = Field(min_length=1)
+    top_k: int = Field(default=6, ge=1, le=50)
+    use_vector: bool = True
+    use_keywords: bool = True
+    rerank: bool = True
+    history: list[KBTurn] = Field(default_factory=list)
+
+
+class KBAskResponse(BaseModel):
+    """A grounded answer with traceable citations (NotebookLM-style).
+
+    ``grounded`` is True when the answer was synthesized by a real LLM from the
+    retrieved context, and False when the offline extractive fallback was used
+    (no provider available). Either way every claim maps to ``citations``.
+    """
+
+    query: str
+    answer: str
+    citations: list[str] = Field(default_factory=list)
+    hits: list[RetrievalHit] = Field(default_factory=list)
+    provider: str = "template"
+    grounded: bool = True
+    generated_at: datetime = Field(default_factory=utcnow)
 
 
 class ChunkEdit(BaseModel):

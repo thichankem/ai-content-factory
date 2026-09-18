@@ -13,7 +13,7 @@ way the specification writes it.
 from __future__ import annotations
 
 import io
-from typing import Any
+from collections.abc import Callable
 
 import numpy as np
 from PIL import Image
@@ -34,38 +34,38 @@ class PhotoCompositorError(ValueError):
     """Raised when a document cannot be composited."""
 
 
-def _clamp01(values):
+def _clamp01(values: np.ndarray) -> np.ndarray:
     return np.clip(values, 0.0, 1.0)
 
 
-def _luminosity(rgb):
+def _luminosity(rgb: np.ndarray) -> np.ndarray:
     """Rec.709 luma, used by the component blending modes."""
     return (0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2])[
         ..., None
     ]
 
 
-def _saturation_of(rgb):
-    return rgb.max(axis=-1, keepdims=True) - rgb.min(axis=-1, keepdims=True)
+def _saturation_of(rgb: np.ndarray) -> np.ndarray:
+    return np.asarray(rgb.max(axis=-1, keepdims=True) - rgb.min(axis=-1, keepdims=True))
 
 
-def _screen(a, b):
+def _screen(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return 1.0 - (1.0 - a) * (1.0 - b)
 
 
-def _overlay(a, b):
+def _overlay(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.where(b <= 0.5, 2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b))
 
 
-def _soft_light(a, b):
-    return (1.0 - 2.0 * b) * a * a + 2.0 * b * a
+def _soft_light(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    return np.asarray((1.0 - 2.0 * b) * a * a + 2.0 * b * a)
 
 
-def _hard_light(a, b):
+def _hard_light(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return _overlay(b, a)
 
 
-def _vivid_light(a, b):
+def _vivid_light(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.where(
         b <= 0.5,
         a / (1.0 - 2.0 * b + 1e-6),
@@ -73,14 +73,12 @@ def _vivid_light(a, b):
     )
 
 
-def _linear_light(a, b):
+def _linear_light(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return _clamp01(a + 2.0 * b - 1.0)
 
 
-def _pin_light(a, b):
+def _pin_light(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.where(b <= 0.5, np.minimum(a, 2.0 * b), np.maximum(a, 2.0 * b - 1.0))
-
-
 
 
 def blend_images(
@@ -99,7 +97,10 @@ def blend_images(
 
     base_rgba = base.convert("RGBA")
     top_rgba = top.convert("RGBA")
-    size = (max(base_rgba.width, top_rgba.width), max(base_rgba.height, top_rgba.height))
+    size = (
+        max(base_rgba.width, top_rgba.width),
+        max(base_rgba.height, top_rgba.height),
+    )
     if base_rgba.size != size:
         base_rgba = base_rgba.resize(size, Image.Resampling.LANCZOS)
     if top_rgba.size != size:
@@ -123,10 +124,8 @@ def blend_images(
     return Image.fromarray(merged, "RGBA")
 
 
-def _component_blend(base, top, mode):
+def _component_blend(base: np.ndarray, top: np.ndarray, mode: str) -> np.ndarray:
     """HSL component blending: take one property from the top, the rest from base."""
-    top_luma, base_luma = _luminosity(top), _luminosity(base)
-    top_sat, base_sat = _saturation_of(top), _saturation_of(base)
     top_luma, base_luma = _luminosity(top), _luminosity(base)
     top_sat, base_sat = _saturation_of(top), _saturation_of(base)
     if mode == "hue":
@@ -206,29 +205,22 @@ def hex_to_rgb(value: str) -> np.ndarray:
         return np.array([int(text[i : i + 2], 16) for i in (0, 2, 4)], dtype=np.float32)
     except ValueError as exc:
         raise PhotoCompositorError(f"'{value}' is not a hex colour.") from exc
-        # Recolour the base towards the top's hue while keeping the base's own
-        # luminance — an approximation good enough for previews.
-        return _clamp01(base_luma + (top - top_luma) * 0.5)
-    if mode == "saturation":
-        scale = top_sat / (base_sat + 1e-6)
-        return _clamp01(base_luma + (base - base_luma) * scale)
-    if mode == "color":
-        return _clamp01(base_luma + (top - top_luma))
-    return _clamp01(base + (top_luma - base_luma))  # luminosity
-def _hard_mix(a, b):
+
+
+def _hard_mix(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.where(a + b >= 1.0, 1.0, 0.0)
 
 
-def _color_burn(a, b):
+def _color_burn(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return _clamp01(1.0 - (1.0 - a) / (b + 1e-6))
 
 
-def _color_dodge(a, b):
+def _color_dodge(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return _clamp01(a / (1.0 - b + 1e-6))
 
 
 #: mode name -> normalised-space blend of (base, top).
-BLEND_MODES = {
+BLEND_MODES: dict[str, Callable[[np.ndarray, np.ndarray], np.ndarray]] = {
     "normal": lambda a, b: b,
     "darken": np.minimum,
     "multiply": lambda a, b: a * b,
@@ -308,7 +300,9 @@ def render_document(document: dict) -> Image.Image:
     width = int(document.get("width", 1080))
     height = int(document.get("height", 1920))
     canvas = Image.new(
-        "RGBA", (width, height), _hex_to_rgba(document.get("background_color", "#00000000"))
+        "RGBA",
+        (width, height),
+        _hex_to_rgba(document.get("background_color", "#00000000")),
     )
 
     for layer in document.get("layers", []):
@@ -325,7 +319,6 @@ def render_document(document: dict) -> Image.Image:
             float(layer.get("opacity", 100)) / 100.0,
         )
     return canvas
-
 
     for layer in document.get("layers", []):
         if not layer.get("visible", True):
@@ -364,7 +357,12 @@ def _hex_to_rgba(value: str) -> tuple[int, int, int, int]:
     """Parse ``#rrggbb`` or ``#rrggbbaa`` into an RGBA tuple."""
     text = value.strip().lstrip("#")
     if len(text) == 8:
-        return (int(text[0:2], 16), int(text[2:4], 16), int(text[4:6], 16), int(text[6:8], 16))
+        return (
+            int(text[0:2], 16),
+            int(text[2:4], 16),
+            int(text[4:6], 16),
+            int(text[6:8], 16),
+        )
     rgb = hex_to_rgb(text)
     return (int(rgb[0]), int(rgb[1]), int(rgb[2]), 255)
 

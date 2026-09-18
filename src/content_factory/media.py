@@ -20,7 +20,7 @@ import threading
 import uuid
 from io import BytesIO
 from pathlib import Path
-from typing import BinaryIO, TypedDict
+from typing import Any, BinaryIO, TypedDict
 
 from .cache import ContentCache
 from .config import (
@@ -29,7 +29,14 @@ from .config import (
     validate_stream_chunk_bytes,
     validate_upload_max_bytes,
 )
-from .models import MediaItem, MediaKind, TranscriptSegment, utcnow
+from .hardware import require_ffmpeg
+from .models import (
+    MediaItem,
+    MediaKind,
+    TranscriptSegment,
+    YouTubeSearchResult,
+    utcnow,
+)
 from .resources import JobKind, ResourceGovernor, default_governor
 
 _VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".flv", ".wmv", ".ts"}
@@ -207,9 +214,7 @@ def convert_file(
     ffmpeg_binary: str | None = None,
 ) -> Path:
     """Convert a media file to another format with ffmpeg."""
-    binary = ffmpeg_binary or shutil.which("ffmpeg")
-    if binary is None:
-        raise RuntimeError("ffmpeg is required for media conversion.")
+    binary = require_ffmpeg(ffmpeg_binary, purpose="media conversion")
     fmt = target_format.lower().lstrip(".")
     if fmt not in CONVERT_TARGETS:
         raise ValueError(f"Unsupported target format '{fmt}'.")
@@ -236,6 +241,7 @@ class MediaLibrary:
         governor: ResourceGovernor | None = None,
         transcribe_model: str = "base",
         transcribe_device: str = "auto",
+        storage: Any | None = None,
     ) -> None:
         validate_stream_chunk_bytes(chunk_bytes)
         validate_upload_max_bytes(max_bytes)
@@ -252,6 +258,14 @@ class MediaLibrary:
         self._lock = threading.RLock()
         self._items: dict[str, MediaItem] = {}
         self._cache = cache
+        # Authoritative media-file store. Local disk by default; S3 when the
+        # caller passes a cloud backend. ``media_dir/files/`` stays the local
+        # processing cache either way.
+        if storage is None:
+            from .cloud import LocalMediaStorage
+
+            storage = LocalMediaStorage(self._dir / "files")
+        self._storage = storage
         self._load()
 
     # --- persistence ----------------------------------------------------------
@@ -339,10 +353,16 @@ class MediaLibrary:
                 except BaseException:
                     self._items.pop(item_id, None)
                     raise
+            # Persist the authoritative copy to the storage backend (local or S3).
+            self._storage.save(self._storage_key(item), dest)
             return item
         except BaseException:
             dest.unlink(missing_ok=True)
             raise
+
+    @staticmethod
+    def _storage_key(item: MediaItem) -> str:
+        return f"media/{item.id}/{item.filename}"
 
     def download_from_url(
         self,
@@ -426,6 +446,143 @@ class MediaLibrary:
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
+    def search_youtube(self, query: str, limit: int = 8) -> list[YouTubeSearchResult]:
+        """Search YouTube for videos matching ``query`` (metadata only, no download).
+
+        Uses yt-dlp's ``ytsearch`` extractor, which is the same engine that backs
+        the download path, so search and download agree on what a video is.
+        Returns lightweight, JSON-safe results an agent can pick from.
+        """
+        import yt_dlp
+
+        limit = max(1, min(int(limit), 25))
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+            "skip_download": True,
+            "extract_flat": "in_playlist",
+        }
+        results: list[YouTubeSearchResult] = []
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+            for entry in info.get("entries") or []:
+                if not entry:
+                    continue
+                video_id = entry.get("id") or ""
+                url = entry.get("webpage_url") or (
+                    f"https://www.youtube.com/watch?v={video_id}" if video_id else ""
+                )
+                results.append(
+                    YouTubeSearchResult(
+                        id=video_id,
+                        title=entry.get("title") or "",
+                        url=url,
+                        duration_seconds=entry.get("duration"),
+                        uploader=entry.get("channel")
+                        or entry.get("uploader")
+                        or entry.get("channel_id")
+                        or "",
+                        thumbnail=entry.get("thumbnail") or "",
+                        description=(entry.get("description") or "")[:500],
+                        view_count=entry.get("view_count"),
+                    )
+                )
+        return results
+
+    # --- Transcript by any means ----------------------------------------------
+
+    def fetch_subtitles(self, url: str, language: str = "en") -> str | None:
+        """Fetch a YouTube video's existing subtitles/captions (instant, no model).
+
+        Tries manual captions first, then auto-generated ones, preferring the
+        requested language and falling back to English. Returns the joined
+        transcript text, or ``None`` when the video has no captions at all.
+        """
+        import yt_dlp
+
+        temp_dir = Path(tempfile.mkdtemp(prefix="cf_subs_"))
+        try:
+            langs = [language, "en"]
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "skip_download": True,
+                "writesubtitles": True,
+                "writeautomaticsub": True,
+                "subtitleslangs": langs,
+                "subtitlesformat": "vtt",
+                "outtmpl": str(temp_dir / "%(id)s"),
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info(url, download=True)
+            vtt_files = sorted(temp_dir.glob("*.vtt"))
+            if not vtt_files:
+                return None
+            # Prefer the requested language, then English, then any.
+            vtt_files.sort(
+                key=lambda p: 0 if language in p.name else (1 if "en" in p.name else 2)
+            )
+            text = self._vtt_to_text(
+                vtt_files[0].read_text(encoding="utf-8", errors="ignore")
+            )
+            return text or None
+        except Exception:  # noqa: BLE001 - a subtitle miss just means fall back to whisper
+            return None
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    @staticmethod
+    def _vtt_to_text(vtt: str) -> str:
+        """Strip a WebVTT file down to its spoken lines."""
+        import re
+
+        lines: list[str] = []
+        for raw in vtt.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("WEBVTT") or "-->" in line:
+                continue
+            if line.startswith(("Kind:", "Language:", "NOTE")):
+                continue
+            line = re.sub(r"<[^>]+>", "", line)
+            if line:
+                lines.append(line)
+        return " ".join(lines).strip()
+
+    @staticmethod
+    def _youtube_url_from_source(source: str) -> str | None:
+        """Extract a YouTube URL from an item's ``url:...`` source, if any."""
+        if not source or not source.startswith("url:"):
+            return None
+        url = source[len("url:") :].strip()
+        if "youtube.com" in url or "youtu.be" in url:
+            return url
+        return None
+
+    def transcribe_youtube(self, url: str, language: str = "en") -> dict:
+        """Get a transcript for a YouTube video by any means.
+
+        Strategy 1 — existing subtitles/captions (instant, free, no model).
+        Strategy 2 — download the audio and run faster-whisper locally.
+        Returns ``{"source", "text", "segments", "media_id"}``.
+        """
+        subs = self.fetch_subtitles(url, language)
+        if subs:
+            return {
+                "source": "subtitles",
+                "text": subs,
+                "segments": [],
+                "media_id": None,
+            }
+        item = self.download_from_url(url, language=language, extract_audio=True)
+        item = self.transcribe(item.id, language)
+        return {
+            "source": "whisper",
+            "text": item.transcription,
+            "segments": [s.model_dump() for s in item.transcript_segments],
+            "media_id": item.id,
+        }
+
     def add_item(self, item: MediaItem) -> MediaItem:
         """Register an already-constructed item (e.g. an imported one)."""
         with self._lock:
@@ -433,11 +590,153 @@ class MediaLibrary:
         self._save()
         return item
 
-    def list(self) -> list[MediaItem]:
+    def list_items(self) -> list[MediaItem]:
         with self._lock:
             return sorted(
                 self._items.values(), key=lambda i: i.created_at, reverse=True
             )
+
+    def query(
+        self,
+        *,
+        kind: str | None = None,
+        tag: str | None = None,
+        q: str | None = None,
+        source: str | None = None,
+        min_duration: float | None = None,
+        max_duration: float | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        sort: str = "newest",
+    ) -> list[MediaItem]:
+        """Query the media database with rich filters (the "database" view).
+
+        Filters by kind, tag, free-text (filename/transcription/text_content/tags),
+        source, duration range and creation-date range, then sorts by newest,
+        oldest, name, size or duration.
+        """
+        items = self.list_items()
+        if kind:
+            items = [i for i in items if i.kind.value == kind]
+        if tag:
+            needle = tag.strip().lower()
+            items = [i for i in items if any(t.lower() == needle for t in i.tags)]
+        if source:
+            items = [i for i in items if i.source == source]
+        if min_duration is not None:
+            items = [
+                i
+                for i in items
+                if i.duration_seconds is not None and i.duration_seconds >= min_duration
+            ]
+        if max_duration is not None:
+            items = [
+                i
+                for i in items
+                if i.duration_seconds is not None and i.duration_seconds <= max_duration
+            ]
+        if date_from:
+            from datetime import datetime as _dt
+
+            try:
+                lo = _dt.fromisoformat(date_from)
+                items = [i for i in items if i.created_at >= lo]
+            except ValueError:
+                pass
+        if date_to:
+            from datetime import datetime as _dt
+
+            try:
+                hi = _dt.fromisoformat(date_to)
+                items = [i for i in items if i.created_at <= hi]
+            except ValueError:
+                pass
+        if q:
+            needles = [token.lower() for token in q.split() if token]
+            if needles:
+                items = [i for i in items if self._matches(i, needles)]
+        return self._sort(items, sort)
+
+    @staticmethod
+    def _matches(item: MediaItem, needles: list[str]) -> bool:
+        haystack = " ".join(
+            [
+                item.filename,
+                item.transcription or "",
+                item.text_content or "",
+                item.source,
+                " ".join(item.tags),
+            ]
+        ).lower()
+        return all(n in haystack for n in needles)
+
+    @staticmethod
+    def _sort(items: list[MediaItem], sort: str) -> list[MediaItem]:
+        if sort == "oldest":
+            return sorted(items, key=lambda i: i.created_at)
+        if sort == "name":
+            return sorted(items, key=lambda i: i.filename.lower())
+        if sort == "size":
+            return sorted(items, key=lambda i: i.size_bytes, reverse=True)
+        if sort == "duration":
+            return sorted(
+                items,
+                key=lambda i: (i.duration_seconds is None, i.duration_seconds or 0),
+                reverse=True,
+            )
+        return sorted(items, key=lambda i: i.created_at, reverse=True)
+
+    def all_tags(self) -> list[str]:
+        """Every distinct tag across the library, sorted."""
+        seen: set[str] = set()
+        with self._lock:
+            for item in self._items.values():
+                seen.update(t.strip().lower() for t in item.tags if t.strip())
+        return sorted(seen)
+
+    def set_tags(self, media_id: str, tags: list[str]) -> MediaItem:
+        """Replace an item's tags (normalised: stripped, lowercased, de-duped)."""
+        item = self.require(media_id)
+        norm: list[str] = []
+        for t in tags:
+            clean = t.strip().lower()
+            if clean and clean not in norm:
+                norm.append(clean)
+        item.tags = norm
+        return self.update(item)
+
+    def add_tag(self, media_id: str, tag: str) -> MediaItem:
+        """Add one tag to an item (idempotent)."""
+        item = self.require(media_id)
+        clean = tag.strip().lower()
+        if clean and clean not in item.tags:
+            item.tags.append(clean)
+            return self.update(item)
+        return item
+
+    def remove_tag(self, media_id: str, tag: str) -> MediaItem:
+        """Remove one tag from an item (idempotent)."""
+        item = self.require(media_id)
+        clean = tag.strip().lower()
+        if clean in item.tags:
+            item.tags = [t for t in item.tags if t != clean]
+            return self.update(item)
+        return item
+
+    def stats(self) -> dict[str, Any]:
+        """Aggregate counts and sizes across the library (dashboard numbers)."""
+        items = self.list_items()
+        by_kind: dict[str, int] = {}
+        total_bytes = 0
+        for item in items:
+            by_kind[item.kind.value] = by_kind.get(item.kind.value, 0) + 1
+            total_bytes += item.size_bytes
+        return {
+            "total_items": len(items),
+            "total_bytes": total_bytes,
+            "by_kind": by_kind,
+            "tags": self.all_tags(),
+        }
 
     def get(self, media_id: str) -> MediaItem | None:
         with self._lock:
@@ -451,7 +750,20 @@ class MediaLibrary:
 
     def path_for(self, item: MediaItem) -> Path | None:
         candidate = self._dir / "files" / f"{item.id}_{item.filename}"
-        return candidate if candidate.is_file() else None
+        if candidate.is_file():
+            return candidate
+        # Not cached locally — pull the authoritative copy from storage (S3).
+        key = self._storage_key(item)
+        if not self._storage.exists(key):
+            return None
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with self._storage.open(key) as src, candidate.open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+            return candidate
+        except Exception:  # noqa: BLE001 - a fetch failure just means "no file"
+            candidate.unlink(missing_ok=True)
+            return None
 
     def delete(self, media_id: str) -> bool:
         with self._lock:
@@ -462,6 +774,8 @@ class MediaLibrary:
         if path is not None:
             with contextlib.suppress(OSError):
                 path.unlink(missing_ok=True)
+        with contextlib.suppress(Exception):  # storage delete is best-effort
+            self._storage.delete(self._storage_key(item))
         self._save()
         return True
 
@@ -535,50 +849,25 @@ class MediaLibrary:
             raise ValueError(f"'{item.kind}' cannot be transcribed; use extract_text")
         if item.transcription:
             return item
+
+        # Strategy 1 — reuse the video's existing subtitles (instant, no model).
+        # Tried before the file check because subtitles need only the source URL,
+        # not the downloaded file on disk.
+        youtube_url = self._youtube_url_from_source(item.source)
+        if youtube_url:
+            subs = self.fetch_subtitles(youtube_url, language)
+            if subs:
+                item.transcription = subs
+                item.transcript_segments = []
+                item.language = language
+                return self.update(item)
+
         path = self.path_for(item)
         if path is None:
             raise FileNotFoundError(f"media file for '{media_id}' is missing")
 
         def compute() -> tuple[str, list[TranscriptSegment]]:
-            try:
-                from faster_whisper import WhisperModel
-            except ImportError as exc:  # pragma: no cover - depends on optional tool
-                raise RuntimeError(
-                    "faster-whisper is not installed; run `pip install faster-whisper` "
-                    "to enable transcription."
-                ) from exc
-
-            governor = self._governor or default_governor()
-            with governor.job(JobKind.TRANSCRIBE) as decision:
-                device, compute_type, _reason = governor.whisper_compute(
-                    self._transcribe_device
-                )
-                if decision.admission.value != "gpu":
-                    # The GPU was busy, hot or short of VRAM: spend CPU time instead
-                    # of waiting, and say so rather than silently queueing.
-                    device, compute_type = "cpu", "int8"
-                model = WhisperModel(
-                    self._transcribe_model, device=device, compute_type=compute_type
-                )
-                # faster-whisper decodes lazily, so the generator must be consumed
-                # while the slot is held — otherwise the heavy work would happen
-                # after the governor already let another job onto the GPU.
-                segments, _info = model.transcribe(str(path), language=language)
-                lines: list[str] = []
-                cues: list[TranscriptSegment] = []
-                for seg in segments:
-                    text = (seg.text or "").strip()
-                    if not text:
-                        continue
-                    lines.append(text)
-                    cues.append(
-                        TranscriptSegment(
-                            start_seconds=round(float(seg.start), 2),
-                            end_seconds=round(float(seg.end), 2),
-                            text=text,
-                        )
-                    )
-                return " ".join(lines), cues
+            return self._run_whisper(path, language)
 
         if self._cache is not None:
             key = self._cache.key_for_file(
@@ -609,6 +898,57 @@ class MediaLibrary:
         item.transcript_segments = cues
         item.language = language
         return self.update(item)
+
+    def _run_whisper(
+        self, path: Path, language: str
+    ) -> tuple[str, list[TranscriptSegment]]:
+        """Run faster-whisper on an audio file; return (text, cues).
+
+        Held inside the governor's transcribe slot so the lazy decoder is fully
+        consumed before another heavy job is admitted to the GPU.
+        """
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError as exc:  # pragma: no cover - depends on optional tool
+            raise RuntimeError(
+                "faster-whisper is not installed; run `pip install faster-whisper` "
+                "to enable transcription."
+            ) from exc
+
+        governor = self._governor or default_governor()
+        with governor.job(JobKind.TRANSCRIBE) as decision:
+            device, compute_type, _reason = governor.whisper_compute(
+                self._transcribe_device
+            )
+            if decision.admission.value != "gpu":
+                # The GPU was busy, hot or short of VRAM: spend CPU time instead
+                # of waiting, and say so rather than silently queueing.
+                device, compute_type = "cpu", "int8"
+            model = WhisperModel(
+                self._transcribe_model, device=device, compute_type=compute_type
+            )
+            segments, _info = model.transcribe(str(path), language=language)
+            lines: list[str] = []
+            cues: list[TranscriptSegment] = []
+            for seg in segments:
+                text = (seg.text or "").strip()
+                if not text:
+                    continue
+                lines.append(text)
+                cues.append(
+                    TranscriptSegment(
+                        start_seconds=round(float(seg.start), 2),
+                        end_seconds=round(float(seg.end), 2),
+                        text=text,
+                    )
+                )
+            return " ".join(lines), cues
+
+    def transcribe_file(
+        self, path: Path, language: str = "en"
+    ) -> tuple[str, list[TranscriptSegment]]:
+        """Transcribe an arbitrary audio file (no media item) with faster-whisper."""
+        return self._run_whisper(Path(path), language)
 
     def extract_text(self, media_id: str) -> MediaItem:
         """Extract plain text from a document item (PDF/text)."""
@@ -650,9 +990,7 @@ def synthesize_music_bed(
     A stacked set of detuned sine tones with slow tremolo produces a
     cinematic drone that is safe to use as a re-cooked cut's new soundtrack.
     """
-    binary = ffmpeg_binary or shutil.which("ffmpeg")
-    if binary is None:
-        raise RuntimeError("ffmpeg is required to synthesize a music bed.")
+    binary = require_ffmpeg(ffmpeg_binary, purpose="synthesizing a music bed")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     duration = max(1.0, float(duration_seconds))
     # Three detuned sine oscillators + a soft low octave, amplitude-modulated.

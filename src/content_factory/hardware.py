@@ -14,6 +14,11 @@ believing it.
 
 Standard library only (``nvidia-smi`` plus ``ctypes`` for RAM), so nothing has to
 be installed and a machine without a GPU degrades to "no GPU" rather than failing.
+
+This module also owns the one answer to "which ffmpeg should we shell out to?"
+(:func:`resolve_ffmpeg` / :func:`require_ffmpeg`). Eight call sites used to spell
+that policy out by hand, which meant a change to it — an env override, a bundled
+build, a portable install — had to be made eight times.
 """
 
 from __future__ import annotations
@@ -35,6 +40,8 @@ __all__ = [
     "machine_pressure",
     "probe",
     "probe_encoder",
+    "require_ffmpeg",
+    "resolve_ffmpeg",
 ]
 
 #: Extra builds to look for when the primary ffmpeg cannot start an encoder.
@@ -353,6 +360,38 @@ def _onnx_providers() -> tuple[str, ...]:
         return ()
 
 
+def resolve_ffmpeg(
+    explicit: str | None = None, *, which: Callable[[str], str | None] = shutil.which
+) -> str | None:
+    """The ffmpeg binary to use: an operator-supplied path, else the one on PATH.
+
+    Returning ``None`` rather than raising keeps discovery honest — probing and
+    the capability report must work on a machine with no ffmpeg at all. Callers
+    that cannot proceed without it ask :func:`require_ffmpeg` instead.
+    """
+    return explicit or which("ffmpeg")
+
+
+def require_ffmpeg(
+    explicit: str | None = None,
+    *,
+    purpose: str,
+    error: type[Exception] = RuntimeError,
+    which: Callable[[str], str | None] = shutil.which,
+) -> str:
+    """Resolve ffmpeg, or fail with a message naming what needed it.
+
+    ``error`` is the exception type the caller's layer already speaks
+    (:class:`~content_factory.render.RenderError`, ``VoiceError``), so a missing
+    binary surfaces as the same class of failure as everything else in that
+    layer rather than as a bare ``RuntimeError``.
+    """
+    binary = resolve_ffmpeg(explicit, which=which)
+    if binary is None:
+        raise error(f"ffmpeg is required for {purpose}.")
+    return binary
+
+
 def probe(
     *,
     which: Callable[[str], str | None] = shutil.which,
@@ -371,7 +410,7 @@ def probe(
     """Measure this machine. Every probe is injectable so tests need no GPU."""
     smi = which("nvidia-smi")
     builds = discover(
-        ffmpeg_binary or which("ffmpeg"),
+        resolve_ffmpeg(ffmpeg_binary, which=which),
         _extra_binaries(extra_binaries),
         bundled(),
         encoders=encoders,

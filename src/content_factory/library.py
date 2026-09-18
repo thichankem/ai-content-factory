@@ -15,7 +15,6 @@ import hashlib
 import re
 import sqlite3
 import threading
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -23,9 +22,6 @@ import httpx
 
 from .models import DocumentResult, LibraryHit, LibraryStats
 
-_SUPPORTED_EXTENSIONS = frozenset(
-    {".pdf", ".txt", ".md", ".markdown", ".rst", ".html", ".htm", ".csv"}
-)
 _SNIPPET_OPEN = "[["
 _SNIPPET_CLOSE = "]]"
 
@@ -96,17 +92,6 @@ def _build_match_query(query: str) -> str:
             continue
         terms.append(f'"{term}"*' if prefix else f'"{term}"')
     return " AND ".join(terms)
-
-
-@dataclass
-class IndexStats:
-    """Outcome of an indexing run."""
-
-    files_indexed: int = 0
-    files_skipped: int = 0
-    files_failed: int = 0
-    pages_indexed: int = 0
-    errors: list[str] = field(default_factory=list)
 
 
 class DocumentLibrary:
@@ -185,27 +170,6 @@ class DocumentLibrary:
         return dest
 
     # --- indexing -----------------------------------------------------------
-
-    def index_directory(self, path: str | None = None) -> IndexStats:
-        stats = IndexStats()
-        root = Path(path) if path else self.root
-        for candidate in sorted(root.rglob("*")):
-            if (
-                candidate.is_file()
-                and candidate.suffix.lower() in _SUPPORTED_EXTENSIONS
-            ):
-                try:
-                    pages = self.index_file(candidate)
-                except Exception as err:  # noqa: BLE001 - one unreadable file must not abort a whole index run
-                    stats.files_failed += 1
-                    stats.errors.append(f"{candidate.name}: {err}")
-                    continue
-                if pages is None:
-                    stats.files_skipped += 1
-                else:
-                    stats.files_indexed += 1
-                    stats.pages_indexed += pages
-        return stats
 
     def index_file(self, path: Path) -> int | None:
         """Index one file; returns unit count, or None if unchanged."""

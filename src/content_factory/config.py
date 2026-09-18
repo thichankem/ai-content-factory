@@ -118,6 +118,16 @@ class Settings(BaseSettings):
     library_db_path: str = "./library/.index.db"
     # Universal media library (video/audio/image/document uploads).
     media_dir: str = "./library/media"
+    # Optional cloud object storage for media files. When ``s3_bucket`` is set
+    # (and boto3 is installed), the authoritative copy of every media file is
+    # kept in S3-compatible storage; the local ``media_dir`` remains a cache for
+    # in-place processing. Leave empty for a purely local library.
+    s3_bucket: str = ""
+    s3_endpoint: str = ""
+    s3_region: str = ""
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_prefix: str = "content-factory"
     stream_chunk_bytes: int = Field(
         default=DEFAULT_STREAM_CHUNK_BYTES, ge=1, le=MAX_STREAM_CHUNK_BYTES
     )

@@ -27,6 +27,11 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from .agent_audio import audio_tool_specs
+from .agent_knowledge import knowledge_tool_specs
+from .agent_photo import photo_tool_specs
+from .agent_video import video_tool_specs
+from .agent_youtube import youtube_tool_specs
 from .models import (
     SEO_METRICS,
     SEO_PLATFORMS,
@@ -1784,11 +1789,16 @@ TOOL_SPECS: list[ToolSpec] = [
     *_DISCOVERY,
     *_COMPUTE,
     *_RESEARCH,
+    *knowledge_tool_specs(),
+    *youtube_tool_specs(),
     *_SCRIPT,
     *_TIMELINE,
     *_MEDIA,
     *_AUDIO,
+    *audio_tool_specs(),
     *_IMAGE,
+    *photo_tool_specs(),
+    *video_tool_specs(),
     *_VOICE,
     *_SEO,
     *_PRODUCTION,

@@ -1,0 +1,99 @@
+........................................................................ [  7%]
+........................................................................ [ 15%]
+........................................................................ [ 22%]
+............................................F..........F................ [ 30%]
+........................................................................ [ 37%]
+........................................................................ [ 45%]
+........................................................................ [ 52%]
+........................................................................ [ 60%]
+........................................................................ [ 67%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+........................................................................ [ 90%]
+........................................................................ [ 97%]
+.......................                                                  [100%]
+================================== FAILURES ===================================
+___________________ test_upload_and_retrieve_text_document ____________________
+
+library = <content_factory.media.MediaLibrary object at 0x000001F82175C550>
+
+    def test_upload_and_retrieve_text_document(library: MediaLibrary) -> None:
+        item = library.upload("notes.txt", b"Hello world.\nSecond line.", language="en")
+        assert item.kind == MediaKind.DOCUMENT
+        assert item.size_bytes == len(b"Hello world.\nSecond line.")
+        assert library.get(item.id) is not None
+>       assert item in library.list()
+                       ^^^^^^^^^^^^
+E       AttributeError: 'MediaLibrary' object has no attribute 'list'
+
+tests\test_media.py:39: AttributeError
+__________ test_upload_stream_rejects_oversize_and_keeps_index_clean __________
+
+tmp_path = WindowsPath('C:/Users/ADMIN/AppData/Local/Temp/pytest-of-ADMIN/pytest-698/test_upload_stream_rejects_ove0')
+
+    def test_upload_stream_rejects_oversize_and_keeps_index_clean(tmp_path) -> None:
+        lib = MediaLibrary(tmp_path / "media", max_bytes=10)
+        with pytest.raises(UploadTooLargeError):
+            lib.upload_stream("clip.mp4", io.BytesIO(b"x" * 11))
+>       assert lib.list() == []
+               ^^^^^^^^
+E       AttributeError: 'MediaLibrary' object has no attribute 'list'
+
+tests\test_media.py:197: AttributeError
+============================== warnings summary ===============================
+.venv\Lib\site-packages\starlette\testclient.py:53
+  C:\Users\ADMIN\OneDrive\M�y t�nh\GitHub\ai-content-factory\.venv\Lib\site-packages\starlette\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+tests/test_media_tools.py::test_describe_is_json_safe_and_covers_the_essentials
+tests/test_media_tools.py::test_describe_media_tool_returns_a_reading
+  C:\Users\ADMIN\OneDrive\M�y t�nh\GitHub\ai-content-factory\.venv\Lib\site-packages\easyocr\detection.py:81: DeprecationWarning: torch.ao.quantization is deprecated and will be removed in 2.10. 
+  For migrations of users: 
+  1. Eager mode quantization (torch.ao.quantization.quantize, torch.ao.quantization.quantize_dynamic), please migrate to use torchao eager mode quantize_ API instead 
+  2. FX graph mode quantization (torch.ao.quantization.quantize_fx.prepare_fx,torch.ao.quantization.quantize_fx.convert_fx, please migrate to use torchao pt2e quantization API instead (prepare_pt2e, convert_pt2e) 
+  3. pt2e quantization has been migrated to torchao (https://github.com/pytorch/ao/tree/main/torchao/quantization/pt2e) 
+  see https://github.com/pytorch/ao/issues/2259 for more details
+    torch.quantization.quantize_dynamic(net, dtype=torch.qint8, inplace=True)
+
+tests/test_media_tools.py::test_describe_is_json_safe_and_covers_the_essentials
+tests/test_media_tools.py::test_describe_is_json_safe_and_covers_the_essentials
+tests/test_media_tools.py::test_describe_media_tool_returns_a_reading
+tests/test_media_tools.py::test_describe_media_tool_returns_a_reading
+  C:\Users\ADMIN\OneDrive\M�y t�nh\GitHub\ai-content-factory\.venv\Lib\site-packages\torch\ao\quantization\quantize.py:570: DeprecationWarning: torch.ao.quantization is deprecated and will be removed in 2.10. 
+  For migrations of users: 
+  1. Eager mode quantization (torch.ao.quantization.quantize, torch.ao.quantization.quantize_dynamic), please migrate to use torchao eager mode quantize_ API instead 
+  2. FX graph mode quantization (torch.ao.quantization.quantize_fx.prepare_fx,torch.ao.quantization.quantize_fx.convert_fx, please migrate to use torchao pt2e quantization API instead (prepare_pt2e, convert_pt2e) 
+  3. pt2e quantization has been migrated to torchao (https://github.com/pytorch/ao/tree/main/torchao/quantization/pt2e) 
+  see https://github.com/pytorch/ao/issues/2259 for more details
+    convert(model, mapping, inplace=True)
+
+tests/test_media_tools.py::test_describe_is_json_safe_and_covers_the_essentials
+tests/test_media_tools.py::test_describe_media_tool_returns_a_reading
+  C:\Users\ADMIN\OneDrive\M�y t�nh\GitHub\ai-content-factory\.venv\Lib\site-packages\easyocr\recognition.py:177: DeprecationWarning: torch.ao.quantization is deprecated and will be removed in 2.10. 
+  For migrations of users: 
+  1. Eager mode quantization (torch.ao.quantization.quantize, torch.ao.quantization.quantize_dynamic), please migrate to use torchao eager mode quantize_ API instead 
+  2. FX graph mode quantization (torch.ao.quantization.quantize_fx.prepare_fx,torch.ao.quantization.quantize_fx.convert_fx, please migrate to use torchao pt2e quantization API instead (prepare_pt2e, convert_pt2e) 
+  3. pt2e quantization has been migrated to torchao (https://github.com/pytorch/ao/tree/main/torchao/quantization/pt2e) 
+  see https://github.com/pytorch/ao/issues/2259 for more details
+    torch.quantization.quantize_dynamic(model, dtype=torch.qint8, inplace=True)
+
+tests/test_media_tools.py::test_describe_is_json_safe_and_covers_the_essentials
+  C:\Users\ADMIN\OneDrive\M�y t�nh\GitHub\ai-content-factory\.venv\Lib\site-packages\torch\ao\nn\quantized\dynamic\modules\rnn.py:162: UserWarning: torch.quantize_per_tensor, torch.quantize_per_channel and other quantized tensor creation functions that produce tensors with dtype torch.quint8, torch.qint8, and torch.qint32 are deprecated and will be removed in a future PyTorch release. Please see https://github.com/pytorch/pytorch/issues/184982 for more information. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\aten\src\ATen\quantized\Quantizer.cpp:116.)
+    w_ih = torch.quantize_per_tensor(
+
+tests/test_media_tools.py::test_describe_is_json_safe_and_covers_the_essentials
+tests/test_media_tools.py::test_describe_media_tool_returns_a_reading
+  C:\Users\ADMIN\OneDrive\M�y t�nh\GitHub\ai-content-factory\.venv\Lib\site-packages\torch\utils\data\dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+    super().__init__(loader)
+
+tests/test_media_tools.py::test_describe_is_json_safe_and_covers_the_essentials
+tests/test_media_tools.py::test_describe_is_json_safe_and_covers_the_essentials
+tests/test_media_tools.py::test_describe_media_tool_returns_a_reading
+tests/test_media_tools.py::test_describe_media_tool_returns_a_reading
+  C:\Users\ADMIN\OneDrive\M�y t�nh\GitHub\ai-content-factory\.venv\Lib\site-packages\easyocr\recognition.py:60: DeprecationWarning: 'mode' parameter is deprecated and will be removed in Pillow 13 (2026-10-15)
+    return Image.fromarray(img, 'L')
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_media.py::test_upload_and_retrieve_text_document - Attribut...
+FAILED tests/test_media.py::test_upload_stream_rejects_oversize_and_keeps_index_clean
