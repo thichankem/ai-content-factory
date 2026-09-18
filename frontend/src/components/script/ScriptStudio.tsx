@@ -308,18 +308,6 @@ ${brief.callToAction}`;
           </button>
 
           <button
-            onClick={() => setActiveSubTab("split")}
-            className={`hidden md:flex px-3 py-1.5 rounded-lg text-xs font-semibold items-center space-x-1.5 transition-colors ${
-              activeSubTab === "split"
-                ? "bg-nle-cyan text-black shadow-sm font-bold"
-                : "text-gray-400 hover:text-white hover:bg-nle-surface"
-            }`}
-          >
-            <Columns className="w-3.5 h-3.5" />
-            <span>3. Chia Đôi (Song Song)</span>
-          </button>
-
-          <button
             onClick={() => setActiveSubTab("virality")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
               activeSubTab === "virality"
@@ -328,7 +316,7 @@ ${brief.callToAction}`;
             }`}
           >
             <Flame className="w-3.5 h-3.5" />
-            <span>4. Phân Tích & Duyệt Gate 1</span>
+            <span>3. Phân Tích & Duyệt Gate 1</span>
             {viralityResult && (
               <Badge variant="amber" className="text-[9px] py-0 px-1">
                 {viralityResult.score}đ
@@ -337,25 +325,25 @@ ${brief.callToAction}`;
           </button>
         </div>
 
-        {/* Right Chatbot Toggle Button */}
+        {/* AI Chatbot Toggle Button */}
         <div className="flex items-center space-x-1">
           <button
-            onClick={() => setShowRightChatbot(!showRightChatbot)}
-            title={showRightChatbot ? "Thu nhỏ AI Chatbot" : "Mở AI Chatbot"}
+            onClick={() => setShowChatbot(!showChatbot)}
+            title={showChatbot ? "Thu nhỏ AI Chatbot" : "Mở AI Chatbot"}
             className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs border transition-colors ${
-              showRightChatbot
+              showChatbot
                 ? "bg-nle-surface border-nle-cyan/40 text-nle-cyan font-semibold"
                 : "bg-nle-panel border-nle-border text-gray-400 hover:text-white"
             }`}
           >
-            {showRightChatbot ? (
+            {showChatbot ? (
               <>
-                <PanelRightClose className="w-3.5 h-3.5" />
+                <PanelLeftClose className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Ẩn Chatbot</span>
               </>
             ) : (
               <>
-                <PanelRightOpen className="w-3.5 h-3.5" />
+                <PanelLeftOpen className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Mở Chatbot</span>
               </>
             )}
@@ -364,12 +352,26 @@ ${brief.callToAction}`;
       </div>
 
       {/* ========================================================================= */}
-      {/* MAIN TWO-COLUMN WORKSPACE: LEFT MAIN VIEW + RIGHT PERSISTENT CHATBOT */}
+      {/* MAIN WORKSPACE: LEFT AI CHATBOT COPILOT + RIGHT SINGLE-COLUMN WORKSPACE  */}
       {/* ========================================================================= */}
       <div className="flex-1 flex space-x-3 min-h-0 overflow-hidden">
-        {/* Left / Center Main Studio Area */}
+        {/* Left Side: ALWAYS-PRESENT AI CHATBOT (Tự sinh kịch bản & sửa theo dòng) */}
+        {showChatbot && (
+          <div className="w-[360px] lg:w-[400px] shrink-0 h-full min-h-0 flex flex-col">
+            <ScriptChatbot
+              scriptText={scriptText}
+              onScriptTextChange={setScriptText}
+              targetScope={targetScope}
+              onTargetScopeChange={setTargetScope}
+              pacingConfig={pacingConfig}
+              brief={brief}
+            />
+          </div>
+        )}
+
+        {/* Right Side / Center: Single Column Studio Area */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* TAB 1: 10 Dimensions Settings */}
+          {/* TAB 1: 10 Dimensions Settings (Single-Column) */}
           {activeSubTab === "brief" && (
             <div className="flex-1 min-h-0 overflow-hidden">
               <ScriptBriefSettingsPanel
@@ -381,7 +383,7 @@ ${brief.callToAction}`;
             </div>
           )}
 
-          {/* TAB 2: Script Editor with Line Numbers */}
+          {/* TAB 2: Script Editor with Line Numbers (Single-Column) */}
           {activeSubTab === "editor" && (
             <div className="flex-1 min-h-0 overflow-hidden">
               <ScriptEditorView
@@ -397,43 +399,12 @@ ${brief.callToAction}`;
                 onApproveGate1={handleApproveGate1}
                 isApproving={approveScriptMutation.isPending}
                 onScoreVirality={handleScoreVirality}
+                onOpenHistory={() => setIsHistoryOpen(true)}
+                historyCount={historyEntries.length}
                 topic={brief.topic}
                 platform={brief.platform}
                 targetDuration={brief.targetDuration}
               />
-            </div>
-          )}
-
-          {/* TAB 3: Split Side-by-Side View (Settings + Editor) */}
-          {activeSubTab === "split" && (
-            <div className="flex-1 grid grid-cols-2 gap-3 min-h-0 overflow-hidden">
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <ScriptBriefSettingsPanel
-                  brief={brief}
-                  onBriefChange={setBrief}
-                  onGenerateScript={handleGenerateFromBrief}
-                  isProcessing={isAiProcessing}
-                />
-              </div>
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <ScriptEditorView
-                  scriptText={scriptText}
-                  onScriptTextChange={setScriptText}
-                  targetScope={targetScope}
-                  onTargetScopeChange={setTargetScope}
-                  pacingConfig={pacingConfig}
-                  sourceRightsConfirmed={currentProject?.source_rights_confirmed || false}
-                  onConfirmSourceRights={handleConfirmSourceRights}
-                  onSaveScript={() => void handleSaveScript()}
-                  isSaving={saveScriptMutation.isPending}
-                  onApproveGate1={handleApproveGate1}
-                  isApproving={approveScriptMutation.isPending}
-                  onScoreVirality={handleScoreVirality}
-                  topic={brief.topic}
-                  platform={brief.platform}
-                  targetDuration={brief.targetDuration}
-                />
-              </div>
             </div>
           )}
 
@@ -567,21 +538,18 @@ ${brief.callToAction}`;
             </div>
           )}
         </div>
-
-        {/* Right Side: ALWAYS-PRESENT AI CHATBOT (SỬA TRỰC TIẾP KỊCH BẢN THEO DÒNG ĐÁNH DẤU) */}
-        {showRightChatbot && (
-          <div className="w-[360px] lg:w-[400px] shrink-0 h-full min-h-0 flex flex-col">
-            <ScriptChatbot
-              scriptText={scriptText}
-              onScriptTextChange={setScriptText}
-              targetScope={targetScope}
-              onTargetScopeChange={setTargetScope}
-              pacingConfig={pacingConfig}
-              brief={brief}
-            />
-          </div>
-        )}
       </div>
+
+      {/* Script Section History Modal */}
+      <ScriptSectionHistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        historyEntries={historyEntries}
+        onRestoreEntry={handleRestoreHistoryEntry}
+        onSaveManualSnapshot={handleSaveManualSnapshot}
+        onClearHistory={() => setHistoryEntries([])}
+        onDeleteEntry={(id) => setHistoryEntries((prev) => prev.filter((e) => e.id !== id))}
+      />
     </div>
   );
 }
