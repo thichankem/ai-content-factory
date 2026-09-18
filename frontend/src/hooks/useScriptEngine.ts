@@ -1,42 +1,67 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { fetchApi } from "../lib/api-client";
-import { ViralityScoreResult } from "../types/api";
-import { Project } from "../types/project";
+/**
+ * Scripting hooks: presets, virality scoring, save and draft.
+ *
+ * The studio treats the *raw* script text as the editable artifact
+ * (``project.script``) and the structured bundle (``project.script_document``) as
+ * derived, which is exactly how the backend models it.
+ */
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { scriptApi } from "@/lib/api";
+import { queryKeys } from "@/lib/queryKeys";
+import { syncProject } from "@/lib/projectSync";
+import { ViralityRequest } from "@/types/qa";
+import { ScriptStyle } from "@/types/script";
 
 export function useScriptEngine(projectId?: string) {
-  const viralityMutation = useMutation({
-    mutationFn: ({ scriptText, topic }: { scriptText: string; topic: string }) =>
-      fetchApi<ViralityScoreResult>("/script/virality", {
-        method: "POST",
-        body: JSON.stringify({ script_text: scriptText, topic }),
-      }),
+  const queryClient = useQueryClient();
+
+  const stylesQuery = useQuery({
+    queryKey: queryKeys.scriptStyles,
+    queryFn: () => scriptApi.listStyles(),
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const saveStyleMutation = useMutation({
+    mutationFn: (style: ScriptStyle) => scriptApi.saveStyle(style),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.scriptStyles });
+    },
+  });
+
+  const deleteStyleMutation = useMutation({
+    mutationFn: (name: string) => scriptApi.deleteStyle(name),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.scriptStyles });
+    },
+  });
+
+  const selectStyleMutation = useMutation({
+    mutationFn: ({ style }: { style: string }) => {
+      if (!projectId) throw new Error("No project selected");
+      return scriptApi.selectScriptStyle(projectId, style);
+    },
+    onSuccess: (project) => syncProject(queryClient, project),
   });
 
   const analyzeScriptMutation = useMutation({
-    mutationFn: (data?: { script_text?: string; style?: string }) =>
-      fetchApi<any>(`/projects/${projectId}/script/analyze`, {
-        method: "POST",
-        body: data ? JSON.stringify(data) : undefined,
-      }),
+    mutationFn: (payload: { script?: string | null; style?: string | null } = {}) => {
+      if (!projectId) throw new Error("No project selected");
+      return scriptApi.analyzeScript(projectId, payload);
+    },
   });
 
-  const updateScriptMutation = useMutation({
-    mutationFn: (payload: { raw_script: string; source_rights_confirmed?: boolean }) =>
-      fetchApi<Project>(`/projects/${projectId}/script`, {
-        method: "PUT",
-        body: JSON.stringify(payload),
-      }),
-  });
-
-  const stylesQuery = useQuery({
-    queryKey: ["script-styles"],
-    queryFn: () => fetchApi<Array<{ name: string; title: string; tone: string }>>("/script/styles"),
+  const viralityMutation = useMutation({
+    mutationFn: (payload: ViralityRequest) => scriptApi.scoreVirality(payload),
   });
 
   return {
-    viralityMutation,
-    analyzeScriptMutation,
-    updateScriptMutation,
     stylesQuery,
+    saveStyleMutation,
+    deleteStyleMutation,
+    selectStyleMutation,
+    analyzeScriptMutation,
+    viralityMutation,
   };
 }

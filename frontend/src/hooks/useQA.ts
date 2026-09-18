@@ -1,35 +1,42 @@
+/**
+ * QA hooks: platform, brand and copyright verification.
+ *
+ * These are the checks that run *before* a gate. They never approve anything —
+ * the two human gates remain the only paths that move a project forward, and the
+ * backend refuses an out-of-order approval.
+ */
+
 import { useMutation } from "@tanstack/react-query";
-import { fetchApi } from "../lib/api-client";
-import { PlatformQAResult, BrandKitQAResult, CopyrightCheckResult } from "../types/api";
+
+import { qaApi } from "@/lib/api";
+import {
+  BrandCheckRequest,
+  CopyrightCheckRequest,
+  PlatformCheckRequest,
+} from "@/types/qa";
 
 export function useQA() {
   const platformQAMutation = useMutation({
-    mutationFn: ({ platform, duration, aspectRatio }: { platform: string; duration: number; aspectRatio: string }) =>
-      fetchApi<PlatformQAResult>("/qa/platform/verdict", {
-        method: "POST",
-        body: JSON.stringify({ platform, duration_seconds: duration, aspect_ratio: aspectRatio }),
-      }),
+    mutationFn: (req: PlatformCheckRequest) => qaApi.platformVerdict(req),
   });
 
   const brandQAMutation = useMutation({
-    mutationFn: (payload: { font?: string; primary_color?: string; tone?: string }) =>
-      fetchApi<BrandKitQAResult>("/qa/brand/verdict", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      }),
+    mutationFn: (req: BrandCheckRequest) => qaApi.brandVerdict(req),
   });
 
   const copyrightMutation = useMutation({
-    mutationFn: (assetIds: string[]) =>
-      fetchApi<CopyrightCheckResult>("/qa/copyright/verdict", {
-        method: "POST",
-        body: JSON.stringify({ asset_ids: assetIds }),
-      }),
+    mutationFn: (req: CopyrightCheckRequest) => qaApi.copyrightVerdict(req),
+  });
+
+  const simplifySubtitlesMutation = useMutation({
+    mutationFn: (captions: string[]) =>
+      qaApi.simplifySubtitles({ captions, level: "basic" }),
   });
 
   return {
     platformQAMutation,
     brandQAMutation,
     copyrightMutation,
+    simplifySubtitlesMutation,
   };
 }
