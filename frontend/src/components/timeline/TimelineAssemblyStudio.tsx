@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { DualMonitorPlayer } from "./DualMonitorPlayer";
-import { TimelineVisualizer } from "./TimelineVisualizer";
-import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
-import { useTimelineStore } from "../../stores/useTimelineStore";
-import { PropertiesInspector } from "../inspector/PropertiesInspector";
-import { CaptionSimplifier } from "../captions/CaptionSimplifier";
+import { DualMonitorPlayer } from "@/components/timeline/DualMonitorPlayer";
+import { TimelineVisualizer } from "@/components/timeline/TimelineVisualizer";
+import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
+import { useTimelineStore } from "@/stores/useTimelineStore";
+import { PropertiesInspector } from "@/components/inspector/PropertiesInspector";
+import { CaptionSimplifier } from "@/components/captions/CaptionSimplifier";
 import {
   Sparkles,
   Layers,

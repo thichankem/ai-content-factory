@@ -7,7 +7,7 @@
  * writes a status itself.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import { AgentCatalog, AgentResultCreate } from "@/types/agent";
 import { Project } from "@/types/project";
 

@@ -10,7 +10,7 @@
  *   and indexed with SQLite FTS5 — and returns page-level hits with snippets.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import { LibraryHit, LibraryResponse } from "@/types/library";
 import { DocumentResult } from "@/types/research";
 

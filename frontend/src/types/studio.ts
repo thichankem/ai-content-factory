@@ -7,7 +7,7 @@
  * whether a type describes the API or the interface.
  */
 
-import { VideoScene } from "./timeline";
+import { VideoScene } from "@/types/timeline";
 
 /** One lane of the multi-track timeline (a UI grouping, not a backend track). */
 export interface TimelineTrack {

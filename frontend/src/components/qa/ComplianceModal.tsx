@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { useUIStore } from "../../stores/useUIStore";
-import { useQA } from "../../hooks/useQA";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useUIStore } from "@/stores/useUIStore";
+import { useQA } from "@/hooks/useQA";
 import { ShieldCheck, Palette, FileCheck, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 
 export function ComplianceModal() {

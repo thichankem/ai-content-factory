@@ -6,11 +6,11 @@ import {
   TargetScope,
   SpeechPacingConfig,
   ChatbotMessage,
-} from "../../types/script";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { formatTime } from "./ScriptPacingBar";
+} from "@/types/script";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { formatTime } from "@/components/script/ScriptPacingBar";
 import {
   Bot,
   Send,

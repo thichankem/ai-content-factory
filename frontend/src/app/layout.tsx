@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { TooltipProvider } from "../components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 export default function RootLayout({

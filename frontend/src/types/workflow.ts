@@ -10,8 +10,8 @@
  * ``params`` as a list of required parameter *names* plus ``default_params``.
  */
 
-import { IssueSeverity } from "./common";
-import { ApprovalStage } from "./common";
+import { IssueSeverity } from "@/types/common";
+import { ApprovalStage } from "@/types/common";
 
 /** The kinds of block a production flow can contain. */
 export type WorkflowNodeType =

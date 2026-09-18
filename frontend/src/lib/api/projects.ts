@@ -6,7 +6,7 @@
  * reading component code.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import {
   ApprovalCreate,
   Project,

@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
-import { usePlayerStore } from "../../stores/usePlayerStore";
-import { useTimelineStore } from "../../stores/useTimelineStore";
-import { useUIStore, TimelineTool, MonitorTab } from "../../stores/useUIStore";
-import { formatTimecode } from "../../lib/utils";
-import { Slider } from "../ui/slider";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import { usePlayerStore } from "@/stores/usePlayerStore";
+import { useTimelineStore } from "@/stores/useTimelineStore";
+import { useUIStore, TimelineTool, MonitorTab } from "@/stores/useUIStore";
+import { formatTimecode } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Play,
   Pause,

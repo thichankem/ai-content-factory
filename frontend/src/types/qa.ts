@@ -8,8 +8,8 @@
  * stay documented in the backend.
  */
 
-import { IssueSeverity } from "./common";
-import { VideoProject } from "./timeline";
+import { IssueSeverity } from "@/types/common";
+import { VideoProject } from "@/types/timeline";
 
 /** Payload for ``POST /qa/platform`` and ``/qa/platform/verdict``. */
 export interface PlatformCheckRequest {

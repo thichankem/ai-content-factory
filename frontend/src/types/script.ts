@@ -8,7 +8,7 @@
  * Studio binds to.
  */
 
-import { IssueSeverity } from "./common";
+import { IssueSeverity } from "@/types/common";
 
 /** One labelled section of a narration script, with timing estimates. */
 export interface ScriptSectionInfo {

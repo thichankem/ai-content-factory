@@ -5,7 +5,7 @@
  * the server and drive the prompt the script engine builds.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import { ScriptStyle } from "@/types/script";
 import { ViralityRequest, ViralityResult } from "@/types/qa";
 

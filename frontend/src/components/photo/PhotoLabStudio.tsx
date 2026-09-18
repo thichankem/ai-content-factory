@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
-import { usePhotoStore, AspectPreset, PhotoLayer } from "../../stores/usePhotoStore";
-import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Button } from "../ui/button";
-import { Slider } from "../ui/slider";
-import { Badge } from "../ui/badge";
+import { usePhotoStore, AspectPreset, PhotoLayer } from "@/stores/usePhotoStore";
+import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import {
   Sparkles,
   Layers,

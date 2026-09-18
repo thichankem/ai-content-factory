@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { Scene } from "../types/project";
-import { TimelineTrack } from "../types/timeline";
+import { Scene } from "@/types/project";
+import { TimelineTrack } from "@/types/timeline";
 
 interface TimelineStore {
   selectedSceneIndex: number | null;

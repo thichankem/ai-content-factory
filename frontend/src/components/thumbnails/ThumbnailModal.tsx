@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { useUIStore } from "../../stores/useUIStore";
-import { useProjectStore } from "../../stores/useProjectStore";
-import { useThumbnails } from "../../hooks/useThumbnails";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useUIStore } from "@/stores/useUIStore";
+import { useProjectStore } from "@/stores/useProjectStore";
+import { useThumbnails } from "@/hooks/useThumbnails";
 import { Sparkles, Image as ImageIcon, Flame, Check, Loader2 } from "lucide-react";
 
 export function ThumbnailModal() {

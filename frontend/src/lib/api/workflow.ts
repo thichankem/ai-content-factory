@@ -8,7 +8,7 @@
  * * ``background`` is a **query parameter** on the run route, not part of the body.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import { Project } from "@/types/project";
 import {
   Workflow,

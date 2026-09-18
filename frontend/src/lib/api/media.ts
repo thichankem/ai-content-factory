@@ -5,7 +5,7 @@
  * backend but belong to the media library by concept, so they are grouped here.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import {
   DedupRequest,
   DedupResult,

@@ -5,7 +5,7 @@
  * encodes as multipart without a hand-written ``Content-Type`` header.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import {
   BatchExternalImportRequest,
   ExternalAssetRecord,

@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { useVideoFXStore, LUTPreset } from "../../stores/useVideoFXStore";
-import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Slider } from "../ui/slider";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import { useVideoFXStore, LUTPreset } from "@/stores/useVideoFXStore";
+import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Film,
   Activity,
@@ -21,7 +21,7 @@ import {
   Sliders,
   GitBranch,
 } from "lucide-react";
-import { FusionNodeCompositor } from "../fusion/FusionNodeCompositor";
+import { FusionNodeCompositor } from "@/components/fusion/FusionNodeCompositor";
 
 export function VideoMotionFXStudio() {
   const {

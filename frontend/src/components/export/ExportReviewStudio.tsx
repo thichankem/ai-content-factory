@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { useProjectStore } from "../../stores/useProjectStore";
-import { useUIStore } from "../../stores/useUIStore";
-import { useProjects } from "../../hooks/useProjects";
-import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { Slider } from "../ui/slider";
+import { useProjectStore } from "@/stores/useProjectStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { useProjects } from "@/hooks/useProjects";
+import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import {
   CheckCircle2,
   AlertTriangle,

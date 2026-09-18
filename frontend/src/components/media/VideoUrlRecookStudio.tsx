@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { Input } from "../ui/input";
-import { useUIStore } from "../../stores/useUIStore";
-import { useTimelineStore } from "../../stores/useTimelineStore";
-import { useProjectStore } from "../../stores/useProjectStore";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { useUIStore } from "@/stores/useUIStore";
+import { useTimelineStore } from "@/stores/useTimelineStore";
+import { useProjectStore } from "@/stores/useProjectStore";
 import {
   DownloadCloud,
   Link as LinkIcon,

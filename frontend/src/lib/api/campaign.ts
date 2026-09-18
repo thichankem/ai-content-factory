@@ -5,7 +5,7 @@
  * generate call is expensive and the update call is cheap.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import {
   CampaignGenerateRequest,
   MultiFormatCampaign,

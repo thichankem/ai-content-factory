@@ -12,7 +12,7 @@
  * uses, but prefer the canonical one in new code.
  */
 
-import { IssueSeverity } from "./common";
+import { IssueSeverity } from "@/types/common";
 
 /** Transition effect between scenes. */
 export type VideoTransition =

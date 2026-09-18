@@ -6,7 +6,7 @@
  * scores one platform at a time so it can render a single report.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import {
   SeoAbPlanRequest,
   SeoAbPlanResult,

@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { useUIStore } from "../../stores/useUIStore";
-import { useProjects } from "../../hooks/useProjects";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Button } from "../ui/button";
+import { useUIStore } from "@/stores/useUIStore";
+import { useProjects } from "@/hooks/useProjects";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   FolderPlus,
   X,

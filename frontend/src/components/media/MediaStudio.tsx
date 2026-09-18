@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
 import {
   Search,
   CopyCheck,
@@ -22,9 +22,9 @@ import {
   LayoutTemplate,
   DownloadCloud,
 } from "lucide-react";
-import { useMediaLibrary } from "../../hooks/useMediaLibrary";
-import { HtmlSlideDeckStudio } from "./HtmlSlideDeckStudio";
-import { VideoUrlRecookStudio } from "./VideoUrlRecookStudio";
+import { useMediaLibrary } from "@/hooks/useMediaLibrary";
+import { HtmlSlideDeckStudio } from "@/components/media/HtmlSlideDeckStudio";
+import { VideoUrlRecookStudio } from "@/components/media/VideoUrlRecookStudio";
 
 export function MediaStudio() {
   const [activeSubMode, setActiveSubMode] = useState<"bin" | "slides" | "recook">("bin");

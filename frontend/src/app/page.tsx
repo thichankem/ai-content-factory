@@ -1,32 +1,32 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { SidebarWorkflowNav } from "../components/layout/SidebarWorkflowNav";
-import { ScriptStudio } from "../components/script/ScriptStudio";
-import { MediaStudio } from "../components/media/MediaStudio";
-import { PhotoLabStudio } from "../components/photo/PhotoLabStudio";
-import { VideoMotionFXStudio } from "../components/videofx/VideoMotionFXStudio";
-import { AudioLabStudio } from "../components/audio/AudioLabStudio";
-import { TimelineAssemblyStudio } from "../components/timeline/TimelineAssemblyStudio";
-import { ExportReviewStudio } from "../components/export/ExportReviewStudio";
-import { FusionNodeCompositor } from "../components/fusion/FusionNodeCompositor";
-import { ContentEmpireStudio } from "../components/campaign/ContentEmpireStudio";
-import { DAGWorkflowStudio } from "../components/workflow/DAGWorkflowStudio";
+import { SidebarWorkflowNav } from "@/components/layout/SidebarWorkflowNav";
+import { ScriptStudio } from "@/components/script/ScriptStudio";
+import { MediaStudio } from "@/components/media/MediaStudio";
+import { PhotoLabStudio } from "@/components/photo/PhotoLabStudio";
+import { VideoMotionFXStudio } from "@/components/videofx/VideoMotionFXStudio";
+import { AudioLabStudio } from "@/components/audio/AudioLabStudio";
+import { TimelineAssemblyStudio } from "@/components/timeline/TimelineAssemblyStudio";
+import { ExportReviewStudio } from "@/components/export/ExportReviewStudio";
+import { FusionNodeCompositor } from "@/components/fusion/FusionNodeCompositor";
+import { ContentEmpireStudio } from "@/components/campaign/ContentEmpireStudio";
+import { DAGWorkflowStudio } from "@/components/workflow/DAGWorkflowStudio";
 
-import { CommandBarModal } from "../components/copilot/CommandBarModal";
-import { ComplianceModal } from "../components/qa/ComplianceModal";
-import { ThumbnailModal } from "../components/thumbnails/ThumbnailModal";
-import { AuditCostModal } from "../components/audit/AuditCostModal";
-import { ExternalIngestionModal } from "../components/media/ExternalIngestionModal";
-import { AgentBridgeModal } from "../components/copilot/AgentBridgeModal";
-import { SeoPackagingModal } from "../components/export/SeoPackagingModal";
-import { NewProjectModal } from "../components/project/NewProjectModal";
-import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { useUIStore } from "../stores/useUIStore";
-import { useProjectStore } from "../stores/useProjectStore";
-import { useProjects } from "../hooks/useProjects";
-import { useWorkflowCampaign } from "../hooks/useWorkflowCampaign";
+import { CommandBarModal } from "@/components/copilot/CommandBarModal";
+import { ComplianceModal } from "@/components/qa/ComplianceModal";
+import { ThumbnailModal } from "@/components/thumbnails/ThumbnailModal";
+import { AuditCostModal } from "@/components/audit/AuditCostModal";
+import { ExternalIngestionModal } from "@/components/media/ExternalIngestionModal";
+import { AgentBridgeModal } from "@/components/copilot/AgentBridgeModal";
+import { SeoPackagingModal } from "@/components/export/SeoPackagingModal";
+import { NewProjectModal } from "@/components/project/NewProjectModal";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useUIStore } from "@/stores/useUIStore";
+import { useProjectStore } from "@/stores/useProjectStore";
+import { useProjects } from "@/hooks/useProjects";
+import { useWorkflowCampaign } from "@/hooks/useWorkflowCampaign";
 import {
   CheckCircle2,
   Sparkles,

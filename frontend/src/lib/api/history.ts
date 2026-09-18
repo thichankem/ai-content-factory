@@ -5,7 +5,7 @@
  * can seed a project idea without any external call.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import { OnThisDayEvent } from "@/types/history";
 
 /** ``GET /history/on-this-day`` — today's events, or a specific date's. */

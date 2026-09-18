@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { useTimelineStore } from "../../stores/useTimelineStore";
-import { usePlayerStore } from "../../stores/usePlayerStore";
-import { Slider } from "../ui/slider";
+import { useTimelineStore } from "@/stores/useTimelineStore";
+import { usePlayerStore } from "@/stores/usePlayerStore";
+import { Slider } from "@/components/ui/slider";
 import { ZoomIn, ZoomOut, Scissors, Magnet, Layers } from "lucide-react";
 
 export function TimelineVisualizer() {

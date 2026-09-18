@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../ui/table";
-import { Progress } from "../ui/progress";
-import { Badge } from "../ui/badge";
-import { useUIStore } from "../../stores/useUIStore";
-import { useAuditCost } from "../../hooks/useAuditCost";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { useUIStore } from "@/stores/useUIStore";
+import { useAuditCost } from "@/hooks/useAuditCost";
 import { DollarSign, History, ShieldCheck, PieChart } from "lucide-react";
 
 export function AuditCostModal() {

@@ -6,7 +6,7 @@
  * ``@/types/qa`` even though the route is under ``/timeline``.
  */
 
-import * as api from "./client";
+import * as api from "@/lib/api/client";
 import { Project } from "@/types/project";
 import { StructuredTimeline } from "@/types/history";
 import { TimelineCommandRequest, TimelineCommandResult } from "@/types/qa";

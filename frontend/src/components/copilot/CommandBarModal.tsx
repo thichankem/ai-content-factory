@@ -2,10 +2,10 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUIStore } from "../../stores/useUIStore";
-import { useTimelineStore } from "../../stores/useTimelineStore";
-import { useProjectStore } from "../../stores/useProjectStore";
-import { useTimelineCommands } from "../../hooks/useTimelineCommands";
+import { useUIStore } from "@/stores/useUIStore";
+import { useTimelineStore } from "@/stores/useTimelineStore";
+import { useProjectStore } from "@/stores/useProjectStore";
+import { useTimelineCommands } from "@/hooks/useTimelineCommands";
 import { Sparkles, X, ArrowRight, CornerDownLeft, Loader2 } from "lucide-react";
 
 export function CommandBarModal() {

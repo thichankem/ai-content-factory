@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useUIStore, ActiveStudioTab } from "../../stores/useUIStore";
-import { useProjectStore } from "../../stores/useProjectStore";
+import { useUIStore, ActiveStudioTab } from "@/stores/useUIStore";
+import { useProjectStore } from "@/stores/useProjectStore";
 import {
   FileText,
   FolderOpen,

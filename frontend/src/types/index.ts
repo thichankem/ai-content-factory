@@ -13,19 +13,19 @@
  * the concept is narrow; the barrel exists for the common case.
  */
 
-export * from "./common";
-export * from "./project";
-export * from "./script";
-export * from "./timeline";
-export * from "./media";
-export * from "./library";
-export * from "./research";
-export * from "./voice";
-export * from "./qa";
-export * from "./seo";
-export * from "./workflow";
-export * from "./campaign";
-export * from "./agent";
-export * from "./external";
-export * from "./history";
-export * from "./studio";
+export * from "@/types/common";
+export * from "@/types/project";
+export * from "@/types/script";
+export * from "@/types/timeline";
+export * from "@/types/media";
+export * from "@/types/library";
+export * from "@/types/research";
+export * from "@/types/voice";
+export * from "@/types/qa";
+export * from "@/types/seo";
+export * from "@/types/workflow";
+export * from "@/types/campaign";
+export * from "@/types/agent";
+export * from "@/types/external";
+export * from "@/types/history";
+export * from "@/types/studio";

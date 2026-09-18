@@ -1,19 +1,19 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useProjectStore } from "../../stores/useProjectStore";
-import { useScriptEngine } from "../../hooks/useScriptEngine";
-import { useProjects } from "../../hooks/useProjects";
-import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
-import { ScriptBriefSettings, TargetScope, SpeechPacingConfig } from "../../types/script";
-import { ScriptPacingBar } from "./ScriptPacingBar";
-import { ScriptChatbot } from "./ScriptChatbot";
-import { ScriptBriefSettingsPanel, DEFAULT_BRIEF_SETTINGS } from "./ScriptBriefSettingsPanel";
-import { ScriptEditorView } from "./ScriptEditorView";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { ViralityScoreResult } from "../../types/api";
+import { useProjectStore } from "@/stores/useProjectStore";
+import { useScriptEngine } from "@/hooks/useScriptEngine";
+import { useProjects } from "@/hooks/useProjects";
+import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
+import { ScriptBriefSettings, TargetScope, SpeechPacingConfig } from "@/types/script";
+import { ScriptPacingBar } from "@/components/script/ScriptPacingBar";
+import { ScriptChatbot } from "@/components/script/ScriptChatbot";
+import { ScriptBriefSettingsPanel, DEFAULT_BRIEF_SETTINGS } from "@/components/script/ScriptBriefSettingsPanel";
+import { ScriptEditorView } from "@/components/script/ScriptEditorView";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ViralityScoreResult } from "@/types/api";
 import {
   Flame,
   CheckCircle2,

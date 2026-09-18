@@ -15,18 +15,18 @@
  * cache behaviour in another.
  */
 
-export * as agentsApi from "./agents";
-export * as campaignApi from "./campaign";
-export * as externalApi from "./external";
-export * as historyApi from "./history";
-export * as libraryApi from "./library";
-export * as mediaApi from "./media";
-export * as projectsApi from "./projects";
-export * as qaApi from "./qa";
-export * as scriptApi from "./script";
-export * as seoApi from "./seo";
-export * as timelineApi from "./timeline";
-export * as workflowApi from "./workflow";
+export * as agentsApi from "@/lib/api/agents";
+export * as campaignApi from "@/lib/api/campaign";
+export * as externalApi from "@/lib/api/external";
+export * as historyApi from "@/lib/api/history";
+export * as libraryApi from "@/lib/api/library";
+export * as mediaApi from "@/lib/api/media";
+export * as projectsApi from "@/lib/api/projects";
+export * as qaApi from "@/lib/api/qa";
+export * as scriptApi from "@/lib/api/script";
+export * as seoApi from "@/lib/api/seo";
+export * as timelineApi from "@/lib/api/timeline";
+export * as workflowApi from "@/lib/api/workflow";
 
-export { ApiError, apiFetch, apiSend, apiText, buildQuery } from "./client";
-export type { QueryValue, RequestOptions } from "./client";
+export { ApiError, apiFetch, apiSend, apiText, buildQuery } from "@/lib/api/client";
+export type { QueryValue, RequestOptions } from "@/lib/api/client";
