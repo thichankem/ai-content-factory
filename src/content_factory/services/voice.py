@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from .. import timeline
-from ..models import Project, VoiceoverBundle, VoiceoverTrack, utcnow
+from ..models import (
+    Project,
+    VideoProject,
+    VoiceoverBundle,
+    VoiceoverTrack,
+    utcnow,
+)
 from ..tts import resolve_voice
 from .errors import (
     StateConflictError,
@@ -36,68 +43,81 @@ class VoiceMixin(TimelineMixin):
 
     def _synthesize_voiceover(self, project_id: str) -> None:
         """Synthesize narration per scene and sync scene durations to the audio."""
-        import asyncio
+        asyncio.run(self._synthesize_and_store(project_id))
 
-        async def run() -> None:
-            try:
-                snapshot = self._assert_tts_available(project_id).model_copy(deep=True)
-                video_project = self._editable_video_project(snapshot).model_copy(
-                    deep=True
+    async def _synthesize_and_store(self, project_id: str) -> None:
+        """Run the synthesis batch, then persist it only if nothing moved."""
+        try:
+            snapshot = self._assert_tts_available(project_id).model_copy(deep=True)
+            video_project = self._editable_video_project(snapshot).model_copy(deep=True)
+            timeline.normalize(video_project)
+            audio_dir = Path(self._settings.library_dir) / "audio" / project_id
+            audio_dir.mkdir(parents=True, exist_ok=True)
+            with TemporaryDirectory(dir=audio_dir) as staging:
+                tracks, engine_name = await self._synthesize_clips(
+                    snapshot, video_project, Path(staging)
                 )
-                timeline.normalize(video_project)
-                audio_dir = Path(self._settings.library_dir) / "audio" / project_id
-                audio_dir.mkdir(parents=True, exist_ok=True)
-                tracks: list[VoiceoverTrack] = []
-                engine_name = self._settings.tts_engine
-                with TemporaryDirectory(dir=audio_dir) as staging:
-                    for scene in video_project.scenes:
-                        text = scene.narration or scene.text or ""
-                        if not text.strip():
-                            continue
-                        data, duration, engine_name = await self._tts.synthesize(
-                            text, snapshot.target_language, pitch=scene.pitch
-                        )
-                        (Path(staging) / f"{scene.id}.mp3").write_bytes(data)
-                        scene.duration_seconds = round(max(1.0, duration + 0.35), 1)
-                        tracks.append(
-                            VoiceoverTrack(
-                                scene_id=scene.id,
-                                audio_url=f"/projects/{project_id}/voiceover/{scene.id}",
-                                duration_seconds=round(duration, 2),
-                                text=text,
-                            )
-                        )
-                    project = self._assert_tts_available(project_id).model_copy(
-                        deep=True
-                    )
-                    if (
-                        project.video_project != snapshot.video_project
-                        or project.target_language != snapshot.target_language
-                        or project.voiceover != snapshot.voiceover
-                    ):
-                        raise StateConflictError(
-                            "Timeline or narration changed during synthesis; "
-                            "retry voiceover."
-                        )
-                    self._store_video_project(project, video_project)
-                    project.voiceover = VoiceoverBundle(
-                        tracks=tracks,
-                        engine=engine_name,
-                        voice=resolve_voice(project.target_language),
-                        generated_at=utcnow(),
-                    )
-                    destination = audio_dir / project.voiceover.generated_at.strftime(
-                        "%Y%m%dT%H%M%S%fZ"
-                    )
-                    Path(staging).rename(destination)
-                    project.error = None
-                    self._store.save(project)
-            except Exception as exc:
-                project = self.get_project(project_id).model_copy(deep=True)
-                project.error = f"Voiceover failed: {exc}"
+                project = self._assert_tts_available(project_id).model_copy(deep=True)
+                self._assert_unchanged_for_voiceover(project, snapshot)
+                self._store_video_project(project, video_project)
+                project.voiceover = VoiceoverBundle(
+                    tracks=tracks,
+                    engine=engine_name,
+                    voice=resolve_voice(project.target_language),
+                    generated_at=utcnow(),
+                )
+                destination = audio_dir / project.voiceover.generated_at.strftime(
+                    "%Y%m%dT%H%M%S%fZ"
+                )
+                Path(staging).rename(destination)
+                project.error = None
                 self._store.save(project)
+        except Exception as exc:
+            project = self.get_project(project_id).model_copy(deep=True)
+            project.error = f"Voiceover failed: {exc}"
+            self._store.save(project)
 
-        asyncio.run(run())
+    async def _synthesize_clips(
+        self, snapshot: Project, video_project: VideoProject, staging: Path
+    ) -> tuple[list[VoiceoverTrack], str]:
+        """Synthesize one clip per non-empty scene into ``staging``.
+
+        Returns the finished tracks and the engine that produced them; scene
+        durations are re-timed to the measured audio in place.
+        """
+        tracks: list[VoiceoverTrack] = []
+        engine_name = self._settings.tts_engine
+        for scene in video_project.scenes:
+            text = scene.narration or scene.text or ""
+            if not text.strip():
+                continue
+            data, duration, engine_name = await self._tts.synthesize(
+                text, snapshot.target_language, pitch=scene.pitch
+            )
+            (staging / f"{scene.id}.mp3").write_bytes(data)
+            scene.duration_seconds = round(max(1.0, duration + 0.35), 1)
+            tracks.append(
+                VoiceoverTrack(
+                    scene_id=scene.id,
+                    audio_url=f"/projects/{snapshot.id}/voiceover/{scene.id}",
+                    duration_seconds=round(duration, 2),
+                    text=text,
+                )
+            )
+        return tracks, engine_name
+
+    def _assert_unchanged_for_voiceover(
+        self, project: Project, snapshot: Project
+    ) -> None:
+        """Reject the batch when the timeline or narration moved mid-synthesis."""
+        if (
+            project.video_project != snapshot.video_project
+            or project.target_language != snapshot.target_language
+            or project.voiceover != snapshot.voiceover
+        ):
+            raise StateConflictError(
+                "Timeline or narration changed during synthesis; retry voiceover."
+            )
 
     def _assert_tts_available(self, project_id: str) -> Project:
         """Guard the narration path: enabled engine, and a timeline to voice."""

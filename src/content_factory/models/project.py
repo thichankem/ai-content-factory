@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .campaign import MultiFormatCampaign
 from .common import (
@@ -26,6 +26,7 @@ from .research import (
     ResearchBundle,
 )
 from .script import (
+    ScriptDocument,
     ScriptIssue,
     ScriptPlan,
 )
@@ -44,10 +45,27 @@ class ProjectCreate(BaseModel):
 
 
 class ScriptUpdate(BaseModel):
-    """Payload for saving a script and confirming source rights."""
+    """Payload for saving a script and confirming source rights.
 
-    script: str = Field(min_length=1)
+    ``script`` is the canonical field; ``raw_script`` is the name both web clients
+    send, because they think of it as the raw text behind the parsed sections.
+    Exactly one of the two is required.
+    """
+
+    script: str | None = None
+    raw_script: str | None = None
     source_rights_confirmed: bool = False
+
+    @property
+    def text(self) -> str:
+        """The script body, whichever field carried it."""
+        return self.script if self.script is not None else (self.raw_script or "")
+
+    @model_validator(mode="after")
+    def _require_a_script(self) -> ScriptUpdate:
+        if not self.text.strip():
+            raise ValueError("provide 'script' (or its alias 'raw_script')")
+        return self
 
 
 class ApprovalCreate(BaseModel):
@@ -84,6 +102,9 @@ class Project(BaseModel):
     duration_target_seconds: int
     status: ProjectStatus = ProjectStatus.DRAFT
     script: str | None = None
+    #: Structured view of ``script`` (sections, timing, style) for editors.
+    #: ``script`` itself stays the raw text every other consumer expects.
+    script_document: ScriptDocument | None = None
     source_rights_confirmed: bool = False
     approvals: list[ApprovalRecord] = Field(default_factory=list)
     provider_used: str | None = None

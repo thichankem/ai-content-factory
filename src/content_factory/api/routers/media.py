@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 
 from ...media import UploadTooLargeError
 from ...models import (
+    MediaIngestUrlRequest,
     MediaItem,
     ReCookRequest,
     ReCookResult,
@@ -39,6 +40,17 @@ def build_router(service: ContentFactoryService) -> APIRouter:
             )
         except UploadTooLargeError as exc:
             raise HTTPException(status_code=413, detail=str(exc)) from exc
+
+    @router.post("/media/from-url", response_model=MediaItem, status_code=201)
+    def media_from_url(payload: MediaIngestUrlRequest) -> MediaItem:
+        """Ingest an external video or audio from a URL (YouTube/TikTok/direct link)."""
+        return guard_value(
+            lambda: service.media_from_url(
+                payload.url,
+                language=payload.language,
+                extract_audio=payload.extract_audio,
+            )
+        )
 
     @router.post("/ai-editor/edit")
     async def ai_editor_edit(

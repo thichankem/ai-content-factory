@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useProjectStore } from "../../stores/useProjectStore";
+import { useUIStore } from "../../stores/useUIStore";
 import { useProjects } from "../../hooks/useProjects";
 import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
@@ -25,6 +26,7 @@ import {
 
 export function ExportReviewStudio() {
   const { currentProject } = useProjectStore();
+  const { setSeoModalOpen } = useUIStore();
   const {
     approveVideoMutation,
     publishMutation,
@@ -264,6 +266,16 @@ export function ExportReviewStudio() {
                 {seoTags}
               </div>
             </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSeoModalOpen(true)}
+              className="w-full text-xs border-nle-cyan/40 text-nle-cyan hover:bg-nle-cyan/10 h-7"
+            >
+              <Sparkles className="w-3.5 h-3.5 mr-1" />
+              Mở SEO Packaging & 70-Signal Scoring Studio
+            </Button>
           </Card>
 
           {/* Card 4: Manual Export Parameters */}

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useUIStore, ActiveStudioTab } from "../../stores/useUIStore";
 import { useProjectStore } from "../../stores/useProjectStore";
 import {
@@ -16,8 +16,13 @@ import {
   ChevronRight,
   Sparkles,
   GitBranch,
-  ShieldAlert,
   Bot,
+  DownloadCloud,
+  Cpu,
+  Target,
+  ShieldCheck,
+  DollarSign,
+  FolderPlus,
 } from "lucide-react";
 
 interface WorkflowStep {
@@ -41,24 +46,24 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   {
     id: "assets",
     stepNumber: "02",
-    title: "Chọn Tư liệu & Nhạc",
-    subtitle: "Asset Hunter & Media Bin",
+    title: "Tư liệu & Slide HTML",
+    subtitle: "Asset Bin & HTML Slide Deck",
     icon: FolderOpen,
     accentColor: "text-amber-400",
   },
   {
     id: "photo",
     stepNumber: "03",
-    title: "Chỉnh sửa Ảnh",
-    subtitle: "Photo Lab & Photoshop Layers",
+    title: "Chỉnh sửa Ảnh & Đồ họa",
+    subtitle: "Photo Lab & Layer Compositor",
     icon: ImageIcon,
     accentColor: "text-nle-violet",
   },
   {
     id: "video_fx",
     stepNumber: "04",
-    title: "Chỉnh sửa Video & FX",
-    subtitle: "After Effects & Speed Ramp",
+    title: "Chỉnh sửa Video & Kỹ xảo",
+    subtitle: "Speed Ramping & Motion Easing",
     icon: Film,
     accentColor: "text-rose-400",
   },
@@ -66,7 +71,7 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
     id: "audio",
     stepNumber: "05",
     title: "Chỉnh sửa Âm thanh",
-    subtitle: "Audition EQ & Ducking",
+    subtitle: "5-Band EQ & Auto-Ducking",
     icon: Sliders,
     accentColor: "text-emerald-400",
   },
@@ -74,7 +79,7 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
     id: "timeline",
     stepNumber: "06",
     title: "Ghép nối Kéo thả",
-    subtitle: "NLE Assembly & Dual Monitor",
+    subtitle: "NLE Assembly & Dual Monitors",
     icon: Layers,
     accentColor: "text-sky-400",
   },
@@ -82,9 +87,9 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
     id: "export",
     stepNumber: "07",
     title: "Xuất ra & Kiểm duyệt",
-    subtitle: "Pre-flight QC & 2-Gate Approval",
+    subtitle: "Pre-flight QC & Packaging",
     icon: Download,
-    accentColor: "text-nle-cyan",
+    accentColor: "text-amber-500",
   },
 ];
 
@@ -96,8 +101,25 @@ export function SidebarWorkflowNav() {
     sidebarCollapsed,
     toggleSidebar,
     setCommandBarOpen,
+    setIngestionModalOpen,
+    setAgentBridgeModalOpen,
+    setSeoModalOpen,
+    setQAModalOpen,
+    setAuditModalOpen,
+    setNewProjectModalOpen,
   } = useUIStore();
-  const { currentProject } = useProjectStore();
+  const { currentProject, projects, setCurrentProject } = useProjectStore();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandBarOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [setCommandBarOpen]);
 
   return (
     <aside
@@ -105,27 +127,24 @@ export function SidebarWorkflowNav() {
         sidebarCollapsed ? "w-16" : "w-64"
       }`}
     >
-      {/* Top Header / Studio Brand */}
-      <div>
-        <div className="h-14 px-3.5 border-b border-nle-border flex items-center justify-between">
+      {/* Top Header / Studio Brand & Project Selector */}
+      <div className="flex flex-col shrink-0">
+        <div className="h-12 px-3 border-b border-nle-border flex items-center justify-between">
           {!sidebarCollapsed && (
             <div className="flex items-center space-x-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-nle-cyan via-nle-violet to-emerald-400 flex items-center justify-center font-black text-black text-xs shadow-md shadow-nle-cyan/20">
+              <div className="w-6 h-6 rounded-md bg-gradient-to-tr from-nle-cyan via-nle-violet to-emerald-400 flex items-center justify-center font-black text-black text-[11px] shadow-sm shadow-nle-cyan/20">
                 CF
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-xs tracking-wider text-white">
                   STUDIO <span className="text-nle-cyan text-[10px]">ULTIMATE</span>
                 </span>
-                <span className="text-[9px] text-gray-400 tracking-tight">
-                  Premiere • AE • CapCut
-                </span>
               </div>
             </div>
           )}
 
           {sidebarCollapsed && (
-            <div className="w-8 h-8 mx-auto rounded-lg bg-gradient-to-tr from-nle-cyan to-nle-violet flex items-center justify-center font-bold text-black text-xs">
+            <div className="w-7 h-7 mx-auto rounded-md bg-gradient-to-tr from-nle-cyan to-nle-violet flex items-center justify-center font-bold text-black text-xs">
               CF
             </div>
           )}
@@ -143,9 +162,76 @@ export function SidebarWorkflowNav() {
           </button>
         </div>
 
+        {/* Project Selector & Status Banner */}
+        {!sidebarCollapsed ? (
+          <div className="p-2 border-b border-nle-border bg-nle-panel/30">
+            <div className="flex items-center space-x-1.5">
+              {projects && projects.length > 0 ? (
+                <select
+                  value={currentProject?.id || ""}
+                  onChange={(e) => {
+                    const p = projects.find((proj) => proj.id === e.target.value);
+                    if (p) setCurrentProject(p);
+                  }}
+                  className="flex-1 bg-nle-panel border border-nle-border rounded-md px-2 py-1 text-xs text-white font-medium outline-none truncate"
+                >
+                  {projects.map((proj) => (
+                    <option key={proj.id} value={proj.id} className="bg-nle-base">
+                      {proj.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="flex-1 text-xs font-semibold text-gray-200 truncate px-1">
+                  {currentProject?.name || "Dự án mẫu"}
+                </span>
+              )}
+              <button
+                onClick={() => setNewProjectModalOpen(true)}
+                className="w-7 h-7 rounded-md bg-nle-panel hover:bg-nle-surface border border-nle-border text-nle-cyan flex items-center justify-center transition-colors shrink-0"
+                title="Tạo dự án mới"
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Mandatory Review Gates Badges */}
+            {currentProject && (
+              <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+                <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-nle-panel text-nle-cyan border border-nle-border">
+                  {currentProject.status.replace("_", " ")}
+                </span>
+                {currentProject.status === "script_review" && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse font-medium">
+                    Gate 1: Duyệt kịch bản
+                  </span>
+                )}
+                {currentProject.status === "video_review" && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse font-medium">
+                    Gate 2: Duyệt video
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-2 flex justify-center border-b border-nle-border">
+            <button
+              onClick={() => setNewProjectModalOpen(true)}
+              className="w-8 h-8 rounded-md bg-nle-panel hover:bg-nle-surface border border-nle-border text-nle-cyan flex items-center justify-center transition-colors"
+              title="Tạo dự án mới"
+            >
+              <FolderPlus className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Navigation: 7 Steps */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {/* Workflow Title */}
         {!sidebarCollapsed && (
-          <div className="px-3.5 pt-3 pb-1 flex items-center justify-between">
+          <div className="px-3.5 pt-3 pb-1 flex items-center justify-between shrink-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
               Quy trình Dựng phim 7 Bước
             </span>
@@ -222,8 +308,73 @@ export function SidebarWorkflowNav() {
         </nav>
       </div>
 
-      {/* Bottom Auxiliary Section: DAG, Campaign & AI Agent Status */}
-      <div className="p-2 border-t border-nle-border space-y-1 bg-nle-surface/40">
+      {/* Bottom Auxiliary Section: Tools Quick Bar, DAG, Campaign & AI Agent Status */}
+      <div className="p-2 border-t border-nle-border space-y-1.5 bg-nle-surface/40 shrink-0">
+        {/* Quick Modal Tools Bar */}
+        {!sidebarCollapsed ? (
+          <div className="grid grid-cols-5 gap-1 bg-nle-panel/60 p-1 rounded-lg border border-nle-border">
+            <button
+              onClick={() => setIngestionModalOpen(true)}
+              className="p-1.5 rounded flex items-center justify-center text-gray-400 hover:text-nle-cyan hover:bg-nle-surface transition-colors"
+              title="Nạp Media ngoại vi (Kling, Veo, URL)"
+            >
+              <DownloadCloud className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setAgentBridgeModalOpen(true)}
+              className="p-1.5 rounded flex items-center justify-center text-gray-400 hover:text-nle-violet hover:bg-nle-surface transition-colors"
+              title="Universal Agent Bridge (Claude, Gemini brief.md)"
+            >
+              <Cpu className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setSeoModalOpen(true)}
+              className="p-1.5 rounded flex items-center justify-center text-gray-400 hover:text-amber-400 hover:bg-nle-surface transition-colors"
+              title="Chấm điểm SEO 70 tín hiệu"
+            >
+              <Target className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setQAModalOpen(true)}
+              className="p-1.5 rounded flex items-center justify-center text-gray-400 hover:text-emerald-400 hover:bg-nle-surface transition-colors"
+              title="Tuân thủ chính sách & Bản quyền (Gate QA)"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setAuditModalOpen(true)}
+              className="p-1.5 rounded flex items-center justify-center text-gray-400 hover:text-rose-400 hover:bg-nle-surface transition-colors"
+              title="Kiểm toán chi phí Token / GPU"
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col space-y-1 items-center pb-1 border-b border-nle-border">
+            <button
+              onClick={() => setIngestionModalOpen(true)}
+              className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:text-nle-cyan hover:bg-nle-panel transition-colors"
+              title="Nạp Media ngoại vi"
+            >
+              <DownloadCloud className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setAgentBridgeModalOpen(true)}
+              className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:text-nle-violet hover:bg-nle-panel transition-colors"
+              title="Agent Bridge"
+            >
+              <Cpu className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setSeoModalOpen(true)}
+              className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:text-amber-400 hover:bg-nle-panel transition-colors"
+              title="SEO Scorer"
+            >
+              <Target className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Visual DAG Workflow Link */}
         <button
           onClick={() => setActiveTab("workflow")}
@@ -232,7 +383,7 @@ export function SidebarWorkflowNav() {
             sidebarCollapsed ? "p-2.5 justify-center" : "px-3 py-2 space-x-2.5"
           } ${
             activeTab === "workflow"
-              ? "bg-nle-panel border border-nle-cyan/40 text-nle-cyan"
+              ? "bg-nle-panel border border-nle-cyan/40 text-nle-cyan shadow-sm"
               : "text-gray-400 hover:text-white hover:bg-nle-panel/40"
           }`}
         >
@@ -250,7 +401,7 @@ export function SidebarWorkflowNav() {
             sidebarCollapsed ? "p-2.5 justify-center" : "px-3 py-2 space-x-2.5"
           } ${
             activeTab === "campaign"
-              ? "bg-nle-panel border border-nle-violet/40 text-nle-violet"
+              ? "bg-nle-panel border border-nle-violet/40 text-nle-violet shadow-sm"
               : "text-gray-400 hover:text-white hover:bg-nle-panel/40"
           }`}
         >

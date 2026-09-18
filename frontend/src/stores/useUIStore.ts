@@ -14,7 +14,7 @@ export type ActiveStudioTab =
   | "video"
   | "media";
 
-export type AdobeTool =
+export type TimelineTool =
   | "select"
   | "trackSelect"
   | "ripple"
@@ -28,7 +28,7 @@ export type MonitorTab = "program" | "source" | "scopes";
 
 interface UIStore {
   activeTab: ActiveStudioTab;
-  activeTool: AdobeTool;
+  activeTool: TimelineTool;
   activeMonitorTab: MonitorTab;
   completedSteps: Record<string, boolean>;
   sidebarCollapsed: boolean;
@@ -37,8 +37,11 @@ interface UIStore {
   isThumbnailModalOpen: boolean;
   isAuditModalOpen: boolean;
   isNewProjectModalOpen: boolean;
+  isIngestionModalOpen: boolean;
+  isAgentBridgeModalOpen: boolean;
+  isSeoModalOpen: boolean;
   setActiveTab: (tab: ActiveStudioTab) => void;
-  setActiveTool: (tool: AdobeTool) => void;
+  setActiveTool: (tool: TimelineTool) => void;
   setActiveMonitorTab: (tab: MonitorTab) => void;
   toggleStepCompleted: (stepId: string) => void;
   toggleSidebar: () => void;
@@ -47,6 +50,9 @@ interface UIStore {
   setThumbnailModalOpen: (open: boolean) => void;
   setAuditModalOpen: (open: boolean) => void;
   setNewProjectModalOpen: (open: boolean) => void;
+  setIngestionModalOpen: (open: boolean) => void;
+  setAgentBridgeModalOpen: (open: boolean) => void;
+  setSeoModalOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -68,6 +74,9 @@ export const useUIStore = create<UIStore>((set) => ({
   isThumbnailModalOpen: false,
   isAuditModalOpen: false,
   isNewProjectModalOpen: false,
+  isIngestionModalOpen: false,
+  isAgentBridgeModalOpen: false,
+  isSeoModalOpen: false,
   setActiveTab: (tab) =>
     set({
       activeTab: tab === "video" ? "timeline" : tab === "media" ? "assets" : tab,
@@ -87,5 +96,8 @@ export const useUIStore = create<UIStore>((set) => ({
   setThumbnailModalOpen: (open) => set({ isThumbnailModalOpen: open }),
   setAuditModalOpen: (open) => set({ isAuditModalOpen: open }),
   setNewProjectModalOpen: (open) => set({ isNewProjectModalOpen: open }),
+  setIngestionModalOpen: (open) => set({ isIngestionModalOpen: open }),
+  setAgentBridgeModalOpen: (open) => set({ isAgentBridgeModalOpen: open }),
+  setSeoModalOpen: (open) => set({ isSeoModalOpen: open }),
 }));
 

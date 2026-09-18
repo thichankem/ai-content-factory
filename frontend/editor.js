@@ -1558,7 +1558,7 @@ $("btn-scene-add").addEventListener("click", addScene);
 $("btn-scene-dup").addEventListener("click", duplicateScene);
 $("btn-scene-del").addEventListener("click", deleteScene);
 
-// Premiere Pro Workspace Tabs
+// Professional NLE Workspace Tabs
 document.querySelectorAll(".pr-ws-tab").forEach((tab) => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".pr-ws-tab").forEach((t) => t.classList.remove("active"));
@@ -1599,7 +1599,7 @@ if ($("btn-mark-out")) {
 // Safe Margins & TikTok Guides
 if ($("btn-pr-safemargins")) {
   $("btn-pr-safemargins").addEventListener("click", () => {
-    const sm = $("adobe-safe-margins");
+    const sm = $("studio-safe-margins");
     if (!sm) return;
     sm.classList.toggle("active");
     $("btn-pr-safemargins").classList.toggle("active", sm.classList.contains("active"));
@@ -1633,7 +1633,7 @@ if ($("btn-shortcuts-close")) {
   });
 }
 
-// Pro Hotkeys (Adobe Premiere Pro & After Effects standard)
+// Pro NLE Hotkeys (Industry Standard)
 document.addEventListener("keydown", (ev) => {
   const isInput = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
   if (isInput) return;

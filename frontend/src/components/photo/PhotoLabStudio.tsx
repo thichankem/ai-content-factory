@@ -292,14 +292,14 @@ export function PhotoLabStudio() {
           </div>
         </div>
 
-        {/* Right Sidebar: Photoshop Layers & Lightroom Tone Adjustments */}
+        {/* Right Sidebar: Multi-Layer Stack & Tone Adjustments */}
         <div className="lg:col-span-5 grid grid-rows-2 gap-3 min-h-0">
-          {/* Panel 1: Photoshop-style Layers Panel */}
+          {/* Panel 1: Multi-Layer Stack Panel */}
           <Card className="flex flex-col overflow-hidden">
             <CardHeader className="py-2.5 px-3 border-b border-nle-border flex flex-row items-center justify-between">
               <CardTitle className="text-xs font-bold text-white flex items-center">
                 <Layers className="w-3.5 h-3.5 mr-1.5 text-nle-cyan" />
-                Lớp Đồ Họa (Photoshop Layers)
+                Lớp Đồ Họa & Mặt Nạ (Layer Compositor)
               </CardTitle>
               <Badge variant="cyan" className="text-[9px]">
                 {layers.length} Layers

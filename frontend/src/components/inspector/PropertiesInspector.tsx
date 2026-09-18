@@ -32,7 +32,7 @@ export function PropertiesInspector() {
   const [openTransform, setOpenTransform] = useState(false);
   const [openCutout, setOpenCutout] = useState(false);
 
-  // Text Typography State (Premiere Pro 2025 Text Properties)
+  // Text Typography State
   const [fontFamily, setFontFamily] = useState("Monument Extended");
   const [fontSize, setFontSize] = useState(96);
   const [fontWeight, setFontWeight] = useState("Bold");
@@ -54,7 +54,7 @@ export function PropertiesInspector() {
   const [shadowColor, setShadowColor] = useState("#00f0ff");
   const [shadowBlur, setShadowBlur] = useState(16);
 
-  // CapCut Pro Cutout & Retouch State
+  // Neural Cutout & Retouch State
   const [autoCutoutEnabled, setAutoCutoutEnabled] = useState(false);
   const [chromaKeyEnabled, setChromaKeyEnabled] = useState(false);
   const [chromaColor, setChromaColor] = useState("#00ff00");
@@ -73,13 +73,13 @@ export function PropertiesInspector() {
           </CardTitle>
         </div>
         <Badge variant="cyan" className="text-[9px] uppercase font-mono">
-          Premiere 2025 • CapCut
+          Typography & Cutout Inspector
         </Badge>
       </CardHeader>
 
       {/* Inspector Scrollable Body */}
       <CardContent className="p-3 space-y-3 flex-1 overflow-y-auto">
-        {/* Accordion 1: Text Typography (Premiere 2025) */}
+        {/* Accordion 1: Text Typography */}
         <div className="rounded-lg border border-nle-border bg-nle-panel overflow-hidden">
           <button
             onClick={() => setOpenText(!openText)}
@@ -180,7 +180,7 @@ export function PropertiesInspector() {
           )}
         </div>
 
-        {/* Accordion 2: Appearance & Styling (Premiere 2025) */}
+        {/* Accordion 2: Appearance & Styling */}
         <div className="rounded-lg border border-nle-border bg-nle-panel overflow-hidden">
           <button
             onClick={() => setOpenAppearance(!openAppearance)}
@@ -279,7 +279,7 @@ export function PropertiesInspector() {
           )}
         </div>
 
-        {/* Accordion 3: CapCut Cutout & Chroma Key */}
+        {/* Accordion 3: Neural Cutout & Chroma Key */}
         <div className="rounded-lg border border-nle-border bg-nle-panel overflow-hidden">
           <button
             onClick={() => setOpenCutout(!openCutout)}
@@ -287,7 +287,7 @@ export function PropertiesInspector() {
           >
             <span className="flex items-center">
               <Scissors className="w-3.5 h-3.5 mr-1.5 text-rose-400" />
-              Tách Nền & Mặt nạ (CapCut Cutout & Mask)
+              Tách Nền & Mặt Nạ (Neural Cutout & Mask)
             </span>
             {openCutout ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
           </button>

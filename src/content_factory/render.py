@@ -21,11 +21,16 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 
 from .models import RenderPlan
-from .resources import ResourceGovernor, default_governor
+from .resources import CodecChoice, ResourceGovernor, default_governor
+
+#: Placeholder in the input list marking where hardware-decode flags belong.
+_DECODE_SLOT = "__content_factory_decode__"
 
 #: Callable that resolves a media URL (image_url / narration_url) to a local
 #: file path, or None when the URL is not resolvable locally.
@@ -149,7 +154,9 @@ def _render_scenes(
                 if is_image:
                     inputs += ["-loop", "1", "-i", str(src)]
                 else:
-                    inputs += ["-stream_loop", "-1", "-i", str(src)]
+                    # The decode slot lets hardware decode be grafted in front of
+                    # this input, and removed again if the attempt fails.
+                    inputs += [_DECODE_SLOT, "-stream_loop", "-1", "-i", str(src)]
                 vidx = input_idx
                 input_idx += 1
                 vchain = (
@@ -238,24 +245,39 @@ def _render_scenes(
                 "aac" if export_format == "mp4" else "libopus",
             ]
 
-        prefix = [
-            binary,
-            "-y",
-            "-filter_complex_threads",
-            str(threads),
-            "-filter_threads",
-            str(threads),
-            *_bounded_inputs(inputs, threads),
-            "-filter_complex",
-            ";".join(filters),
-            "-map",
-            "[outv]",
-            *audio_args,
-            "-r",
-            str(plan.fps),
-        ]
+        def build_prefix(
+            decode: list[str], encoder_binary: str | None = None
+        ) -> list[str]:
+            """ffmpeg arguments before the encoder, hardware decode grafted in.
+
+            ``encoder_binary`` overrides the ffmpeg that runs the whole command,
+            for the case where the GPU encoder only starts on a *different* build
+            than the machine's own (see ``resources.FfmpegBuild``).
+            """
+            resolved_inputs = [
+                arg
+                for item in inputs
+                for arg in (decode if item == _DECODE_SLOT else [item])
+            ]
+            return [
+                encoder_binary or binary,
+                "-y",
+                "-filter_complex_threads",
+                str(threads),
+                "-filter_threads",
+                str(threads),
+                *_bounded_inputs(resolved_inputs, threads),
+                "-filter_complex",
+                ";".join(filters),
+                "-map",
+                "[outv]",
+                *audio_args,
+                "-r",
+                str(plan.fps),
+            ]
+
         completed = _run_encode(
-            prefix,
+            build_prefix,
             export_format=export_format,
             threads=threads,
             total_seconds=plan.total_seconds,
@@ -380,24 +402,39 @@ def _render_with_background_video(
                 "aac" if export_format == "mp4" else "libopus",
             ]
 
-        prefix = [
-            binary,
-            "-y",
-            "-filter_complex_threads",
-            str(threads),
-            "-filter_threads",
-            str(threads),
-            *_bounded_inputs(inputs, threads),
-            "-filter_complex",
-            ";".join(filters),
-            "-map",
-            "[outv]",
-            *audio_args,
-            "-r",
-            str(plan.fps),
-        ]
+        def build_prefix(
+            decode: list[str], encoder_binary: str | None = None
+        ) -> list[str]:
+            """ffmpeg arguments before the encoder, hardware decode grafted in.
+
+            ``encoder_binary`` overrides the ffmpeg that runs the whole command,
+            for the case where the GPU encoder only starts on a *different* build
+            than the machine's own (see ``resources.FfmpegBuild``).
+            """
+            resolved_inputs = [
+                arg
+                for item in inputs
+                for arg in (decode if item == _DECODE_SLOT else [item])
+            ]
+            return [
+                encoder_binary or binary,
+                "-y",
+                "-filter_complex_threads",
+                str(threads),
+                "-filter_threads",
+                str(threads),
+                *_bounded_inputs(resolved_inputs, threads),
+                "-filter_complex",
+                ";".join(filters),
+                "-map",
+                "[outv]",
+                *audio_args,
+                "-r",
+                str(plan.fps),
+            ]
+
         completed = _run_encode(
-            prefix,
+            build_prefix,
             export_format=export_format,
             threads=threads,
             total_seconds=plan.total_seconds,
@@ -421,28 +458,82 @@ def _bounded_inputs(inputs: list[str], threads: int) -> list[str]:
     return result
 
 
+def _spawn(command: list[str]) -> subprocess.Popen[str]:
+    """Start the encoder.
+
+    A seam, not decoration: the watchdog needs a process handle rather than
+    ``subprocess.run``'s black box, and tests need to substitute one to prove the
+    monitor kills what it should without running a real hour-long encode.
+    """
+    return subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
 def _run_command(
-    command: list[str], timeout: float
+    command: list[str],
+    timeout: float,
+    *,
+    governor: ResourceGovernor | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run ffmpeg with a hard deadline; a hung encoder must not pin the machine."""
+    """Run ffmpeg under a deadline *and* a live pressure watch.
+
+    A deadline alone only catches a hang. The failure this guards against is the
+    opposite: a render that is working perfectly and pulling the whole machine
+    down with it — walking RAM into swap, or holding the GPU at its thermal limit
+    for an hour. So while the process runs, a monitor thread re-reads pressure and
+    terminates it the moment the machine is in real trouble, reporting *why*.
+    Ordinary load never trips it; the thresholds are abort-level, not busy-level.
+    """
+    resolved = governor or default_governor()
+    interval = float(resolved.settings.render_monitor_seconds)
+    kill_reason: list[str] = []
+    started = time.monotonic()
     try:
-        return subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired as exc:
+        process = _spawn(command)
+    except OSError as exc:
+        raise RenderError(f"could not run ffmpeg ({command[0]}): {exc}") from exc
+
+    def watch() -> None:
+        """Terminate the render if the machine becomes unsafe, else let it run."""
+        while process.poll() is None:
+            time.sleep(interval)
+            if process.poll() is not None:
+                return
+            violation = resolved.pressure_violation()
+            if violation:
+                kill_reason.append(violation)
+                process.terminate()
+                return
+            if timeout and time.monotonic() - started > timeout:
+                kill_reason.append(f"exceeded the {timeout:.0f}s render budget")
+                process.terminate()
+                return
+
+    monitor = threading.Thread(target=watch, name="render-watchdog", daemon=True)
+    monitor.start()
+    stdout, stderr = process.communicate()
+    monitor.join(timeout=interval + 5.0)
+    if kill_reason:
+        reason = kill_reason[0]
+        if "budget" in reason:
+            raise RenderError(
+                f"ffmpeg {reason} and was killed to protect the machine; raise "
+                "CONTENT_FACTORY_RENDER_TIMEOUT_SECONDS for very long timelines."
+            )
         raise RenderError(
-            f"ffmpeg exceeded the {timeout:.0f}s render budget and was killed to "
-            "protect the machine; raise CONTENT_FACTORY_RENDER_TIMEOUT_SECONDS "
-            "for very long timelines."
-        ) from exc
+            f"the render was aborted to protect the machine: {reason}. "
+            "Lower CONTENT_FACTORY_RENDER_THREADS, close other heavy apps, or "
+            "raise the abort thresholds if the readings are wrong for this box."
+        )
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 def _run_encode(
-    prefix: list[str],
+    build_prefix: Callable[..., list[str]],
     *,
     export_format: str,
     threads: int,
@@ -452,39 +543,54 @@ def _run_encode(
 ) -> subprocess.CompletedProcess[str]:
     """Encode with the best available device, and fall back instead of failing.
 
-    The encoder is chosen by the resource governor: a hardware encoder when this
-    machine exposes one and the policy allows it, the software encoder otherwise.
-    If a hardware encoder fails at runtime (driver reset, another process holding
-    the encoder session, VRAM exhausted), the export is retried once in software
-    so a GPU problem never costs the whole job.
+    ``build_prefix`` receives the hardware-decode flags to place before each
+    input, so the same graph can be rebuilt for each attempt. Attempts run from
+    most accelerated to plain software:
+
+    1. the chosen encoder with hardware decode,
+    2. the chosen encoder without it (decode acceleration is the usual suspect),
+    3. the software encoder, which is the safety net when a GPU encoder fails
+       mid-job (driver reset, encoder session held elsewhere, VRAM exhausted).
+
+    Attempt 3 also reverts to the machine's own ffmpeg, since the software encoder
+    is the one thing that is certainly present there.
     """
     resolved = governor or default_governor()
     choice = resolved.video_codec(export_format)
-    command = [
-        *prefix,
-        *choice.args,
-        "-threads",
-        str(threads),
-        "-t",
-        str(total_seconds),
-        str(output_path),
-    ]
-    completed = _run_command(command, resolved.settings.render_timeout_seconds)
-    resolved.note_encoder(choice.encoder)
-    if completed.returncode == 0 or not choice.hardware:
-        return completed
-    resolved.note_encoder_fallback(choice.encoder)
-    software = resolved.software_video_codec(export_format)
-    retry = [
-        *prefix,
-        *software.args,
-        "-threads",
-        str(threads),
-        "-t",
-        str(total_seconds),
-        str(output_path),
-    ]
-    return _run_command(retry, resolved.settings.render_timeout_seconds)
+    decode = resolved.decoder_args(export_format)
+    attempts: list[tuple[CodecChoice, tuple[str, ...], bool]] = []
+    if decode:
+        attempts.append((choice, decode, False))
+    attempts.append((choice, (), False))
+    if choice.hardware:
+        attempts.append((resolved.software_video_codec(export_format), (), True))
+    completed: subprocess.CompletedProcess[str] | None = None
+    for codec, decode_args, is_fallback in attempts:
+        # A fallback must not reuse the alternate build: software encoding is the
+        # guaranteed-present path, so it reverts to the machine's own ffmpeg.
+        prefix_binary = None if is_fallback else (codec.binary or None)
+        command = [
+            *build_prefix(list(decode_args), prefix_binary),
+            *codec.args,
+            "-threads",
+            str(threads),
+            "-t",
+            str(total_seconds),
+            str(output_path),
+        ]
+        completed = _run_command(
+            command,
+            resolved.settings.render_timeout_seconds,
+            governor=resolved,
+        )
+        resolved.note_encoder(f"{codec.encoder}->cpu" if is_fallback else codec.encoder)
+        if completed.returncode == 0:
+            break
+        if is_fallback:
+            break
+        resolved.note_encoder_fallback(codec.encoder)
+    assert completed is not None  # attempts is never empty
+    return completed
 
 
 def _voice_volume(plan: RenderPlan) -> float:

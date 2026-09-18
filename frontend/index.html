@@ -8,18 +8,18 @@
   <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body class="studio-body">
-  <!-- ADOBE CREATIVE CLOUD APPLICATION MENU BAR -->
+  <!-- STUDIO APPLICATION MENU BAR -->
   <div class="adobe-app-bar" id="adobe-app-bar">
     <div class="adobe-badges-row">
-      <span class="adobe-badge pr" title="Adobe Premiere Pro NLE Studio">Pr</span>
-      <span class="adobe-badge ae" title="Adobe After Effects Motion Engine">Ae</span>
-      <span class="adobe-badge ps" title="Adobe Photoshop Creative Lab">Ps</span>
-      <span class="adobe-badge au" title="Adobe Audition Multi-track Mixer">Au</span>
-      <span class="adobe-badge me" title="Adobe Media Encoder Queue">Me</span>
+      <span class="adobe-badge pr" title="Non-Linear Video Editor (NLE)">NLE</span>
+      <span class="adobe-badge ae" title="Motion Dynamics & Visual Effects (VFX)">VFX</span>
+      <span class="adobe-badge ps" title="Photo Lab & Multi-Layer Compositor (IMG)">IMG</span>
+      <span class="adobe-badge au" title="Digital Audio Workstation & 5-Band EQ (DAW)">DAW</span>
+      <span class="adobe-badge me" title="Hardware Media Encoder & Delivery (ENC)">ENC</span>
     </div>
 
     <!-- Desktop Dropdown Menus -->
-    <nav class="adobe-menus" aria-label="Adobe Application Menus">
+    <nav class="adobe-menus" aria-label="Studio Application Menus">
       <div class="adobe-menu-item" tabindex="0">
         <span class="adobe-menu-title">File</span>
         <div class="adobe-dropdown">
@@ -27,7 +27,7 @@
           <button class="adobe-menu-btn" id="menu-file-save"><span>Save Project</span><kbd>Ctrl+S</kbd></button>
           <div class="adobe-menu-div"></div>
           <button class="adobe-menu-btn" id="menu-file-ingest"><span>Ingest External AI Media…</span><kbd>Ctrl+I</kbd></button>
-          <button class="adobe-menu-btn" id="menu-file-export"><span>Export to Media Encoder…</span><kbd>Ctrl+M</kbd></button>
+          <button class="adobe-menu-btn" id="menu-file-export"><span>Export to Render Queue…</span><kbd>Ctrl+M</kbd></button>
           <button class="adobe-menu-btn" id="menu-file-render"><span>Render Video (ffmpeg)…</span><kbd>Enter</kbd></button>
           <div class="adobe-menu-div"></div>
           <button class="adobe-menu-btn" id="menu-file-cinema"><span>Cinema Fullscreen Mode</span><kbd>F</kbd></button>
@@ -100,15 +100,15 @@
           <div class="adobe-menu-div"></div>
           <button class="adobe-menu-btn" id="menu-gfx-neon"><span>Style: Neon Cyber Glow</span><kbd>Alt+N</kbd></button>
           <button class="adobe-menu-btn" id="menu-gfx-outline"><span>Style: Heavy Bold Outline</span><kbd>Alt+O</kbd></button>
-          <button class="adobe-menu-btn" id="menu-gfx-photolab"><span>Open Frame in Photo Lab (Photoshop)</span><kbd>Ctrl+P</kbd></button>
+          <button class="adobe-menu-btn" id="menu-gfx-photolab"><span>Open Frame in Photo Lab &amp; Layer Compositor</span><kbd>Ctrl+P</kbd></button>
         </div>
       </div>
 
       <div class="adobe-menu-item" tabindex="0">
         <span class="adobe-menu-title">Window</span>
         <div class="adobe-dropdown">
-          <button class="adobe-menu-btn" id="menu-win-editing"><span>Workspace: Video Studio (Premiere NLE)</span><kbd>2</kbd></button>
-          <button class="adobe-menu-btn" id="menu-win-photolab"><span>Workspace: Photo Lab (Photoshop)</span><kbd>3</kbd></button>
+          <button class="adobe-menu-btn" id="menu-win-editing"><span>Workspace: Video Studio (Multi-Track NLE)</span><kbd>2</kbd></button>
+          <button class="adobe-menu-btn" id="menu-win-photolab"><span>Workspace: Photo Lab &amp; Layer Compositor</span><kbd>3</kbd></button>
           <button class="adobe-menu-btn" id="menu-win-pipeline"><span>Workspace: Pipeline Stepper</span><kbd>1</kbd></button>
           <button class="adobe-menu-btn" id="menu-win-dag"><span>Workspace: Node Flow (DAG)</span><kbd>4</kbd></button>
           <button class="adobe-menu-btn" id="menu-win-agents"><span>Workspace: Agents Orchestra</span><kbd>5</kbd></button>
@@ -133,7 +133,7 @@
       <div class="brand-mark">◈</div>
       <div class="brand-info">
         <div class="brand-name">AI Content Factory</div>
-        <div class="brand-sub">Adobe Creative Cloud &amp; TikTok Studio Pro Edition</div>
+        <div class="brand-sub">Professional Multi-Track NLE &amp; Autonomous Pipeline Edition</div>
       </div>
     </div>
 
@@ -147,7 +147,7 @@
         <span class="ws-icon">🎬</span>
         <span class="ws-title">Video Studio</span>
       </button>
-      <button class="ws-tab" data-ws="photolab" id="ws-tab-photolab" title="Photoshop Image &amp; Thumbnail Lab (Key 3)">
+      <button class="ws-tab" data-ws="photolab" id="ws-tab-photolab" title="Photo Lab &amp; Layer Compositor (Key 3)">
         <span class="ws-icon">🎨</span>
         <span class="ws-title">Photo Lab</span>
       </button>
@@ -771,10 +771,10 @@
           </div>
         </section>
 
-        <!-- WORKSPACE VIEW 2: PHOTO & PHOTOSHOP LAB -->
+        <!-- WORKSPACE VIEW 2: PHOTO LAB & LAYER COMPOSITOR -->
         <section class="ws-view" id="view-photolab">
           <div class="photolab-container">
-            <!-- Left Photoshop Toolbar -->
+            <!-- Left Graphics Toolbar -->
             <div class="photolab-toolbar">
               <button class="pl-tool-btn active" data-tool="select" title="Move &amp; Select (V)">↖</button>
               <button class="pl-tool-btn" data-tool="crop" title="Crop &amp; Frame (C)">✂</button>
@@ -791,7 +791,7 @@
               </div>
             </div>
 
-            <!-- Center Photoshop Stage & Canvas -->
+            <!-- Center Canvas Viewport -->
             <div class="photolab-viewport">
               <div class="photolab-viewport-topbar">
                 <div class="pl-preset-chips">
@@ -822,7 +822,7 @@
               </div>
             </div>
 
-            <!-- Right Photoshop Panels (Layers & Color Adjustments) -->
+            <!-- Right Panels (Layers & Color Adjustments) -->
             <div class="photolab-panels">
               <!-- Tab Navigation inside Photo Lab -->
               <div class="pl-tab-bar">
@@ -1310,13 +1310,13 @@
     </aside>
   </div>
 
-  <!-- FULLSCREEN VIDEO STUDIO OVERLAY (ADOBE PREMIERE PRO & CREATIVE SUITE) -->
+  <!-- FULLSCREEN VIDEO STUDIO OVERLAY (PROFESSIONAL NLE SUITE) -->
   <div id="editor" class="editor-overlay" hidden>
     <!-- Studio Topbar -->
     <div class="editor-topbar">
       <div class="editor-brand">
-        <span class="adobe-badge pr" style="font-size: 13px; padding: 2px 6px;">Pr</span>
-        <h2>Premiere Video Studio Pro</h2>
+        <span class="adobe-badge pr" style="font-size: 13px; padding: 2px 6px;">NLE</span>
+        <h2>Video Studio Pro (Multi-Track NLE)</h2>
         <select id="ed-aspect" class="ed-select">
           <option value="9:16" selected>9:16 · Vertical Shorts / TikTok</option>
           <option value="16:9">16:9 · Landscape Cinematic (YouTube)</option>
@@ -1344,22 +1344,22 @@
         <button id="btn-ed-voice" class="btn" title="Synthesize neural narration voiceover (Edge-TTS) [Ctrl+G]">🎙 Voiceover</button>
         <button id="btn-ed-undo" class="btn" title="Undo (Ctrl+Z)">↶ Undo</button>
         <button id="btn-ed-redo" class="btn" title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
-        <button id="btn-ed-capture" class="btn" title="Send Frame to Photoshop Lab for Thumbnail [Ctrl+P]">📸 Thumbnail</button>
+        <button id="btn-ed-capture" class="btn" title="Send Frame to Photo Lab for Thumbnail [Ctrl+P]">📸 Thumbnail</button>
         <button id="btn-ed-save" class="btn" title="Save Project to Disk (Ctrl+S)">💾 Save</button>
-        <button id="btn-ed-export" class="btn primary" title="Export to Media Encoder Queue (Ctrl+M)">⚡ Export</button>
+        <button id="btn-ed-export" class="btn primary" title="Export to Render Queue (Ctrl+M)">⚡ Export</button>
         <button id="btn-ed-close" class="btn icon-btn" title="Close Studio (Esc)">✕</button>
       </div>
     </div>
 
-    <!-- Adobe Premiere Pro Workspace Tabs Bar -->
-    <div class="premiere-workspace-bar">
-      <div class="pr-ws-tabs" role="tablist" aria-label="Premiere Workspaces">
+    <!-- Professional NLE Workspace Tabs Bar -->
+    <div class="nle-workspace-bar">
+      <div class="pr-ws-tabs" role="tablist" aria-label="NLE Workspaces">
         <button class="pr-ws-tab active" data-prtab="scene" id="pr-tab-editing">🎬 Editing</button>
-        <button class="pr-ws-tab" data-prtab="color" id="pr-tab-color">🎨 Color (Lumetri)</button>
-        <button class="pr-ws-tab" data-prtab="effects" id="pr-tab-effects">✨ Effects (Ae)</button>
-        <button class="pr-ws-tab" data-prtab="audio" id="pr-tab-audio">🎙 Audio (Audition)</button>
+        <button class="pr-ws-tab" data-prtab="color" id="pr-tab-color">🎨 Color &amp; 3D LUTs</button>
+        <button class="pr-ws-tab" data-prtab="effects" id="pr-tab-effects">✨ Effects &amp; Motion</button>
+        <button class="pr-ws-tab" data-prtab="audio" id="pr-tab-audio">🎙 Audio (5-Band EQ)</button>
         <button class="pr-ws-tab" data-prtab="text" id="pr-tab-graphics">📝 Graphics &amp; Captions</button>
-        <button class="pr-ws-tab" data-prtab="export" id="pr-tab-export">⚡ Export (Media Encoder)</button>
+        <button class="pr-ws-tab" data-prtab="export" id="pr-tab-export">⚡ Export &amp; Render</button>
         <button class="pr-ws-tab" data-prtab="ai" id="pr-tab-ai">🤖 AI Co-Pilot</button>
       </div>
       <div class="pr-sequence-meta">
@@ -1370,8 +1370,8 @@
 
     <!-- Studio Main Workspace: Left Tool Dock, Center Canvas Viewport & VU Meter, Right Inspector -->
     <div class="editor-body">
-      <!-- Left Tool Palette (Adobe Premiere Classic Tools) -->
-      <div class="editor-left-dock" aria-label="Adobe Tools Palette">
+      <!-- Left Tool Palette (Precision NLE Tools) -->
+      <div class="editor-left-dock" aria-label="Precision NLE Tools Palette">
         <button class="dock-tool-btn active" data-tool="select" title="Selection Tool (V)">↖<small>V</small></button>
         <button class="dock-tool-btn" data-tool="track-forward" title="Track Select Forward (A)">⇉<small>A</small></button>
         <button class="dock-tool-btn" data-tool="ripple" title="Ripple Edit Tool (B)">⇥<small>B</small></button>
@@ -1408,8 +1408,8 @@
             <div class="canvas-frame" id="canvas-frame">
               <canvas id="preview-canvas"></canvas>
 
-              <!-- Action & Title Safe Margins Overlay (Adobe Standard) -->
-              <div class="adobe-safe-margins" id="adobe-safe-margins">
+              <!-- Action & Title Safe Margins Overlay (Broadcast Standard) -->
+              <div class="studio-safe-margins adobe-safe-margins" id="studio-safe-margins">
                 <div class="safe-action-box" title="Action Safe Zone (90%)"></div>
                 <div class="safe-title-box" title="Title Safe Zone (80%)"></div>
                 <div class="safe-crosshair" title="Center Crosshair"></div>
@@ -1439,8 +1439,8 @@
             </div>
           </div>
 
-          <!-- Audition Live Stereo Audio VU Peak Meter -->
-          <div class="audio-vu-meter" id="audio-vu-meter" title="Master Audio Peak Levels (Adobe Audition)">
+          <!-- Live Stereo Audio VU Peak Meter -->
+          <div class="audio-vu-meter" id="audio-vu-meter" title="Master Audio Peak Levels (Broadcast Standard)">
             <div class="vu-scale">
               <span class="vu-mark clip">+3</span>
               <span class="vu-mark">0</span>
@@ -2151,7 +2151,7 @@
         <button type="button" id="btn-shortcuts-close" class="btn sm">✕</button>
       </div>
       <p class="muted small" style="margin-top: -6px; margin-bottom: 18px;">
-        Standard NLE keyboard mappings matching Adobe Premiere Pro, After Effects, and Photoshop.
+        Standard NLE keyboard mappings matching industry standard video, motion, and graphics workflows.
       </p>
 
       <div class="shortcuts-grid">
@@ -2167,7 +2167,7 @@
         </div>
 
         <div class="shortcut-group">
-          <h4>Adobe Premiere Tools</h4>
+          <h4>Precision NLE Tools</h4>
           <div class="shortcut-row"><span>Selection Tool</span><kbd>V</kbd></div>
           <div class="shortcut-row"><span>Razor Blade (Split Clip)</span><kbd>C</kbd></div>
           <div class="shortcut-row"><span>Track Select Forward</span><kbd>A</kbd></div>
@@ -2193,7 +2193,7 @@
           <div class="shortcut-row"><span>Save Project to Disk</span><kbd>Ctrl + S</kbd></div>
           <div class="shortcut-row"><span>Undo</span><kbd>Ctrl + Z</kbd></div>
           <div class="shortcut-row"><span>Redo</span><kbd>Ctrl + Shift + Z</kbd></div>
-          <div class="shortcut-row"><span>Export to Media Encoder</span><kbd>Ctrl + M</kbd></div>
+          <div class="shortcut-row"><span>Export to Render Queue</span><kbd>Ctrl + M</kbd></div>
           <div class="shortcut-row"><span>Switch Workspaces</span><kbd>Keys 1 – 7</kbd></div>
           <div class="shortcut-row"><span>Send Frame to Photo Lab</span><kbd>Ctrl + P</kbd></div>
         </div>
@@ -2201,7 +2201,7 @@
     </div>
   </div>
 
-  <!-- AI NATURAL LANGUAGE TIMELINE CO-PILOT MODAL (SPOTLIGHT / RAYCAST / CAPCUT AI STYLE) -->
+  <!-- AI NATURAL LANGUAGE TIMELINE CO-PILOT MODAL (COMMAND PALETTE / PRO NLE AI CO-PILOT) -->
   <div id="command-bar-modal" class="modal-overlay" hidden>
     <div class="modal command-bar-dialog" style="max-width: 680px; padding: 0; overflow: hidden; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.4); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.25);">
       <div class="cmd-bar-header">

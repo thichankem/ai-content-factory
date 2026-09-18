@@ -313,6 +313,7 @@ class ResearchEngine:
             "Review the highlights below; the draft is grounded in these facts."
         )
         return ResearchBundle(
+            topic=topic,
             sources=sources,
             key_facts=key_facts,
             notes=notes,

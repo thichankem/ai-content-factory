@@ -19,12 +19,17 @@ import {
   Compass,
   Radio,
   SlidersHorizontal,
+  LayoutTemplate,
+  DownloadCloud,
 } from "lucide-react";
 import { useMediaLibrary } from "../../hooks/useMediaLibrary";
+import { HtmlSlideDeckStudio } from "./HtmlSlideDeckStudio";
+import { VideoUrlRecookStudio } from "./VideoUrlRecookStudio";
 
 export function MediaStudio() {
+  const [activeSubMode, setActiveSubMode] = useState<"bin" | "slides" | "recook">("bin");
   const [searchQuery, setSearchQuery] = useState("");
-  const [mediaFilter, setMediaFilter] = useState<"all" | "video" | "audio" | "image">("all");
+  const [mediaFilter, setMediaFilter] = useState<"all" | "video" | "audio" | "image" | "slide">("all");
   const { dedupMutation } = useMediaLibrary();
 
   const [dedupResult, setDedupResult] = useState<any>(null);
@@ -115,6 +120,18 @@ export function MediaStudio() {
       icon: CopyCheck,
       onClick: handleRunDedup,
     },
+    {
+      id: "ai-html-slides",
+      label: "Thiết Kế Slide HTML/CSS (Slide Deck)",
+      icon: LayoutTemplate,
+      onClick: () => setActiveSubMode("slides"),
+    },
+    {
+      id: "ai-recook-video",
+      label: "Khai Thác Video URL & Biến Tấu Script",
+      icon: DownloadCloud,
+      onClick: () => setActiveSubMode("recook"),
+    },
   ];
 
   const filteredAssets = assetsList.filter((a) => {
@@ -127,9 +144,9 @@ export function MediaStudio() {
     <div className="flex flex-col space-y-3 h-full min-h-0 overflow-y-auto">
       {/* Universal AI Agent Bar for Media */}
       <AIAgentBar
-        tabTitle="Chọn Tư liệu & Âm thanh (Asset Hunter & Media Bin)"
+        tabTitle="Chọn Tư liệu & Slide Trình Diễn (Asset Hunter & Media Bin)"
         agentRole="Archival Researcher & AI Generation Specialist"
-        promptPlaceholder="Nhập yêu cầu AI (ví dụ: 'Sinh ảnh bìa phong cách Cyberpunk 9:16', 'Tìm âm thanh tiếng sấm chớp nổ lớn')..."
+        promptPlaceholder="Nhập yêu cầu AI (ví dụ: 'Tạo slide so sánh HTML/CSS', 'Khai thác video TikTok', 'Tìm âm thanh tiếng sấm')..."
         quickActions={quickActions}
         statusMessage={aiStatus}
         isProcessing={isAiProcessing}
@@ -142,98 +159,171 @@ export function MediaStudio() {
         }}
       />
 
-      {/* Search, Filter & Actions Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-nle-surface border border-nle-border rounded-xl">
-        <div className="flex items-center space-x-2 flex-1 max-w-md">
-          <div className="relative w-full">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <Input
-              placeholder="Tìm kiếm tư liệu theo tên hoặc tag (ví dụ: 'city', 'lofi beat')..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 text-xs h-8"
-            />
-          </div>
+      {/* Sub-Mode Toggle: Media Bin vs Slide Deck vs Video URL Ingestion */}
+      <div className="flex flex-wrap items-center justify-between bg-nle-panel border border-nle-border rounded-xl p-1.5 gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            onClick={() => setActiveSubMode("bin")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+              activeSubMode === "bin"
+                ? "bg-nle-surface text-nle-cyan shadow-sm border border-nle-cyan/30"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span>Kho Tư Liệu (Media Bin)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubMode("slides")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+              activeSubMode === "slides"
+                ? "bg-nle-surface text-nle-cyan shadow-sm border border-nle-cyan/30"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <LayoutTemplate className="w-3.5 h-3.5 text-amber-400" />
+            <span>Slide Trình Diễn HTML/CSS (Slide Deck Studio)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubMode("recook")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+              activeSubMode === "recook"
+                ? "bg-nle-surface text-rose-400 shadow-sm border border-rose-500/30"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <DownloadCloud className="w-3.5 h-3.5 text-rose-400" />
+            <span>Khai Thác Video &amp; Biến Tấu Script (AI Re-Cook)</span>
+          </button>
         </div>
 
-        {/* Media Type Filters */}
-        <div className="flex items-center space-x-1 bg-nle-panel border border-nle-border rounded-lg p-0.5 text-xs">
-          {(
-            [
-              { id: "all", label: "Tất cả" },
-              { id: "video", label: "Video" },
-              { id: "image", label: "Hình ảnh" },
-              { id: "audio", label: "Âm thanh" },
-            ] as const
-          ).map((filter) => (
-            <button
-              key={filter.id}
-              onClick={() => setMediaFilter(filter.id)}
-              className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
-                mediaFilter === filter.id
-                  ? "bg-nle-surface text-nle-cyan shadow-sm"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Upload Button */}
-        <Button size="sm" variant="neon" className="text-xs h-8 px-3">
-          <Plus className="w-3.5 h-3.5 mr-1" />
-          Tải Lên File (Upload)
-        </Button>
+        <Badge variant="cyan" className="text-[10px]">
+          {activeSubMode === "bin"
+            ? `${filteredAssets.length} Tệp Khả Dụng`
+            : activeSubMode === "slides"
+            ? "Web Standards Vector"
+            : "Whisper & Re-Cook Engine"}
+        </Badge>
       </div>
 
-      {/* Dedup Notification if run */}
-      {dedupResult && (
-        <div className="p-3 bg-nle-panel border border-nle-border rounded-lg text-xs text-emerald-400 flex items-center justify-between">
-          <span className="flex items-center">
-            <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-            Đã hoàn thành quét dHash toàn bộ thư viện: 100% tệp tư liệu là duy nhất, không trùng lặp thị giác.
-          </span>
-          <Badge variant="emerald">100% Unique Verified</Badge>
+      {activeSubMode === "slides" ? (
+        <div className="flex-1 min-h-[520px]">
+          <HtmlSlideDeckStudio
+            onAddSlideToMedia={(newSlide) => {
+              setAssetsList((prev) => [newSlide, ...prev]);
+            }}
+          />
         </div>
-      )}
-
-      {/* Media Bin Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 flex-1 overflow-y-auto">
-        {filteredAssets.map((asset) => (
-          <Card
-            key={asset.id}
-            className="group hover:border-nle-cyan transition-all flex flex-col justify-between overflow-hidden bg-nle-surface border-nle-border"
-          >
-            <div className="aspect-video bg-nle-base flex items-center justify-center border-b border-nle-border relative group-hover:bg-black/40 transition-colors">
-              {asset.type === "video" && (
-                <Film className="w-8 h-8 text-nle-cyan/60 group-hover:text-nle-cyan transition-colors" />
-              )}
-              {asset.type === "audio" && (
-                <Music className="w-8 h-8 text-amber-400/60 group-hover:text-amber-400 transition-colors" />
-              )}
-              {asset.type === "image" && (
-                <ImageIcon className="w-8 h-8 text-nle-violet/60 group-hover:text-nle-violet transition-colors" />
-              )}
-
-              {/* Tag / Source Pill */}
-              <span className="absolute bottom-1 right-1 text-[9px] bg-black/70 px-1 rounded text-gray-300 font-mono">
-                {asset.duration}
-              </span>
-            </div>
-
-            <div className="p-2 space-y-1">
-              <span className="font-semibold text-xs text-white truncate block" title={asset.name}>
-                {asset.name}
-              </span>
-              <div className="flex justify-between items-center text-[10px] text-gray-400">
-                <span className="uppercase text-[9px] text-nle-cyan font-bold">{asset.type}</span>
-                <span className="truncate max-w-[70px] text-gray-400">{asset.source}</span>
+      ) : activeSubMode === "recook" ? (
+        <div className="flex-1 min-h-[520px]">
+          <VideoUrlRecookStudio
+            onAddMediaAsset={(newMedia) => {
+              setAssetsList((prev) => [newMedia, ...prev]);
+            }}
+          />
+        </div>
+      ) : (
+        <>
+          {/* Search, Filter & Actions Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-nle-surface border border-nle-border rounded-xl shrink-0">
+            <div className="flex items-center space-x-2 flex-1 max-w-md">
+              <div className="relative w-full">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  placeholder="Tìm kiếm tư liệu theo tên hoặc tag (ví dụ: 'city', 'lofi beat', 'slide')..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 text-xs h-8"
+                />
               </div>
             </div>
-          </Card>
-        ))}
-      </div>
+
+            {/* Media Type Filters */}
+            <div className="flex items-center space-x-1 bg-nle-panel border border-nle-border rounded-lg p-0.5 text-xs">
+              {(
+                [
+                  { id: "all", label: "Tất cả" },
+                  { id: "video", label: "Video" },
+                  { id: "image", label: "Hình ảnh" },
+                  { id: "audio", label: "Âm thanh" },
+                  { id: "slide", label: "Slide HTML" },
+                ] as const
+              ).map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setMediaFilter(filter.id)}
+                  className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
+                    mediaFilter === filter.id
+                      ? "bg-nle-surface text-nle-cyan shadow-sm"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Upload Button */}
+            <Button size="sm" variant="neon" className="text-xs h-8 px-3">
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Tải Lên File (Upload)
+            </Button>
+          </div>
+
+          {/* Dedup Notification if run */}
+          {dedupResult && (
+            <div className="p-3 bg-nle-panel border border-nle-border rounded-lg text-xs text-emerald-400 flex items-center justify-between shrink-0">
+              <span className="flex items-center">
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                Đã hoàn thành quét dHash toàn bộ thư viện: 100% tệp tư liệu là duy nhất, không trùng lặp thị giác.
+              </span>
+              <Badge variant="emerald">100% Unique Verified</Badge>
+            </div>
+          )}
+
+          {/* Media Bin Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 flex-1 overflow-y-auto">
+            {filteredAssets.map((asset) => (
+              <Card
+                key={asset.id}
+                className="group hover:border-nle-cyan transition-all flex flex-col justify-between overflow-hidden bg-nle-surface border-nle-border"
+              >
+                <div className="aspect-video bg-nle-base flex items-center justify-center border-b border-nle-border relative group-hover:bg-black/40 transition-colors">
+                  {asset.type === "video" && (
+                    <Film className="w-8 h-8 text-nle-cyan/60 group-hover:text-nle-cyan transition-colors" />
+                  )}
+                  {asset.type === "audio" && (
+                    <Music className="w-8 h-8 text-amber-400/60 group-hover:text-amber-400 transition-colors" />
+                  )}
+                  {asset.type === "image" && (
+                    <ImageIcon className="w-8 h-8 text-nle-violet/60 group-hover:text-nle-violet transition-colors" />
+                  )}
+                  {asset.type === "slide" && (
+                    <LayoutTemplate className="w-8 h-8 text-emerald-400/60 group-hover:text-emerald-400 transition-colors" />
+                  )}
+
+                  {/* Tag / Source Pill */}
+                  <span className="absolute bottom-1 right-1 text-[9px] bg-black/70 px-1 rounded text-gray-300 font-mono">
+                    {asset.duration}
+                  </span>
+                </div>
+
+                <div className="p-2 space-y-1">
+                  <span className="font-semibold text-xs text-white truncate block" title={asset.name}>
+                    {asset.name}
+                  </span>
+                  <div className="flex justify-between items-center text-[10px] text-gray-400">
+                    <span className="uppercase text-[9px] text-nle-cyan font-bold">{asset.type}</span>
+                    <span className="truncate max-w-[70px] text-gray-400">{asset.source}</span>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

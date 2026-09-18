@@ -66,6 +66,7 @@ from .knowledge import (
     RetrievalResponse,
 )
 from .media import (
+    MediaIngestUrlRequest,
     MediaItem,
     MediaKind,
     ReCookMode,
@@ -105,6 +106,7 @@ from .research import (
 from .script import (
     ScriptAnalysis,
     ScriptAnalyzeRequest,
+    ScriptDocument,
     ScriptIssue,
     ScriptIssueSeverity,
     ScriptPlan,
@@ -248,6 +250,7 @@ __all__ = [
     "MapRoutePoint",
     "MapRouteSpec",
     "MarkerCreate",
+    "MediaIngestUrlRequest",
     "MediaItem",
     "MediaKind",
     "MultiFormatCampaign",
@@ -286,6 +289,7 @@ __all__ = [
     "ScriptAnalyzeRequest",
     "ScriptIssue",
     "ScriptIssueSeverity",
+    "ScriptDocument",
     "ScriptPlan",
     "ScriptSectionInfo",
     "ScriptStyle",

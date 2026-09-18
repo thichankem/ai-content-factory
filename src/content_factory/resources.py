@@ -1,424 +1,80 @@
-"""Hardware probe and resource governor.
+"""Resource policy: admit, serialize, accelerate or abort a heavy job.
 
-This project runs on a laptop with one 8 GB GPU that is also driving the desktop,
-so the interesting question is never "can this use the GPU?" but "should this use
-the GPU **right now**?".
+:mod:`content_factory.hardware` measures the machine; this module decides what to
+do with it. This project runs on a laptop with one 8 GB GPU that is also driving
+the desktop, so the question is never "can this use the GPU?" but "should this use
+the GPU **right now**, and what happens if the machine changes its mind halfway?".
 
-The module answers two questions:
+Three decisions, each with a different timescale:
 
-* :func:`probe` — what does this machine actually have? CPU count, RAM, GPU
-  name/VRAM/temperature, which hardware encoders ffmpeg exposes, whether torch
-  has CUDA. Standard library only (``nvidia-smi`` + ``ctypes``), so nothing new
-  has to be installed and it degrades to "no GPU" on a machine without one.
-* :class:`ResourceGovernor` — may this job take the GPU, or should it wait, or
-  should it honestly fall back to CPU?
+* **Which encoder, and on which ffmpeg build.** ``resolve_hardware_encoder``
+  opens every *(build, encoder)* pair it can find and keeps the first that really
+  starts. Builds matter because they target different NVENC API versions: a
+  current ffmpeg can be refused by the installed driver while a bundled older
+  build encodes on the same GPU without complaint.
+* **Whether the job may start now.** :meth:`ResourceGovernor.begin` serializes
+  heavy work, then walks a degradation ladder:
 
-The degradation ladder, in order:
+  1. **No GPU, or policy says CPU** → run on CPU.
+  2. **Another heavy job is running** → wait for the slot, so the machine stays
+     responsive; the wait is reported.
+  3. **GPU too hot, saturated, or short of free VRAM** → poll with a backoff
+     until it cools or frees, up to ``gpu_wait_seconds``.
+  4. **Still busy after that** → run on CPU and record *why*, instead of blocking
+     forever or failing the job.
 
-1. **No GPU, or policy says CPU** → run on CPU.
-2. **Another heavy job is running** → wait for the slot (jobs are serialized, so
-   the machine stays responsive; the wait is reported).
-3. **GPU too hot, saturated, or short of free VRAM** → poll with a backoff until
-   it cools or frees, up to ``gpu_wait_seconds``.
-4. **Still busy after that** → run on CPU and record *why*, instead of blocking
-   forever or failing the job.
+* **Whether a job already running must stop.**
+  :meth:`ResourceGovernor.pressure_violation` answers that against much more
+  serious thresholds than admission uses, so ordinary load never kills work —
+  only a machine walking into swap or past its thermal ceiling does.
 
-Nothing here is a guess about correctness: the profile is measured, every
-decision carries its reason, and the counters are exposed through
-``GET /resources`` so the behaviour can be inspected rather than believed.
+Nothing here is a guess about correctness: the profile is measured, every decision
+carries its reason, and the counters are exposed through ``GET /resources`` so the
+behaviour can be inspected rather than believed.
 """
 
 from __future__ import annotations
 
-import ctypes
-import os
-import platform
-import shutil
-import subprocess
 import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from enum import StrEnum
-from pathlib import Path
 from typing import Any
 
+from .compute import (
+    _AUTO_ENCODER_PREFERENCE,
+    _HEAVY,
+    _REQUESTABLE_ENCODERS,
+    _VRAM_MB,
+    Admission,
+    CodecChoice,
+    Decision,
+    FfmpegBuild,
+    GpuInfo,
+    HardwareProfile,
+    JobKind,
+)
 from .config import Settings, get_settings
+from .hardware import discover_binaries, machine_pressure, probe, probe_encoder
 
 __all__ = [
     "default_governor",
+    # Re-exported so the many modules (and tests) that have always imported the
+    # compute vocabulary from here keep working unchanged.
     "Admission",
     "CodecChoice",
     "Decision",
+    "FfmpegBuild",
     "GpuInfo",
     "HardwareProfile",
     "JobKind",
     "ResourceGovernor",
+    "discover_binaries",
+    "machine_pressure",
     "probe",
+    "probe_encoder",
 ]
-
-#: Encoder names ffmpeg may expose that put the work on the GPU.
-_HARDWARE_ENCODERS = ("h264_nvenc", "hevc_nvenc", "av1_nvenc", "h264_qsv", "h264_amf")
-
-
-class JobKind(StrEnum):
-    """The heavy job families this project schedules."""
-
-    TRANSCRIBE = "transcribe"
-    OCR = "ocr"
-    VISION = "vision"
-    RENDER = "render"
-
-
-#: Rough VRAM each kind needs *in addition to* whatever is already resident.
-#: Deliberately generous: the point is to refuse a job that would swap the GPU,
-#: not to be exact. Overridable per call.
-_VRAM_MB: dict[JobKind, int] = {
-    JobKind.TRANSCRIBE: 1200,
-    JobKind.OCR: 1600,
-    JobKind.VISION: 2500,
-    JobKind.RENDER: 700,
-}
-
-#: Kinds that must never overlap with each other on a laptop.
-_HEAVY: frozenset[JobKind] = frozenset(
-    {JobKind.TRANSCRIBE, JobKind.OCR, JobKind.VISION, JobKind.RENDER}
-)
-
-#: GPU blockers that mean "there is no GPU to use", not "the GPU was busy".
-_NON_GPU: frozenset[str] = frozenset({"policy", "no_gpu"})
-
-
-class Admission(StrEnum):
-    """Where a job was told to run."""
-
-    GPU = "gpu"
-    CPU = "cpu"
-
-
-@dataclass(frozen=True)
-class GpuInfo:
-    """One GPU as reported by ``nvidia-smi``."""
-
-    index: int
-    name: str
-    driver: str
-    vram_total_mb: int
-    vram_used_mb: int
-    utilization_pct: int
-    temperature_c: int | None
-
-    @property
-    def vram_free_mb(self) -> int:
-        return max(0, self.vram_total_mb - self.vram_used_mb)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "index": self.index,
-            "name": self.name,
-            "driver": self.driver,
-            "vram_total_mb": self.vram_total_mb,
-            "vram_used_mb": self.vram_used_mb,
-            "vram_free_mb": self.vram_free_mb,
-            "utilization_pct": self.utilization_pct,
-            "temperature_c": self.temperature_c,
-        }
-
-
-@dataclass(frozen=True)
-class HardwareProfile:
-    """What this machine can do, measured once (pressure parts re-read live)."""
-
-    cpu_count: int
-    ram_total_mb: int
-    ram_available_mb: int
-    gpus: tuple[GpuInfo, ...]
-    encoders: tuple[str, ...]
-    ffmpeg: str | None
-    torch_cuda: bool
-    torch_version: str
-    onnx_providers: tuple[str, ...]
-    probed_at: float
-
-    @property
-    def gpu(self) -> GpuInfo | None:
-        return self.gpus[0] if self.gpus else None
-
-    @property
-    def has_gpu(self) -> bool:
-        return bool(self.gpus)
-
-    def has_encoder(self, name: str) -> bool:
-        return name in self.encoders
-
-    def hardware_video_encoder(self) -> str | None:
-        """Best hardware H.264 encoder this ffmpeg build exposes, if any."""
-        for name in ("h264_nvenc", "h264_qsv", "h264_amf"):
-            if name in self.encoders:
-                return name
-        return None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "cpu_count": self.cpu_count,
-            "ram_total_mb": self.ram_total_mb,
-            "ram_available_mb": self.ram_available_mb,
-            "gpus": [gpu.to_dict() for gpu in self.gpus],
-            "encoders": [name for name in self.encoders if name in _HARDWARE_ENCODERS],
-            "ffmpeg": self.ffmpeg,
-            "torch_cuda": self.torch_cuda,
-            "torch_version": self.torch_version,
-            "onnx_providers": list(self.onnx_providers),
-            "probed_at": round(self.probed_at, 3),
-        }
-
-
-@dataclass(frozen=True)
-class CodecChoice:
-    """The video encoder an export will use."""
-
-    encoder: str
-    hardware: bool
-    args: tuple[str, ...]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "encoder": self.encoder,
-            "hardware": self.hardware,
-            "args": list(self.args),
-        }
-
-
-@dataclass(frozen=True)
-class Decision:
-    """Where one job was allowed to run, and why."""
-
-    kind: JobKind
-    admission: Admission
-    encoder: str | None
-    waited_seconds: float
-    serialized: bool
-    reason: str
-    vram_mb: int
-
-    @property
-    def degraded(self) -> bool:
-        """True when the CPU was used *instead* of a GPU that could not be had.
-
-        A machine without a GPU, or a policy that forbids one, is not degraded —
-        that is simply the configuration. A busy, hot or VRAM-starved GPU is.
-        """
-        return self.admission is Admission.CPU and self.reason not in _NON_GPU
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "kind": str(self.kind),
-            "admission": str(self.admission),
-            "encoder": self.encoder,
-            "waited_seconds": round(self.waited_seconds, 2),
-            "serialized": self.serialized,
-            "degraded": self.degraded,
-            "reason": self.reason,
-        }
-
-
-# ---------------------------------------------------------------------------
-# Probing
-# ---------------------------------------------------------------------------
-
-
-def _system_memory_mb() -> tuple[int, int]:
-    """``(total_mb, available_mb)`` using only the standard library."""
-    if platform.system() == "Windows":
-
-        class _MemoryStatusEx(ctypes.Structure):
-            _fields_ = [
-                ("dwLength", ctypes.c_ulong),
-                ("dwMemoryLoad", ctypes.c_ulong),
-                ("ullTotalPhys", ctypes.c_ulonglong),
-                ("ullAvailPhys", ctypes.c_ulonglong),
-                ("ullTotalPageFile", ctypes.c_ulonglong),
-                ("ullAvailPageFile", ctypes.c_ulonglong),
-                ("ullTotalVirtual", ctypes.c_ulonglong),
-                ("ullAvailVirtual", ctypes.c_ulonglong),
-                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
-            ]
-
-        status = _MemoryStatusEx()
-        status.dwLength = ctypes.sizeof(_MemoryStatusEx)
-        try:
-            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
-                return int(status.ullTotalPhys // 1048576), int(
-                    status.ullAvailPhys // 1048576
-                )
-        except (AttributeError, OSError):  # pragma: no cover - non-Windows
-            return 0, 0
-        return 0, 0
-    try:  # pragma: no cover - POSIX
-        meminfo = Path("/proc/meminfo").read_text(encoding="utf-8")
-    except OSError:
-        return 0, 0
-    values: dict[str, int] = {}
-    for line in meminfo.splitlines():
-        key, _, rest = line.partition(":")
-        number = rest.strip().split(" ")[0]
-        if number.isdigit():
-            values[key] = int(number)
-    return values.get("MemTotal", 0) // 1024, values.get("MemAvailable", 0) // 1024
-
-
-def _nvidia_smi_gpus(binary: str) -> tuple[GpuInfo, ...]:
-    """Read GPU state; an absent or failing ``nvidia-smi`` is simply no GPU."""
-    query = (
-        "index,name,driver_version,memory.total,memory.used,utilization.gpu,"
-        "temperature.gpu"
-    )
-    try:
-        completed = subprocess.run(
-            [binary, f"--query-gpu={query}", "--format=csv,noheader,nounits"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return ()
-    if completed.returncode != 0:
-        return ()
-    gpus: list[GpuInfo] = []
-    for line in completed.stdout.strip().splitlines():
-        parts = [part.strip() for part in line.split(",")]
-        if len(parts) < 7:
-            continue
-        try:
-            gpus.append(
-                GpuInfo(
-                    index=int(parts[0]),
-                    name=parts[1],
-                    driver=parts[2],
-                    vram_total_mb=int(float(parts[3])),
-                    vram_used_mb=int(float(parts[4])),
-                    utilization_pct=int(float(parts[5])),
-                    temperature_c=int(float(parts[6])),
-                )
-            )
-        except ValueError:
-            continue
-    return tuple(gpus)
-
-
-def _ffmpeg_encoders(binary: str) -> tuple[str, ...]:
-    """Names of the video encoders this ffmpeg build supports."""
-    try:
-        completed = subprocess.run(
-            [binary, "-hide_banner", "-encoders"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return ()
-    if completed.returncode != 0:
-        return ()
-    names: list[str] = []
-    for line in completed.stdout.splitlines():
-        fields = line.split()
-        if len(fields) >= 2 and fields[0].startswith("V"):
-            names.append(fields[1])
-    return tuple(names)
-
-
-def probe_encoder(ffmpeg: str, encoder: str) -> tuple[bool, str]:
-    """Prove a hardware encoder really works by encoding one frame.
-
-    Listing encoders is not enough: an ffmpeg build can carry ``h264_nvenc`` and
-    still refuse to start it (an NVENC API newer than the installed driver, a
-    headless session, a busy encoder slot). This runs the smallest possible real
-    encode and returns ``(usable, note)``, so the export path never plans for an
-    encoder the machine cannot actually open.
-    """
-    command = [
-        ffmpeg,
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-f",
-        "lavfi",
-        "-i",
-        "color=c=black:size=64x64:duration=0.1:rate=10",
-        "-frames:v",
-        "1",
-        "-c:v",
-        encoder,
-        "-f",
-        "null",
-        "-",
-    ]
-    try:
-        completed = subprocess.run(
-            command, capture_output=True, text=True, timeout=30, check=False
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        return False, f"probe could not run: {exc}"
-    if completed.returncode == 0:
-        return True, ""
-    lines = [line.strip() for line in completed.stderr.splitlines() if line.strip()]
-    return False, " ".join(lines[-2:])[:300] or "the encoder refused the job"
-
-
-def _torch_state() -> tuple[bool, str]:
-    """``(cuda_available, version)`` without importing torch unless installed."""
-    try:
-        import torch  # noqa: PLC0415 - optional, heavy import on purpose
-
-        return bool(torch.cuda.is_available()), str(torch.__version__)
-    except Exception:  # noqa: BLE001 - any failure means "no torch"
-        return False, ""
-
-
-def _onnx_providers() -> tuple[str, ...]:
-    try:
-        import onnxruntime  # type: ignore[import-untyped]  # noqa: PLC0415
-
-        return tuple(onnxruntime.get_available_providers())
-    except Exception:  # noqa: BLE001 - optional dependency
-        return ()
-
-
-def probe(
-    *,
-    which: Callable[[str], str | None] = shutil.which,
-    nvidia_smi: Callable[[str], tuple[GpuInfo, ...]] = _nvidia_smi_gpus,
-    encoders: Callable[[str], tuple[str, ...]] = _ffmpeg_encoders,
-    memory: Callable[[], tuple[int, int]] = _system_memory_mb,
-    torch_state: Callable[[], tuple[bool, str]] = _torch_state,
-    onnx: Callable[[], tuple[str, ...]] = _onnx_providers,
-    cpu_count: Callable[[], int | None] = os.cpu_count,
-) -> HardwareProfile:
-    """Measure this machine. Every probe is injectable so tests need no GPU."""
-    smi = which("nvidia-smi")
-    ffmpeg = which("ffmpeg")
-    total_mb, available_mb = memory()
-    cuda, torch_version = torch_state()
-    return HardwareProfile(
-        cpu_count=int(cpu_count() or 1),
-        ram_total_mb=total_mb,
-        ram_available_mb=available_mb,
-        gpus=nvidia_smi(smi) if smi else (),
-        encoders=encoders(ffmpeg) if ffmpeg else (),
-        ffmpeg=ffmpeg,
-        torch_cuda=cuda,
-        torch_version=torch_version,
-        onnx_providers=onnx(),
-        probed_at=time.time(),
-    )
-
-
-# ---------------------------------------------------------------------------
-# The governor
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -458,18 +114,27 @@ class ResourceGovernor:
         self,
         settings: Settings,
         *,
-        probe_fn: Callable[[], HardwareProfile] = probe,
+        probe_fn: Callable[[], HardwareProfile] | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         encoder_probe: Callable[[str, str], tuple[bool, str]] = probe_encoder,
+        pressure: Callable[[], tuple[int, int | None]] | None = None,
     ) -> None:
         self._settings = settings
-        self._probe = probe_fn
+        self._pressure = pressure or machine_pressure
+        self._probe = probe_fn or (
+            lambda: probe(
+                ffmpeg_binary=settings.ffmpeg_binary,
+                extra_binaries=settings.ffmpeg_extra_binaries,
+            )
+        )
         self._clock = clock
         self._sleep = sleep
         self._encoder_probe = encoder_probe
-        #: encoder name -> (usable, note), checked once with a real encode.
-        self._encoder_checks: dict[str, tuple[bool, str]] = {}
+        #: (ffmpeg path, encoder name) -> (usable, note), checked once with a
+        #: real one-frame encode. Keyed by the pair, never the name alone: the
+        #: same encoder name is a different capability on a different build.
+        self._encoder_checks: dict[tuple[str, str], tuple[bool, str]] = {}
         self._lock = threading.Lock()
         self._slot_free = threading.Condition(self._lock)
         self._profile: HardwareProfile | None = None
@@ -508,41 +173,158 @@ class ResourceGovernor:
     def settings(self) -> Settings:
         return self._settings
 
-    def encoder_status(self) -> dict[str, Any]:
-        """Whether a hardware encoder exists *and* can really start on this machine."""
+    def decoder_args(self, export_format: str = "mp4") -> tuple[str, ...]:
+        """Hardware *decode* flags for source video. Empty unless asked for.
+
+        ``auto`` means **off**, and that is a measured decision rather than
+        caution. Decode acceleration only pays when the decoded frames stay on
+        the GPU for the rest of the pipeline. This project's filter graph (scale,
+        crop, drawtext) and its software encoder both run on the CPU, so every
+        frame is uploaded and then downloaded again over PCIe — a full round trip
+        bought for nothing. Measured on the RTX 4060 laptop this targets, reading
+        one clip and discarding it:
+
+        ====================  ==========  ==========  ==========
+        source                software    -cuda       -d3d11va
+        ====================  ==========  ==========  ==========
+        3s 720p               120ms       955ms       273ms
+        60s 1080p             626ms       1914ms      2139ms
+        20s 4K                812ms       2292ms      2604ms
+        ====================  ==========  ==========  ==========
+
+        Hardware decode loses at every size here, so opting in is the only way
+        to get it. Pass an explicit name (``render_hwaccel: "cuda"``) when the
+        graph is GPU-resident, and the render will still retry without it.
+        """
+        mode = (self._settings.render_hwaccel or "auto").strip().lower()
+        if mode in {"off", "none", "cpu", "", "auto"} or not self.gpu_allowed:
+            return ()
+        if export_format != "mp4":
+            return ()
+        available = self.profile().hwaccels
+        return ("-hwaccel", mode) if mode in available else ()
+
+    # --- encoder selection ---------------------------------------------------
+
+    def _wanted_encoders(self) -> tuple[str, ...]:
+        """Encoders to try, in order, given ``render_encoder``."""
+        requested = (self._settings.render_encoder or "auto").strip().lower()
+        named = _REQUESTABLE_ENCODERS.get(requested)
+        return (named,) if named else _AUTO_ENCODER_PREFERENCE
+
+    def _builds_for(self, encoder: str) -> tuple[str, ...]:
+        """Paths of discovered builds that list ``encoder``, primary first."""
         profile = self.profile()
-        encoder = profile.hardware_video_encoder()
-        if encoder is None:
+        if not profile.binaries:
+            # A profile built by hand (tests, or a caller passing its own
+            # profile object) describes exactly one build through the flat
+            # fields. Treat it as that build instead of finding nothing.
+            if profile.ffmpeg and encoder in profile.encoders:
+                return (profile.ffmpeg,)
+            return ()
+        return tuple(
+            build.path for build in profile.binaries if encoder in build.encoders
+        )
+
+    def resolve_hardware_encoder(self) -> tuple[str, str] | None:
+        """``(binary, encoder)`` that provably starts, or ``None`` for software.
+
+        An encoder name is not a capability: the same ``h264_nvenc`` may start on
+        one ffmpeg build and be refused by the driver on another, because builds
+        target different NVENC API versions. So every *(build, encoder)* pair is
+        opened for real (one frame, cacheable) and only a pair that succeeds is
+        returned. Encoder preference outranks build preference — a GPU encoder on
+        a secondary build beats a software fallback on the primary one.
+        """
+        requested = (self._settings.render_encoder or "").strip().lower()
+        if requested == "cpu" or not self.gpu_allowed:
+            return None
+        for encoder in self._wanted_encoders():
+            for binary in self._builds_for(encoder):
+                usable, _note = self.check_encoder(encoder, binary)
+                if usable:
+                    return binary, encoder
+        return None
+
+    def encoder_status(self) -> dict[str, Any]:
+        """Whether a hardware encoder exists *and* can really start on this machine.
+
+        Reports the first *wanted* encoder that any build lists, together with the
+        verdict for the best build carrying it — so a machine where NVENC exists
+        but the driver refuses it still answers ``h264_nvenc / unusable + why``
+        rather than a vague "no hardware encoder".
+        """
+        requested = (self._settings.render_encoder or "").strip().lower()
+        named = _REQUESTABLE_ENCODERS.get(requested)
+        for encoder in self._wanted_encoders():
+            builds = self._builds_for(encoder)
+            if not builds:
+                continue
+            usable, note = self.check_encoder(encoder, builds[0])
+            return {
+                "encoder": encoder,
+                "binary": builds[0],
+                "usable": usable,
+                "note": note,
+            }
+        if named is not None:
             return {
                 "encoder": None,
+                "binary": None,
                 "usable": False,
-                "note": "this ffmpeg build exposes no hardware H.264 encoder",
+                "note": f"{named} is requested but no ffmpeg build has it",
             }
+        return {
+            "encoder": None,
+            "binary": None,
+            "usable": False,
+            "note": "no ffmpeg build exposes a hardware H.264 encoder",
+        }
+
+    def check_encoder(
+        self, encoder: str, binary: str | None = None
+    ) -> tuple[bool, str]:
+        """Probe one *(binary, encoder)* pair once per process, sharing the cache.
+
+        ``binary=None`` means the primary build. A probe costs a real ffmpeg
+        start, so the verdict is cached: an encoder the driver refuses will not
+        start on the next export either.
+        """
+        target = binary or self.profile().ffmpeg or "ffmpeg"
+        key = (target, encoder)
         with self._lock:
-            cached = self._encoder_checks.get(encoder)
+            cached = self._encoder_checks.get(key)
         if cached is None:
-            cached = self._encoder_probe(profile.ffmpeg or "ffmpeg", encoder)
+            cached = self._encoder_probe(target, encoder)
             with self._lock:
-                self._encoder_checks[encoder] = cached
-        usable, note = cached
-        return {"encoder": encoder, "usable": usable, "note": note}
+                self._encoder_checks[key] = cached
+        return cached
 
     def video_codec(self, export_format: str) -> CodecChoice:
-        """Pick the encoder for an export: hardware when available and allowed."""
+        """Pick the encoder for an export: hardware when it really starts.
+
+        Hardware encode is preferred even though the raw speed-up over software
+        is modest at 1080p, because the point on a laptop is *where* the work
+        happens: an NVENC export leaves the CPU free, so the machine stays
+        responsive while it encodes. Measured with this pipeline's own
+        single-threaded setting (600 frames at 1080x1920): libx264 4791ms versus
+        h264_nvenc 3095ms, and 4697ms versus 2072ms once the filter threads are
+        counted too.
+        """
         cpu = _cpu_codec(export_format)
         if export_format != "mp4":
             # VP9 has no NVENC path, so WebM stays on the software encoder.
             return cpu
-        if self._settings.render_encoder == "cpu" or not self.gpu_allowed:
+        resolved = self.resolve_hardware_encoder()
+        if resolved is None:
             return cpu
-        status = self.encoder_status()
-        encoder = status["encoder"]
-        if encoder is None or not status["usable"]:
-            return cpu
+        binary, encoder = resolved
+        default_binary = self.profile().ffmpeg or ""
         return CodecChoice(
             encoder=encoder,
             hardware=True,
             args=tuple(_hardware_codec_args(encoder)),
+            binary="" if binary == default_binary else binary,
         )
 
     def model_device(self, preferred: str = "auto") -> tuple[str, str]:
@@ -620,6 +402,32 @@ class ResourceGovernor:
         if floor and profile.ram_available_mb and profile.ram_available_mb < floor:
             return 1
         return max(1, min(configured, max(1, profile.cpu_count // 2)))
+
+    def pressure_violation(self) -> str:
+        """Emergency state that must stop a *running* job, or ``""`` when sane.
+
+        Admission control decides whether a job may start; this decides whether
+        one already running has to be killed. They are different questions: a
+        render that began on a healthy machine can still walk the system into
+        swap or push the GPU past its thermal limit an hour later. The thresholds
+        here are deliberately outside the admission thresholds and much more
+        serious, so ordinary load never aborts work — only a machine in real
+        trouble does.
+        """
+        available_mb, temperature_c = self._pressure()
+        floor = int(self._settings.ram_abort_mb)
+        if floor and available_mb and available_mb < floor:
+            return (
+                f"free RAM fell to {available_mb}MB, below the {floor}MB floor "
+                "(the machine is about to swap)"
+            )
+        ceiling = int(self._settings.gpu_abort_temperature_c)
+        if temperature_c is not None and temperature_c >= ceiling:
+            return (
+                f"the GPU reached {temperature_c}C, at or above the "
+                f"{ceiling}C abort threshold"
+            )
+        return ""
 
     def _gpu_blocker(self, vram_mb: int) -> str:
         """Why the GPU is not usable right now, or an empty string when it is."""
@@ -734,6 +542,58 @@ class ResourceGovernor:
 
     # --- reporting -----------------------------------------------------------
 
+    def _advice(
+        self,
+        last_encoder: str,
+        profile: HardwareProfile,
+        encoder_status: dict[str, Any],
+        resolved: tuple[str, str] | None,
+    ) -> list[str]:
+        """Advice that knows the *probed and resolved* state, not just the build."""
+        notes = _advice(
+            profile,
+            self._settings,
+            encoder_status,
+            last_encoder,
+            resolved=resolved,
+        )
+        primary = profile.ffmpeg
+        if resolved is not None:
+            binary, encoder = resolved
+            if primary and binary != primary:
+                found = profile.build(binary)
+                label = (
+                    f"ffmpeg {found.short_version}"
+                    if found and found.version
+                    else binary
+                )
+                notes.append(
+                    f"{encoder} does not start on the machine's own ffmpeg, but it "
+                    f"does on a second build ({label}): exports use that build for "
+                    "the encode, and nothing else is redirected. That build matched "
+                    "this driver's NVENC API where the primary one expects a newer "
+                    "one — so the GPU is in use despite the driver being older than "
+                    "the system ffmpeg wants."
+                )
+        if resolved is not None or self._settings.render_encoder != "auto":
+            return notes
+        # A working integrated-GPU encoder is a real option, just not the
+        # automatic one: it is faster but spends bits much faster too.
+        for name, label in (("h264_amf", "AMD AMF"), ("h264_qsv", "Intel Quick Sync")):
+            if name not in profile.encoders or not self.gpu_allowed:
+                continue
+            usable, _note = self.check_encoder(name)
+            if usable:
+                notes.append(
+                    f"{label} ({name}) works on this machine and encodes roughly "
+                    "twice as fast as libx264, at the cost of noticeably larger "
+                    "files at the same quality setting. It is never chosen "
+                    "automatically: set CONTENT_FACTORY_RENDER_ENCODER=amf (or "
+                    "'qsv') to opt in."
+                )
+                break
+        return notes
+
     def snapshot(self) -> dict[str, Any]:
         """Everything an operator or an agent needs to explain current behaviour."""
         profile = self.profile(refresh=True)
@@ -742,9 +602,14 @@ class ResourceGovernor:
             gpu_active = self._gpu_active
             heavy_active = self._heavy_active
             last = self._last_decision.to_dict() if self._last_decision else None
+        encoder_status = self.encoder_status()
+        resolved = self.resolve_hardware_encoder()
         return {
             "compute_policy": self._settings.compute_policy,
             "render_encoder": self._settings.render_encoder,
+            "hardware_encoder": None
+            if resolved is None
+            else {"encoder": resolved[1], "binary": resolved[0]},
             "recommended_threads": self.recommended_threads(),
             "limits": {
                 "gpu_max_jobs": self._settings.gpu_max_jobs,
@@ -755,12 +620,19 @@ class ResourceGovernor:
                 "gpu_wait_seconds": self._settings.gpu_wait_seconds,
                 "ram_min_available_mb": self._settings.ram_min_available_mb,
             },
+            "abort_limits": {
+                "ram_abort_mb": self._settings.ram_abort_mb,
+                "gpu_abort_temperature_c": self._settings.gpu_abort_temperature_c,
+                "render_monitor_seconds": self._settings.render_monitor_seconds,
+            },
             "active": {"gpu_jobs": gpu_active, "heavy_jobs": heavy_active},
             "hardware": profile.to_dict(),
             "stats": stats,
             "last_decision": last,
             "admission_now": {str(kind): self.explain(kind) for kind in JobKind},
-            "advice": _advice(profile, self._settings),
+            "advice": self._advice(
+                stats["last_encoder"], profile, encoder_status, resolved
+            ),
         }
 
 
@@ -857,9 +729,34 @@ def _hardware_codec_args(encoder: str) -> list[str]:
     ]
 
 
-def _advice(profile: HardwareProfile, settings: Settings) -> list[str]:
+def _advice(
+    profile: HardwareProfile,
+    settings: Settings,
+    encoder_status: dict[str, Any] | None = None,
+    last_encoder: str = "",
+    *,
+    resolved: tuple[str, str] | None = None,
+) -> list[str]:
     """Plain-language notes: what is fast, what is slow, what is missing."""
     notes: list[str] = []
+    status = encoder_status or {"encoder": None, "usable": False, "note": ""}
+    # ``resolved`` is the truth about where encoding will land. When a hardware
+    # encoder was found on some build, the primary build's refusal is history,
+    # not a reason to tell the operator their exports fell back to software.
+    if status.get("encoder") and not status.get("usable") and resolved is None:
+        notes.append(
+            f"{status['encoder']} is listed by ffmpeg but cannot start on this "
+            f"machine ({status.get('note')}), so MP4 exports use libx264. Either "
+            "fix works: a GPU driver newer than the NVENC API the ffmpeg build "
+            "was compiled against, or a second ffmpeg build compiled against the "
+            "older API. The governor already probes every build it can find; "
+            "CONTENT_FACTORY_FFMPEG_EXTRA_BINARIES points it at one more."
+        )
+    if last_encoder.endswith("->cpu"):
+        notes.append(
+            f"The last export fell back mid-job: {last_encoder}. The render "
+            "still completed, in software."
+        )
     gpu = profile.gpu
     if gpu is None:
         notes.append(
@@ -873,26 +770,27 @@ def _advice(profile: HardwareProfile, settings: Settings) -> list[str]:
         )
         if settings.compute_policy == "cpu":
             notes.append("compute_policy is 'cpu', so the GPU is deliberately unused.")
-    encoder = profile.hardware_video_encoder()
+    encoder = status.get("encoder") if resolved is None else resolved[1]
+    usable = bool(status.get("usable")) or resolved is not None
     hardware_enabled = (
-        encoder is not None
-        and settings.render_encoder != "cpu"
-        and settings.compute_policy != "cpu"
+        usable and settings.render_encoder != "cpu" and settings.compute_policy != "cpu"
     )
-    if encoder and hardware_enabled:
-        notes.append(
-            f"MP4 exports encode with {encoder}: the CPU stays free for the "
-            "filter graph, and a hardware failure falls back to libx264."
-        )
-    elif encoder:
+    if encoder and usable and not hardware_enabled:
         notes.append(
             f"{encoder} is available but disabled by configuration, so MP4 "
             "exports use libx264."
         )
-    elif profile.ffmpeg:
+    elif encoder and usable:
         notes.append(
-            "This ffmpeg build exposes no hardware H.264 encoder, so exports "
-            "use libx264."
+            f"MP4 exports encode with {encoder}: the CPU stays free for the "
+            "filter graph, and a hardware failure falls back to libx264."
+        )
+    if settings.render_hwaccel not in {"auto", "off", "none", "cpu", ""}:
+        notes.append(
+            f"Hardware decode is forced on ({settings.render_hwaccel}). That only "
+            "pays when the decoded frames stay on the GPU; with a CPU filter graph "
+            "it adds a PCIe round trip per frame and measures slower, so the render "
+            "retries in software if it fails."
         )
     if not profile.torch_cuda:
         notes.append(

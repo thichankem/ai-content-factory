@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { usePlayerStore } from "../../stores/usePlayerStore";
 import { useTimelineStore } from "../../stores/useTimelineStore";
-import { useUIStore, AdobeTool, MonitorTab } from "../../stores/useUIStore";
+import { useUIStore, TimelineTool, MonitorTab } from "../../stores/useUIStore";
 import { formatTimecode } from "../../lib/utils";
 import { Slider } from "../ui/slider";
 import { Badge } from "../ui/badge";
@@ -60,8 +60,8 @@ export function DualMonitorPlayer() {
   const sourceCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scopesCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Tools definition (Adobe Premiere Pro Toolbar)
-  const adobeTools: Array<{ id: AdobeTool; label: string; shortcut: string; icon: React.ComponentType<{ className?: string }> }> = [
+  // Tools definition (Precision NLE Tool Palette)
+  const timelineTools: Array<{ id: TimelineTool; label: string; shortcut: string; icon: React.ComponentType<{ className?: string }> }> = [
     { id: "select", label: "Selection Tool", shortcut: "V", icon: MousePointer },
     { id: "trackSelect", label: "Track Select Forward", shortcut: "A", icon: ChevronRight },
     { id: "ripple", label: "Ripple Edit Tool", shortcut: "B", icon: MoveHorizontal },
@@ -146,7 +146,7 @@ export function DualMonitorPlayer() {
           ctx.fillStyle = "#0b111e";
           ctx.fillRect(0, 0, srcCanvas.width, srcCanvas.height);
 
-          // Draw green audio waveform lines (Premiere Pro style)
+          // Draw green audio waveform lines (precision audio monitor)
           ctx.strokeStyle = "#10b981";
           ctx.lineWidth = 1.5;
           ctx.beginPath();
@@ -299,11 +299,11 @@ export function DualMonitorPlayer() {
         </div>
       </div>
 
-      {/* Main Viewport Row: Left Adobe Tools + Center Monitor Canvas + Right Stereo VU Meter */}
+      {/* Main Viewport Row: Left Precision Tools + Center Monitor Canvas + Right Stereo VU Meter */}
       <div className="flex-1 flex overflow-hidden bg-nle-base relative">
-        {/* 1. Adobe Premiere Pro Vertical Tool Palette */}
+        {/* 1. Precision NLE Vertical Tool Palette */}
         <div className="w-10 border-r border-nle-border bg-nle-panel flex flex-col items-center py-2 space-y-1 shrink-0 z-20">
-          {adobeTools.map((tool) => {
+          {timelineTools.map((tool) => {
             const Icon = tool.icon;
             const isToolActive = activeTool === tool.id;
             return (
@@ -405,7 +405,7 @@ export function DualMonitorPlayer() {
           )}
         </div>
 
-        {/* 3. Live Stereo Master VU Meter (Adobe Premiere Pro Style) */}
+        {/* 3. Live Stereo Master VU Meter (Broadcast Standard) */}
         <div className="w-12 border-l border-nle-border bg-nle-panel p-2 flex flex-col items-center justify-between shrink-0 select-none z-20">
           <div className="text-[9px] font-mono text-gray-400 font-bold tracking-tighter">
             0dB

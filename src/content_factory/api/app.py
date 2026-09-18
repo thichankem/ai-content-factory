@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -36,6 +37,25 @@ from .routers import (
 )
 
 
+def _json_safe(value: Any) -> Any:
+    """Coerce a value into something ``json.dumps`` accepts.
+
+    Pydantic validation errors keep the offending exception in ``ctx`` (a
+    ``ValueError`` for a failed custom validator, for instance). Those objects
+    are not JSON-serialisable, so returning ``exc.errors()`` verbatim used to
+    raise ``TypeError`` *inside* the error handler: callers saw an opaque 500
+    instead of the 422 that describes what they got wrong. Everything unknown
+    therefore degrades to its ``repr`` rather than exploding.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    return repr(value)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the application, wiring config, service, and routes together."""
     settings = settings or get_settings()
@@ -47,7 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def validation_handler(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
-        return JSONResponse(status_code=422, content={"detail": exc.errors()})
+        return JSONResponse(status_code=422, content={"detail": _json_safe(exc.errors())})
 
     app.include_router(build_health_router(service, settings))
     app.include_router(build_qa_router(service))

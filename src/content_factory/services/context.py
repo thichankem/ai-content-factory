@@ -27,6 +27,7 @@ from ..models import (
     MediaKind,
     Project,
     ProjectStatus,
+    ScriptDocument,
     VideoAsset,
     WorkflowRun,
 )
@@ -283,10 +284,15 @@ class ServiceContext:
                 pass
 
     def _refresh_analysis(self, project: Project) -> None:
-        """Recompute the stored timing plan and lint findings."""
+        """Recompute the stored timing plan, lint findings and script document.
+
+        All three are derived from the same analysis pass, so they are refreshed
+        together and can never disagree about what the script says.
+        """
         if not project.script:
             project.script_plan = None
             project.script_issues = []
+            project.script_document = None
             return
         analysis = script_engine.analyze_script(
             project.script,
@@ -297,3 +303,13 @@ class ServiceContext:
         )
         project.script_plan = analysis.plan
         project.script_issues = analysis.issues
+        project.script_document = ScriptDocument(
+            topic=project.topic,
+            style=project.script_style,
+            raw_script=project.script,
+            sections=list(analysis.plan.sections),
+            timing_plan=analysis.plan,
+            language=analysis.plan.language,
+            target_seconds=analysis.plan.target_seconds,
+            estimated_seconds=analysis.plan.estimated_seconds,
+        )

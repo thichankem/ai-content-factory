@@ -130,7 +130,7 @@ export function CaptionSimplifier() {
       <CardHeader className="py-2.5 px-3 border-b border-nle-border flex flex-row items-center justify-between shrink-0 bg-nle-panel">
         <CardTitle className="text-xs font-bold text-white flex items-center">
           <Type className="w-4 h-4 mr-1.5 text-nle-cyan" />
-          CapCut Pro Auto-Captions & Mẫu Phụ Đề
+          Neural Auto-Captions & Mẫu Phụ Đề Động
         </CardTitle>
         <Badge variant="cyan" className="text-[9px] uppercase font-mono">
           Speech-to-Text AI

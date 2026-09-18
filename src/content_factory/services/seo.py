@@ -45,6 +45,94 @@ def pack_from_mapping(data: Mapping[str, Any] | None) -> Pack:
     return SeoPackInput.model_validate({} if data is None else data).to_engine()
 
 
+#: A dimension at or above this score is reported as passing to a UI.
+_DIMENSION_PASS = 70.0
+
+
+def _flat_platform_view(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Add the flat view a UI binds to, derived from the report itself.
+
+    The scored report is nested because that is the honest shape: a score is made
+    of four weighted dimensions, each made of signals, each with its own evidence.
+    A dashboard does not want to walk that tree, so this projects it onto the
+    handful of fields a card renders — ``score``/``grade`` plus a ``breakdown``
+    keyed by dimension and a ``fixes`` list. Nothing is invented: ``breakdown``
+    entries are the engine's own dimension scores, and ``fixes`` are its own
+    ``quick_wins``, which already carry the points on the table.
+    """
+    flat: dict[str, Any] = dict(report)
+    dimensions = report.get("dimensions") or []
+    flat["passed"] = bool(report.get("score", 0) >= _DIMENSION_PASS) and not report.get(
+        "capped"
+    )
+    flat["breakdown"] = {
+        str(dimension.get("key", "")): {
+            "score": float(dimension.get("score", 0.0)),
+            "weight": float(dimension.get("weight", 0.0)),
+            "label": str(dimension.get("label", "")),
+            "passed": float(dimension.get("score", 0.0)) >= _DIMENSION_PASS,
+        }
+        for dimension in dimensions
+    }
+    flat["fixes"] = [
+        {
+            "signal": str(win.get("label", "")),
+            "gain": float(win.get("points", 0.0)),
+            "action": str(win.get("fix") or ""),
+        }
+        for win in report.get("quick_wins") or []
+    ]
+    return flat
+
+
+def _optimize_view(result: Mapping[str, Any]) -> dict[str, Any]:
+    """Add the names a UI reads to an optimiser result.
+
+    The engine calls the rewritten pack ``pack`` and the list of edits
+    ``changes``. Clients built against the earlier draft expect ``optimized_pack``
+    and ``applied_fixes``; both spellings are returned so neither has to change.
+    """
+    flat: dict[str, Any] = dict(result)
+    flat["optimized_pack"] = result.get("pack")
+    flat["applied_fixes"] = list(result.get("changes") or [])
+    return flat
+
+
+def _int_or(value: Any, default: int = 0) -> int:
+    """``int(value)``, with ``None`` and junk degrading to ``default``.
+
+    :func:`~content_factory.seo.plan_ab_test` reports ``days=None`` whenever it
+    had no ``daily_traffic`` to divide by. Coercing that honestly-unknown value
+    straight to ``int`` raised inside the response view, so a caller that simply
+    omitted traffic got a 500 instead of a plan.
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _ab_plan_view(plan: Mapping[str, Any]) -> dict[str, Any]:
+    """Add the sample-size aliases a UI reads, keeping the canonical names.
+
+    ``minimum_detectable_effect`` is the absolute rate difference the plan is
+    powered to see (``target_rate - baseline_rate``), not the relative lift — a
+    client that renders one number next to a percentage wants the absolute one.
+
+    ``estimated_days`` is ``0`` when the plan could not estimate a duration
+    because no ``daily_traffic`` was supplied; that ``0`` means "not estimated",
+    never "instant", and ``days`` still carries the honest ``None``.
+    """
+    flat: dict[str, Any] = dict(plan)
+    baseline = float(plan.get("baseline_rate", 0.0) or 0.0)
+    target = float(plan.get("target_rate", 0.0) or 0.0)
+    flat["sample_size_per_arm"] = _int_or(plan.get("per_arm"))
+    flat["total_sample_size"] = _int_or(plan.get("total"))
+    flat["estimated_days"] = _int_or(plan.get("days"))
+    flat["minimum_detectable_effect"] = round(abs(target - baseline), 6)
+    return flat
+
+
 class SeoMixin(TimelineMixin):
     """SEO scoring, optimisation and experiment design."""
 
@@ -62,10 +150,10 @@ class SeoMixin(TimelineMixin):
         key = (platform or "youtube").strip().lower()
         if key == "all":
             return {
-                name: report.to_dict()
+                name: _flat_platform_view(report.to_dict())
                 for name, report in seo.score_platforms(resolved).items()
             }
-        return seo.score_pack(resolved, key).to_dict()
+        return _flat_platform_view(seo.score_pack(resolved, key).to_dict())
 
     def seo_optimize(
         self, platform: str, pack: Pack | Mapping[str, Any] | None = None
@@ -75,10 +163,10 @@ class SeoMixin(TimelineMixin):
         key = (platform or "youtube").strip().lower()
         if key == "all":
             return {
-                name: seo.optimize_pack(resolved, name).to_dict()
+                name: _optimize_view(seo.optimize_pack(resolved, name).to_dict())
                 for name in ("youtube", "tiktok")
             }
-        return seo.optimize_pack(resolved, key).to_dict()
+        return _optimize_view(seo.optimize_pack(resolved, key).to_dict())
 
     def seo_ab_plan(
         self,
@@ -92,15 +180,17 @@ class SeoMixin(TimelineMixin):
         power: float = 0.8,
     ) -> dict[str, Any]:
         """Size an A/B test so a decision is statistically valid."""
-        return seo.plan_ab_test(
-            metric,
-            baseline_rate,
-            relative_lift=relative_lift,
-            daily_traffic=daily_traffic,
-            arms=arms,
-            alpha=alpha,
-            power=power,
-        ).to_dict()
+        return _ab_plan_view(
+            seo.plan_ab_test(
+                metric,
+                baseline_rate,
+                relative_lift=relative_lift,
+                daily_traffic=daily_traffic,
+                arms=arms,
+                alpha=alpha,
+                power=power,
+            ).to_dict()
+        )
 
     def seo_ab_evaluate(
         self,
@@ -238,9 +328,25 @@ class SeoMixin(TimelineMixin):
             reports = seo.score_platforms(pack)
         else:
             reports = {key: seo.score_pack(pack, key)}
+        views = {
+            name: _flat_platform_view(report.to_dict())
+            for name, report in reports.items()
+        }
+        primary = views.get(key) or next(iter(views.values()))
         return {
             "project_id": project.id,
-            "platforms": {name: report.to_dict() for name, report in reports.items()},
+            "platforms": views,
+            # The requested platform's score, flattened to the top level, so a
+            # card can render `score`/`grade`/`breakdown`/`fixes` without knowing
+            # which platform it asked for or walking the `platforms` map.
+            "platform": primary.get("platform", key),
+            "score": primary.get("score", 0),
+            "grade": primary.get("grade", ""),
+            "passed": primary.get("passed", False),
+            "breakdown": primary.get("breakdown", {}),
+            "fixes": primary.get("fixes", []),
+            "verdict": primary.get("verdict", ""),
+            "projected_score": primary.get("projected_score", 0),
             "pack_used": {
                 "title": pack.title,
                 "keywords": list(pack.keywords),

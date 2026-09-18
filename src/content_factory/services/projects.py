@@ -40,7 +40,7 @@ class ProjectsMixin(ServiceContext):
             raise StateConflictError(
                 f"Cannot edit the script while status is '{project.status.value}'."
             )
-        project.script = data.script
+        project.script = data.text
         project.source_rights_confirmed = data.source_rights_confirmed
         if project.status == ProjectStatus.DRAFT:
             self._transition(project, ProjectStatus.SCRIPT_REVIEW)

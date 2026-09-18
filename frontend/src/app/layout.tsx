@@ -28,7 +28,7 @@ export default function RootLayout({
         <title>AI Content Factory • Pro NLE Studio</title>
         <meta
           name="description"
-          content="AI-assisted short-form video pipeline inspired by CapCut Pro, Premiere CC, and DaVinci Resolve."
+          content="AI-assisted professional short-form & long-form video production studio with NLE timeline, dynamic speed curves, parametric EQ, and visual node compositing."
         />
       </head>
       <body className="bg-nle-base min-h-screen text-gray-100 flex flex-col font-sans antialiased">

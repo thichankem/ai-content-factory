@@ -5276,7 +5276,8 @@ body.cinema-mode .workspace {
   gap: 8px;
 }
 
-/* Premiere Pro Workspace Tabs Bar */
+/* NLE Workspace Tabs Bar */
+.nle-workspace-bar,
 .premiere-workspace-bar {
   background: #18181c;
   border-bottom: 1px solid #27272d;
@@ -5421,6 +5422,7 @@ body.cinema-mode .workspace {
 }
 
 /* Safe Margins Overlay */
+.studio-safe-margins,
 .adobe-safe-margins {
   position: absolute;
   inset: 0;
@@ -5429,6 +5431,7 @@ body.cinema-mode .workspace {
   z-index: 10;
 }
 
+.studio-safe-margins.active,
 .adobe-safe-margins.active {
   display: block;
 }

@@ -5,7 +5,7 @@ import { PlatformQAResult, BrandKitQAResult, CopyrightCheckResult } from "../typ
 export function useQA() {
   const platformQAMutation = useMutation({
     mutationFn: ({ platform, duration, aspectRatio }: { platform: string; duration: number; aspectRatio: string }) =>
-      fetchApi<PlatformQAResult>("/qa/platform", {
+      fetchApi<PlatformQAResult>("/qa/platform/verdict", {
         method: "POST",
         body: JSON.stringify({ platform, duration_seconds: duration, aspect_ratio: aspectRatio }),
       }),
@@ -13,7 +13,7 @@ export function useQA() {
 
   const brandQAMutation = useMutation({
     mutationFn: (payload: { font?: string; primary_color?: string; tone?: string }) =>
-      fetchApi<BrandKitQAResult>("/qa/brand", {
+      fetchApi<BrandKitQAResult>("/qa/brand/verdict", {
         method: "POST",
         body: JSON.stringify(payload),
       }),
@@ -21,7 +21,7 @@ export function useQA() {
 
   const copyrightMutation = useMutation({
     mutationFn: (assetIds: string[]) =>
-      fetchApi<CopyrightCheckResult>("/qa/copyright", {
+      fetchApi<CopyrightCheckResult>("/qa/copyright/verdict", {
         method: "POST",
         body: JSON.stringify({ asset_ids: assetIds }),
       }),

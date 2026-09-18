@@ -23,8 +23,13 @@ class ResearchSource(BaseModel):
 
 
 class ResearchBundle(BaseModel):
-    """The result of a research pass: sources plus distilled key facts."""
+    """The result of a research pass: sources plus distilled key facts.
 
+    ``topic`` echoes the subject the pass was run for. The sources already imply
+    it, but a client labelling a bundle should not need a second lookup.
+    """
+
+    topic: str = ""
     sources: list[ResearchSource] = Field(default_factory=list)
     key_facts: list[str] = Field(default_factory=list)
     notes: str | None = None

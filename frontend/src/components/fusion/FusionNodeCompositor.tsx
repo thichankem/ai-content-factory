@@ -47,10 +47,10 @@ export function FusionNodeCompositor() {
 
   const handleExecuteGraph = async () => {
     setIsExecuting(true);
-    setRenderMessage("DaVinci Neural Engine đang render luồng Node Compositing...");
+    setRenderMessage("Neural Graph Engine đang render luồng Node Compositing...");
     await new Promise((r) => setTimeout(r, 1400));
     setIsExecuting(false);
-    setRenderMessage("✅ Kết xuất đồ thị Node Fusion hoàn tất: Sẵn sàng phát lại thời gian thực!");
+    setRenderMessage("✅ Kết xuất đồ thị Node Compositor hoàn tất: Sẵn sàng phát lại thời gian thực!");
   };
 
   return (
@@ -60,7 +60,7 @@ export function FusionNodeCompositor() {
         <div className="flex items-center space-x-2">
           <GitBranch className="w-4 h-4 text-emerald-400" />
           <CardTitle className="text-xs font-bold text-white tracking-wide">
-            DaVinci Resolve Fusion 19 • Node Graph Compositor
+            Visual Node Graph Compositor • Dataflow Engine
           </CardTitle>
         </div>
 
@@ -148,7 +148,7 @@ export function FusionNodeCompositor() {
             })}
           </div>
 
-          {/* Canvas Mini-map (DaVinci Fusion style top-right) */}
+          {/* Canvas Mini-map (Node Graph Overview) */}
           <div className="absolute top-2 right-2 w-28 h-16 rounded border border-nle-border bg-nle-panel/80 p-1 pointer-events-none hidden sm:flex flex-col justify-between">
             <span className="text-[8px] font-mono text-gray-500">Navigator Map</span>
             <div className="flex space-x-1">
@@ -177,7 +177,7 @@ export function FusionNodeCompositor() {
             </div>
 
             <div className="p-2 rounded bg-nle-base border border-nle-border space-y-1 text-[10px] text-gray-400">
-              <span className="text-white font-semibold block">DaVinci Neural Engine:</span>
+              <span className="text-white font-semibold block">Neural Compositing Engine:</span>
               <span>Tính toán GPU 32-bit float pipeline không suy hao chất lượng.</span>
             </div>
           </div>

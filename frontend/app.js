@@ -1058,8 +1058,8 @@ document.addEventListener("keydown", (ev) => {
   }
 });
 
-// Adobe Creative Cloud Application Top Menu Bar
-function initAdobeMenuBar() {
+// Studio Application Top Menu Bar
+function initStudioMenuBar() {
   const bind = (id, fn) => {
     const el = $(id);
     if (el) el.addEventListener("click", fn);
@@ -1223,13 +1223,12 @@ function initAdobeMenuBar() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", initAdobeMenuBar);
+document.addEventListener("DOMContentLoaded", initStudioMenuBar);
 if (document.readyState !== "loading") {
-  initAdobeMenuBar();
+  initStudioMenuBar();
 }
-
 /* ==========================================================================
-   PHOTO & PHOTOSHOP LAB STUDIO ENGINE
+   PHOTO LAB & LAYER COMPOSITOR ENGINE
    ========================================================================== */
 
 const photoLab = {
@@ -3974,7 +3973,7 @@ window.openThumbInPhotoLab = function (idx) {
   const previewCanvas = $("preview-canvas");
   if (previewCanvas && typeof photoLab !== "undefined" && photoLab.ctx) {
     photoLab.ctx.drawImage(previewCanvas, 0, 0, photoLab.canvas.width, photoLab.canvas.height);
-    showToast("Đã chuyển khung hình vào Photo Lab (Photoshop Studio)!", "success");
+    showToast("Đã chuyển khung hình vào Photo Lab & Layer Compositor!", "success");
   }
 };
 
@@ -3994,7 +3993,7 @@ function initApp() {
   setupHistoryNicheListeners();
   setupMediaStudioListeners();
   setupProSuiteExtensions();
-  if (typeof initAdobeMenuBar === "function") initAdobeMenuBar();
+  if (typeof initStudioMenuBar === "function") initStudioMenuBar();
   setInterval(refreshHealth, 15000);
 }
 

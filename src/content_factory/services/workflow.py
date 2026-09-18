@@ -25,6 +25,10 @@ from .growth import GrowthMixin
 from .projects import ProjectsMixin
 from .voice import VoiceMixin
 
+#: The run registry keeps a bounded window of history; it is a monitoring
+#: aid, not an archive, so the oldest records are evicted past this cap.
+_MAX_WORKFLOW_RUNS = 500
+
 
 class WorkflowMixin(AgentsMixin, ProjectsMixin, GrowthMixin, VoiceMixin):
     """Node/edge workflow authoring, validation and background runs."""
@@ -92,8 +96,7 @@ class WorkflowMixin(AgentsMixin, ProjectsMixin, GrowthMixin, VoiceMixin):
             workflow=workflow.project_flow(project),
             inputs=dict(data.inputs),
         )
-        with self._workflow_lock:
-            self._workflow_runs[run.id] = run
+        self._remember_run(run)
         return run
 
     def start_workflow(self, project_id: str, data: WorkflowRunRequest) -> WorkflowRun:
@@ -104,8 +107,7 @@ class WorkflowMixin(AgentsMixin, ProjectsMixin, GrowthMixin, VoiceMixin):
             project_id=project_id,
             inputs=dict(data.inputs),
         )
-        with self._workflow_lock:
-            self._workflow_runs[run.id] = run
+        self._remember_run(run)
         self._register_worker(
             threading.Thread(
                 target=self._run_workflow_thread,
@@ -120,8 +122,7 @@ class WorkflowMixin(AgentsMixin, ProjectsMixin, GrowthMixin, VoiceMixin):
         """Run a flow in the background, publishing progress block by block."""
 
         def publish(run: WorkflowRun) -> None:
-            with self._workflow_lock:
-                self._workflow_runs[run_id] = run.model_copy(deep=True)
+            self._remember_run(run.model_copy(deep=True))
 
         try:
             project = self.get_project(project_id)
@@ -143,6 +144,18 @@ class WorkflowMixin(AgentsMixin, ProjectsMixin, GrowthMixin, VoiceMixin):
                 finished_at=utcnow(),
             )
         publish(finished)
+
+    def _remember_run(self, run: WorkflowRun) -> None:
+        """Store a run record, evicting the oldest ones past the cap."""
+        with self._workflow_lock:
+            self._workflow_runs[run.id] = run
+            excess = len(self._workflow_runs) - _MAX_WORKFLOW_RUNS
+            if excess > 0:
+                oldest = sorted(
+                    self._workflow_runs.values(), key=lambda item: item.started_at
+                )[:excess]
+                for item in oldest:
+                    self._workflow_runs.pop(item.id, None)
 
     def workflow_runs(self, project_id: str, limit: int = 20) -> list[WorkflowRun]:
         """Recent runs for a project, newest first."""

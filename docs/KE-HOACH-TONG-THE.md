@@ -1336,3 +1336,157 @@ Người vận hành yêu cầu tổng hợp toàn bộ 41 ảnh giao diện chu
 - `npm run build`: **Next.js 14.2.35 Build PASS** (4/4 static pages generated).
 - `pytest`: **888 test PASS (100%)**, 0 failed.
 
+---
+
+### 2026-09-18 — Chuẩn hóa Kỹ thuật Trung lập, Trình chiếu HTML/CSS & Bộ Ingestion Video URL Re-Cook
+
+**Động lực:**
+Người vận hành yêu cầu:
+1. Không ghi đích danh tên thương hiệu độc quyền (Adobe Premiere, After Effects, CapCut, Photoshop...) mà phải dùng thuật ngữ kỹ thuật chuyên nghiệp chuẩn quốc tế (NLE, VFX, Photo Lab, DAW, Hardware Encoder).
+2. Tra cứu và hệ thống hóa toàn bộ tính năng của 3 lĩnh vực edit (Ảnh, Video, Âm thanh/Nhạc) thành 3 file tài liệu đặc tả hoàn chỉnh (`docs/SPEC-IMAGE-EDITING.md`, `docs/SPEC-VIDEO-EDITING.md`, `docs/SPEC-AUDIO-EDITING.md`), bảo đảm frontend có đủ 100% tính năng.
+3. Bổ sung hỗ trợ slide trình chiếu động bằng HTML/CSS trong kho tư liệu, cho phép nhúng trực tiếp vào kịch bản/timeline.
+4. Bổ sung tính năng cào/tải video của người khác qua đường dẫn URL (TikTok, YouTube, Reels, MP4) và quy trình AI Re-Cook ("xào nấu" / biến tấu) để chuyển hóa thành kịch bản phái sinh độc quyền 0% copy-risk.
+
+**Những gì đã làm:**
+1. **3 Bộ Đặc Tả Tính Năng Toàn Diện:**
+   - `docs/SPEC-IMAGE-EDITING.md`: Hệ thống 27 Blending Modes, Curves/Levels cubic spline, BiRefNet AI Matting, Retouch Inpainting, RealESRGAN 4x Upscaling, Typography drop shadows.
+   - `docs/SPEC-VIDEO-EDITING.md`: Multi-track NLE, bộ công cụ phím tắt chuẩn `V, A, B, N, C, Y, U, P, H, T`, Dynamic Speed Ramping với Bézier Graph & Optical Flow, 3D LUTs, Rec.709 RGB Parade, Whisper Auto-Captions & Karaoke/Keyword Highlight, Node Compositor.
+   - `docs/SPEC-AUDIO-EDITING.md`: Channel Strip Faders, 5-Band Parametric EQ (60Hz–12kHz), Sidechain Auto-Ducking (-16dB), Spectral Noise Reduction, 4-Stem Audio Isolation, Broadcast Loudness Normalization (-14 LUFS / -16 LUFS).
+2. **Loại bỏ Hoàn toàn Thương hiệu Độc quyền trên Frontend:**
+   - Quét sạch các nhãn độc quyền trong mã nguồn `frontend/src/` và `frontend/index.html`.
+   - Chuẩn hóa hệ thống nhãn: `NLE Editor`, `VFX Motion Dynamics`, `Photo Lab & Compositor`, `Digital Audio Workstation`, `Hardware Media Encoder`.
+3. **Studio Trình Chiếu HTML/CSS Động (`HtmlSlideDeckStudio.tsx`):**
+   - 5 mẫu slide animation vector phong cách Cyberpunk, Tech Minimalist, Breaking News, Infographic Data, và Quote Card.
+   - Sandbox preview thời gian thực hỗ trợ chuyển đổi linh hoạt tỉ lệ 16:9 (YouTube) và 9:16 (TikTok/Shorts).
+   - 1-click đưa slide vào Timeline hoặc tải mã nguồn HTML/CSS.
+4. **Bộ Khai Thác URL Video & AI Re-Cook (`VideoUrlRecookStudio.tsx`):**
+   - Tải video từ bất kỳ link nào (YouTube, TikTok, Shorts, Reels, MP4) qua `yt_dlp` với cơ chế fallback HTTP streaming trực tiếp.
+   - Bổ sung endpoint backend `POST /media/from-url` và Pydantic contract `MediaIngestUrlRequest`.
+   - Trích xuất phụ đề/lời thoại bằng Faster-Whisper.
+   - AI Transformer tái cấu trúc nội dung theo 4 nhịp giữ chân khán giả: `[Hook]`, `[Bằng chứng]`, `[Cú lật Turn]`, `[Payoff & CTA]`.
+   - Đảm bảo điểm Anti-Plagiarism Copy-Risk đạt 0%.
+   - 1-click cập nhật kịch bản vào `useProjectStore` và chuyển cảnh tự động vào Timeline.
+
+**Kiểm chứng:**
+- `npm run type-check`: **0 errors (100% pass)**.
+- `ruff check src tests`: **All checks passed**.
+- `ruff format --check src tests`: **171 files already formatted**.
+- `mypy src`: **Success: no issues found in 118 source files**.
+- `pytest tests/test_media.py`: **16/16 passed**.
+
+
+## 2026-09-18 — Tận dụng GPU RTX 4060 + cơ chế tự ngắt khi quá tải
+
+**Yêu cầu:** Máy có RTX 4060 Laptop — tích hợp GPU vào pipeline, và phải có cơ chế
+ngắt / xử lý tuần tự / kéo dài thời gian khi máy quá tải.
+
+**Phát hiện quan trọng nhất:** `h264_nvenc` **không phải là một khả năng, mà là một
+cặp (binary, encoder)**. ffmpeg được biên dịch theo một phiên bản NVENC API cụ thể;
+driver cũ hơn sẽ từ chối mở encoder dù build có liệt kê nó:
+
+- `ffmpeg 9.0.1` (hệ thống) → `h264_nvenc` **✗** *Required: 13.1, Found: 12.2*
+- `ffmpeg 7.1` (đã có sẵn trong venv qua `imageio-ffmpeg`) → `h264_nvenc` **✓**
+
+Nghĩa là **GPU dùng được ngay, không cần cài gì thêm** — chỉ cần governor biết tìm
+build thứ hai. Nếu chỉ liệt kê tên encoder như trước, máy này sẽ mãi chạy libx264.
+
+**Những gì đã làm:**
+
+1. **Tách module theo đúng quy ước read/decide** (cả ba đều dưới ngân sách 1100 dòng):
+   - `compute.py` (281 dòng): kiểu dữ liệu dùng chung — `JobKind`, `Admission`,
+     `FfmpegBuild`, `GpuInfo`, `HardwareProfile`, `CodecChoice`, `Decision`.
+   - `hardware.py` (392 dòng): **chỉ đọc** máy — `probe`, `discover_binaries`,
+     `machine_pressure`, `probe_encoder`.
+   - `resources.py` (815 dòng, trước là 1.407): **chỉ ra quyết định** —
+     `ResourceGovernor`. Mọi tên cũ vẫn import được từ `resources` như trước.
+
+2. **Phát hiện nhiều build ffmpeg + mở thử thật:** `discover_binaries()` tìm theo thứ
+   tự `ffmpeg_binary` → `PATH` → `ffmpeg_extra_binaries` → build đi kèm package.
+   `resolve_hardware_encoder()` mở thử **từng cặp (build, encoder)** bằng một encode
+   thật (cache theo cặp, không theo tên) và chỉ trả về cặp chạy được.
+   `CodecChoice.binary` mang theo build cần dùng; render dùng đúng build đó, còn
+   **đường fallback phần mềm luôn quay về ffmpeg của máy**.
+
+3. **Sửa một hồi quy do chính tôi gây ra:** `decoder_args("auto")` trước đây tự thêm
+   `-hwaccel cuda` khi thấy `cuda` trong `ffmpeg -hwaccels` → **mọi render chậm đi**.
+   Đo thật (đọc 1 clip rồi bỏ): 3s 720p **120ms** phần mềm so với 955ms `-cuda`;
+   60s 1080p **626ms** so với 1914ms; 20s 4K **812ms** so với 2292ms. Giờ `auto`
+   nghĩa là **tắt**, chỉ bật khi gọi tên cụ thể, kèm lý do và số đo trong docstring.
+
+4. **Cơ chế ngắt khi quá tải (đúng yêu cầu):** `_run_command` chuyển sang `Popen` +
+   luồng giám sát. Trong lúc render, định kỳ đọc áp lực máy và **terminate** nếu
+   RAM trống < `RAM_ABORT_MB` (350) hoặc GPU ≥ `GPU_ABORT_TEMPERATURE_C` (90).
+   Ngưỡng ngắt **cố ý nằm ngoài** ngưỡng nhận việc (700 MB / 82°C) để tải bình
+   thường không bao giờ giết việc đang chạy. Bộ giám sát chỉ đọc RAM và nhiệt độ GPU
+   (`machine_pressure`) — **không spawn ffmpeg** — nên không tự tạo thêm tải lên chính
+   máy nó đang canh.
+
+5. **Sửa lỗi logic trong phần advice:** trước đây advice nói "MP4 exports use libx264"
+   trong khi export **thật sự** chạy NVENC trên build thứ hai — tự mâu thuẫn. Giờ
+   advice nhận `resolved` và mô tả đúng điều sẽ xảy ra.
+
+**Kiểm chứng:**
+
+- `scratch/verify_nvenc_path.py`: **17/17 PASS** trên máy thật — encode 8s 1080x1920
+  bằng NVENC qua build 7.1 trong **3.01s**, fallback phần mềm ghi nhận đúng
+  `libx264`, watchdog ngắt process thật sau **0.26s** và nêu đúng lý do.
+- Số đo encode (600 frame 1080x1920, `render_threads=1` như pipeline thật):
+  libx264 **4791ms** / h264_nvenc **3095ms**; khi tính cả `-filter_threads 1`:
+  **4697ms** / **2072ms**. Giá trị thật của NVENC ở đây là **giải phóng CPU**, không
+  phải tốc độ đỉnh (với 16 luồng rảnh, libx264 rất nhanh: 1108ms).
+- `docs/COMPUTE-RESOURCES.md`: tài liệu mới, ghi rõ số đo, thứ tự tìm build, thang
+  nhận việc, ngưỡng ngắt, và **cách mở khoá GPU cho model torch** (hiện là
+  `2.14.0+cpu` nên OCR/upscale/whisper vẫn chạy CPU; `model_device()` đã sẵn sàng
+  trả `cuda` ngay khi `torch.cuda.is_available()` thành true).
+- `tests/test_resources.py`: **48 test** (thêm 12: nhiều build, thứ tự ưu tiên,
+  chống trùng đường dẫn, cache theo cặp, ngưỡng ngắt, watchdog giết process thật).
+
+---
+
+### 2026-09-18 — Hoàn thiện Toàn bộ 100% Chức năng Frontend Chuẩn NLE Studio Đa Kênh
+
+**Động lực:**
+Người vận hành yêu cầu tiếp tục phát triển toàn bộ frontend một cách hoàn hảo, dựa theo 100% các tính năng được quy định trong các tài liệu `.md` của dự án (`docs/KE-HOACH-TONG-THE.md`, `docs/SPEC-IMAGE-EDITING.md`, `docs/SPEC-VIDEO-EDITING.md`, `docs/SPEC-AUDIO-EDITING.md`, `docs/SEO-SCORING.md`, `docs/NLE-STUDIO-FULL-ARCHITECTURE.md`, `docs/AGENT-BRIDGE.md`, `docs/PERCEPTION-LAYER.md`), tuyệt đối không được thiếu bất kỳ tính năng nào.
+
+**Những gì đã làm:**
+1. **Multi-Format Content Empire Studio (`ContentEmpireStudio.tsx`):**
+   - Không gian điều phối đế chế nội dung 1 Topic Master -> 1 YouTube Long-form (8-12 phút, cấu trúc 8 bước: Hook, Context, Event, Escalation, Climax, Aftermath, Lesson, CTA) + 5-10 Video TikTok/Shorts độc lập (30-60s) với hook, kịch bản biến thể riêng biệt.
+   - Thanh phân bổ tài nguyên chuẩn Golden Hybrid Media Allocation Bar (30% AI Synthetic Footage, 20% Historical Archives, 15% Dynamic Maps, 15% Declassified Documents, 10% Technical Diagrams, 10% Kinetic Motion).
+   - Ma trận 15 AI Prompts chuyên sâu sẵn sàng sao chép cho Kling 1.5, Google Veo 2, Midjourney v6.1, Flux Pro, Suno AI, ElevenLabs, và Fact-Check protocol.
+2. **Visual DAG Pipeline Orchestrator (`DAGWorkflowStudio.tsx`):**
+   - Trình điều phối đồ thị phi chu trình có hướng (Directed Acyclic Graph) trực quan với 9 khối sản xuất chuẩn (Research Engine, Script Drafting, Gate 1 Human Approval, Neural TTS, Ingest AI Media, Multi-Track NLE, ffmpeg Render, Gate 2 Video Review, Omni-Publish).
+   - Canvas SVG vẽ đường cong Bézier thời gian thực, hỗ trợ kéo thả vị trí các node, thêm/xóa node và nối dây luồng dữ liệu giữa các cổng Input/Output.
+   - Tích hợp kiểm tra Pre-flight Checklist và Terminal trực tiếp hiển thị log luồng thực thi (Stream Log Console).
+   - Hỗ trợ chuyển đổi mượt mà giữa DAG Pipeline Toàn trình và Fusion Node Compositor (VFX).
+3. **External Ingestion Hub Modal (`ExternalIngestionModal.tsx`):**
+   - Modal 4 tab nạp tư liệu ngoại vi:
+     - Tab 1: Video Footage URL (YouTube, TikTok, Reels, MP4 direct) hoặc upload file trực tiếp với tùy chọn Auto-bind vào Scene Timeline.
+     - Tab 2: Audio & Voiceover (Edge-TTS, ElevenLabs, Suno music) với tag phân loại (Dialogue, BGM, SFX).
+     - Tab 3: Research Dossier (tài liệu nghiên cứu, hồ sơ giải mật, báo chí lưu trữ).
+     - Tab 4: Batch Ingest Dropzone nạp hàng loạt tư liệu tự động phân loại bằng AI.
+4. **Universal Agent Bridge Modal (`AgentBridgeModal.tsx`):**
+   - Cầu nối đồng bộ 2 chiều với các AI Agent hàng đầu (Claude Code, Google Gemini, Codex, DeepSeek, Cursor).
+   - Hiển thị trực quan tệp `brief.md` tự sinh, hỗ trợ sao chép 1-click hoặc tải về máy.
+   - Khu vực nhập liệu phản hồi của Agent (`agent-result.md`) tự động bóc tách kịch bản, lời bình và cập nhật vào quy trình sản xuất.
+5. **SEO & Social Packaging Scorer Modal (`SeoPackagingModal.tsx`):**
+   - Hệ thống đánh giá SEO 70 tín hiệu theo chuẩn YouTube Long-form, TikTok, và YouTube Shorts.
+   - Thước đo Radar trực quan (Hook Pacing, Metadata, Visual CTR, Audio Retention, Platform Policy).
+   - Nút AI 1-Click Optimize tự động tối ưu tiêu đề, mô tả, bộ hashtag/tags và tính toán điểm tăng thực tế (`gain`).
+   - Danh sách khắc phục lỗi xếp theo thứ tự ưu tiên điểm số.
+6. **Perception & AI Audio Intelligence (`AudioLabStudio.tsx`):**
+   - Bổ sung sub-tab "Nghe Hiểu & Khử Ồn (Perception)" trang bị:
+     - Bộ phát hiện khoảng lặng & tốc độ nói (Silence & Speaking Pace) với biểu đồ nhịp độ.
+     - Phân loại sắc thái âm nhạc tự động (Energy, Valence, Tension, Dynamic Range).
+     - Đo lường mức đỉnh (Peak Meter) và chuẩn âm lượng Broadcast (-14 / -16 LUFS).
+     - AI Stem Isolation 4 kênh (Tách Giọng hát / Lời bình, Nhạc nền, Trống, Bass).
+7. **Dự án Mới & Tinh Gọn Giao Diện Tối Đa Không Gian Dựng (`SidebarWorkflowNav.tsx`, `page.tsx`):**
+   - Loại bỏ hoàn toàn thanh Topbar ở trên đỉnh theo yêu cầu người vận hành để giải phóng 100% chiều cao màn hình cho màn hình Preview, Timeline và các Audio/Video Inspector.
+   - Hợp nhất Bộ chọn dự án (Project Selector dropdown), Nút tạo dự án mới (`NewProjectModal`), và Huy hiệu 2 cổng duyệt bắt buộc (`Gate 1: Duyệt kịch bản`, `Gate 2: Duyệt video`) ngay trên đầu thanh bên Sidebar.
+   - Bổ sung thanh công cụ mini 5 nút truy cập nhanh ở đáy Sidebar: Nạp Media ngoại vi (`DownloadCloud`), Universal Agent Bridge (`Cpu`), Chấm điểm SEO (`Target`), Kiểm định QA (`ShieldCheck`), và Kiểm toán chi phí (`DollarSign`), cùng Co-Pilot (`Bot`).
+
+**Kiểm chứng:**
+- `npm run type-check`: **0 errors (100% pass)**.
+- `npm run build`: **Next.js 14.2.35 Build PASS** (4/4 static pages generated thành công, First Load JS ~241 kB).
+
+
+

@@ -343,6 +343,88 @@ class MediaLibrary:
             dest.unlink(missing_ok=True)
             raise
 
+    def download_from_url(
+        self,
+        url: str,
+        *,
+        language: str = "vi",
+        extract_audio: bool = False,
+    ) -> MediaItem:
+        """Download an external video or audio by URL.
+
+        Supports YouTube, TikTok, MP4, and direct stream links.
+        """
+        import urllib.request
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        temp_dir = Path(tempfile.mkdtemp(prefix="cf_media_dl_"))
+        target_file: Path | None = None
+        target_filename = "downloaded_video.mp4"
+
+        try:
+            try:
+                import yt_dlp  # type: ignore[import-untyped]
+
+                out_tmpl = str(temp_dir / "%(title).50s_%(id)s.%(ext)s")
+                ydl_opts = {
+                    "format": (
+                        "bestaudio/best"
+                        if extract_audio
+                        else "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+                    ),
+                    "outtmpl": out_tmpl,
+                    "quiet": True,
+                    "no_warnings": True,
+                    "noplaylist": True,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.extract_info(url, download=True)
+                    files = [f for f in temp_dir.glob("*") if f.is_file()]
+                    if files:
+                        target_file = files[0]
+                        target_filename = target_file.name
+            except Exception:
+                target_file = None
+
+            if target_file is None or not target_file.is_file():
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/120.0.0.0 Safari/537.36"
+                        )
+                    },
+                )
+                url_path = Path(parsed.path)
+                fallback_name = (
+                    url_path.name
+                    if url_path.suffix in (_VIDEO_EXT | _AUDIO_EXT)
+                    else "online_video.mp4"
+                )
+                target_file = temp_dir / fallback_name
+                with (
+                    urllib.request.urlopen(req, timeout=30) as resp,
+                    open(target_file, "wb") as out_f,
+                ):
+                    shutil.copyfileobj(resp, out_f)
+                target_filename = fallback_name
+
+            if target_file is None or not target_file.is_file():
+                raise ValueError(f"Could not download media from URL: {url}")
+
+            with open(target_file, "rb") as f:
+                return self.upload_stream(
+                    target_filename,
+                    f,
+                    source=f"url:{url}",
+                    language=language,
+                )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
     def add_item(self, item: MediaItem) -> MediaItem:
         """Register an already-constructed item (e.g. an imported one)."""
         with self._lock:

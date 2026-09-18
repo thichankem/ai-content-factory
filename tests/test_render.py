@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 import time
 
 import pytest
@@ -367,9 +368,20 @@ def test_renderer_preserves_old_artifact_on_error(tmp_path, monkeypatch):
     plan = compile_render_plan(build_video_project("Test", 5, "en"))
     output = tmp_path / "old.mp4"
     output.write_bytes(b"old artifact")
+    # Substitute a real process that fails, rather than faking the runner: this
+    # now travels through the same Popen + pressure-watchdog path production uses.
     monkeypatch.setattr(
-        "content_factory.render.subprocess.run",
-        lambda *a, **kw: subprocess.CompletedProcess([], 1, "", "synthetic failure"),
+        "content_factory.render._spawn",
+        lambda _command: subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.stderr.write('synthetic failure'); sys.exit(1)",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ),
     )
     with pytest.raises(RenderError, match="synthetic failure"):
         render_video_file(plan, output, export_format="mp4", ffmpeg_binary="ffmpeg")

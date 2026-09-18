@@ -99,7 +99,7 @@ export function TimelineAssemblyStudio() {
           <DualMonitorPlayer />
         </div>
 
-        {/* Right Collapsible Inspector (Premiere Pro 2025 Properties + CapCut Auto-Captions) */}
+        {/* Right Collapsible Inspector (Properties Inspector & Neural Auto-Captions) */}
         {activeSidePanel !== "none" ? (
           <div className="w-80 lg:w-96 shrink-0 h-full overflow-hidden flex flex-col bg-nle-surface border border-nle-border rounded-xl shadow-xl">
             {/* Inspector Switcher Tabs Header */}

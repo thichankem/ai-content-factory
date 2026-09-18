@@ -196,8 +196,33 @@ class Settings(BaseSettings):
     # The whole policy lives here so a laptop can be tuned without editing code.
     # compute_policy: "auto" (use the GPU when it is free and cool) | "cpu" | "gpu"
     compute_policy: str = "auto"
-    # render_encoder: "auto" (hardware when available) | "nvenc" | "cpu"
+    # render_encoder: "auto" (a discrete hardware encoder when it really starts)
+    # | "nvenc" | "qsv" | "amf" (explicit, incl. laptop iGPUs) | "cpu"
     render_encoder: str = "auto"
+    # render_hwaccel: hardware *decode* of source video. "auto" means OFF, and
+    # that is measured, not cautious: frames must come back to system memory for
+    # this project's CPU filter graph and software encoder, and the round trip
+    # made every size slower on the reference laptop (3s 720p 120ms software vs
+    # 955ms with -hwaccel cuda). Set "off" explicitly, or name one from
+    # `ffmpeg -hwaccels` (cuda, d3d11va, dxva2...) to force it on for a
+    # GPU-resident graph. Any failure still falls back to software.
+    render_hwaccel: str = "auto"
+    # Path to a specific ffmpeg build. Set this to use a build whose NVENC/AMF
+    # API matches the installed driver (a newer ffmpeg can demand a newer driver).
+    ffmpeg_binary: str | None = None
+    # Extra ffmpeg builds to try when the primary one cannot start a hardware
+    # encoder. os.pathsep-separated. The governor also probes a bundled
+    # imageio-ffmpeg build when that package happens to be installed — one such
+    # build targets the older NVENC API and unlocks NVENC on drivers too old for
+    # the system ffmpeg, with nothing installed.
+    ffmpeg_extra_binaries: str = ""
+    # Emergency abort thresholds for a job that is ALREADY running. These sit
+    # well outside the admission thresholds on purpose: ordinary load must never
+    # kill work, only a machine genuinely in trouble.
+    ram_abort_mb: int = Field(default=350, ge=0)
+    gpu_abort_temperature_c: int = Field(default=90, ge=50, le=105)
+    # How often a running job re-checks machine pressure while it runs.
+    render_monitor_seconds: float = Field(default=3.0, ge=0.25, le=60.0)
     # Seconds a hardware profile is trusted before it is probed again.
     profile_ttl_seconds: float = Field(default=15.0, ge=1.0, le=600.0)
     # Heavy jobs (render, transcribe, OCR, vision) never overlap beyond this.

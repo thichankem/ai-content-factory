@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { SidebarWorkflowNav } from "../components/layout/SidebarWorkflowNav";
-import { Topbar } from "../components/layout/Topbar";
 import { ScriptStudio } from "../components/script/ScriptStudio";
 import { MediaStudio } from "../components/media/MediaStudio";
 import { PhotoLabStudio } from "../components/photo/PhotoLabStudio";
@@ -11,11 +10,17 @@ import { AudioLabStudio } from "../components/audio/AudioLabStudio";
 import { TimelineAssemblyStudio } from "../components/timeline/TimelineAssemblyStudio";
 import { ExportReviewStudio } from "../components/export/ExportReviewStudio";
 import { FusionNodeCompositor } from "../components/fusion/FusionNodeCompositor";
+import { ContentEmpireStudio } from "../components/campaign/ContentEmpireStudio";
+import { DAGWorkflowStudio } from "../components/workflow/DAGWorkflowStudio";
 
 import { CommandBarModal } from "../components/copilot/CommandBarModal";
 import { ComplianceModal } from "../components/qa/ComplianceModal";
 import { ThumbnailModal } from "../components/thumbnails/ThumbnailModal";
 import { AuditCostModal } from "../components/audit/AuditCostModal";
+import { ExternalIngestionModal } from "../components/media/ExternalIngestionModal";
+import { AgentBridgeModal } from "../components/copilot/AgentBridgeModal";
+import { SeoPackagingModal } from "../components/export/SeoPackagingModal";
+import { NewProjectModal } from "../components/project/NewProjectModal";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { useUIStore } from "../stores/useUIStore";
@@ -56,6 +61,7 @@ export default function StudioPage() {
 
   const [workflowStatus, setWorkflowStatus] = useState<string | null>(null);
   const [campaignStatus, setCampaignStatus] = useState<string | null>(null);
+  const [workflowSubMode, setWorkflowSubMode] = useState<"dag" | "fusion">("dag");
 
   useEffect(() => {
     if (projectsQuery.data && projectsQuery.data.length > 0 && !currentProject) {
@@ -127,9 +133,6 @@ export default function StudioPage() {
 
       {/* Main Studio Viewport */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Topbar: Project Info, Workspaces Switcher, Co-Pilot & QA */}
-        <Topbar />
-
         {/* Dynamic Studio Workspace Content */}
         <main className="flex-1 p-3 overflow-hidden flex flex-col space-y-3 min-h-0">
           {/* STEP 1: Scriptwriting & Storyboard */}
@@ -146,21 +149,21 @@ export default function StudioPage() {
             </div>
           )}
 
-          {/* STEP 3: Photo Lab (Photoshop/Lightroom Style) */}
+          {/* STEP 3: Photo Lab & Layer Compositor */}
           {activeTab === "photo" && (
             <div className="flex-1 min-h-0">
               <PhotoLabStudio />
             </div>
           )}
 
-          {/* STEP 4: Video & Motion FX (After Effects / CapCut Speed Ramp & Lumetri) */}
+          {/* STEP 4: Video & Motion FX (Speed Ramping, Bézier Keyframes & Color Grading) */}
           {activeTab === "video_fx" && (
             <div className="flex-1 min-h-0">
               <VideoMotionFXStudio />
             </div>
           )}
 
-          {/* STEP 5: Audio Lab (Audition 5-Band EQ, TTS, Sidechain Ducking) */}
+          {/* STEP 5: Audio Lab (5-Band Parametric EQ, TTS, Sidechain Auto-Ducking) */}
           {activeTab === "audio" && (
             <div className="flex-1 min-h-0">
               <AudioLabStudio />
@@ -183,7 +186,7 @@ export default function StudioPage() {
 
           {/* System Utility Tab: Visual DAG Workflow Orchestrator */}
           {activeTab === "workflow" && (
-            <div className="flex-1 flex flex-col space-y-3 min-h-0 overflow-hidden">
+            <div className="flex-1 flex flex-col space-y-2 min-h-0 overflow-hidden">
               <div className="flex items-center justify-between bg-nle-panel border border-nle-border rounded-xl px-4 py-2 shrink-0">
                 <div className="flex items-center space-x-2.5">
                   <div className="w-7 h-7 rounded-lg bg-nle-surface flex items-center justify-center text-nle-cyan border border-nle-border">
@@ -196,6 +199,29 @@ export default function StudioPage() {
                 </div>
 
                 <div className="flex items-center space-x-2">
+                  <div className="flex items-center bg-nle-surface rounded-lg p-0.5 border border-nle-border text-xs">
+                    <button
+                      onClick={() => setWorkflowSubMode("dag")}
+                      className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                        workflowSubMode === "dag"
+                          ? "bg-nle-cyan text-black font-semibold shadow-sm"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      DAG Pipeline (Toàn trình)
+                    </button>
+                    <button
+                      onClick={() => setWorkflowSubMode("fusion")}
+                      className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                        workflowSubMode === "fusion"
+                          ? "bg-nle-cyan text-black font-semibold shadow-sm"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Fusion Node Compositor (VFX)
+                    </button>
+                  </div>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -231,54 +257,15 @@ export default function StudioPage() {
               )}
 
               <div className="flex-1 min-h-0 overflow-hidden">
-                <FusionNodeCompositor />
+                {workflowSubMode === "dag" ? <DAGWorkflowStudio /> : <FusionNodeCompositor />}
               </div>
             </div>
           )}
 
           {/* System Utility Tab: Omni-Channel Campaign Engine */}
           {activeTab === "campaign" && (
-            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-nle-border rounded-xl bg-nle-surface/50 text-center p-6 space-y-3">
-              <div className="w-12 h-12 rounded-xl bg-nle-panel flex items-center justify-center text-nle-violet shadow-lg shadow-nle-violet/10">
-                <Layers className="w-6 h-6" />
-              </div>
-              <h3 className="font-bold text-base text-white">Omni-Channel Campaign Engine</h3>
-              <p className="text-xs text-gray-400 max-w-md">
-                Tự động phân tách nội dung gốc thành 5 video ngắn độc lập với hook, kịch bản biến thể và bao bì xuất bản đa nền tảng.
-              </p>
-
-              <div className="flex space-x-2 mt-2">
-                <Button
-                  variant="neon"
-                  size="sm"
-                  onClick={handleGenerateCampaign}
-                  disabled={generateCampaignMutation.isPending}
-                  className="text-xs"
-                >
-                  {generateCampaignMutation.isPending ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                  )}
-                  Tạo Chiến dịch 5 Shorts Tự động
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    window.open(`/projects/${currentProject?.id}/campaign/export-pack`, "_blank");
-                  }}
-                  className="text-xs border-nle-border text-gray-300 hover:text-white"
-                >
-                  <Download className="w-3.5 h-3.5 mr-1.5 text-nle-cyan" />
-                  Xuất Gói Media (Export Pack)
-                </Button>
-              </div>
-
-              {campaignStatus && (
-                <p className="text-xs text-nle-cyan font-semibold mt-2">{campaignStatus}</p>
-              )}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ContentEmpireStudio />
             </div>
           )}
         </main>
@@ -289,6 +276,10 @@ export default function StudioPage() {
       <ComplianceModal />
       <ThumbnailModal />
       <AuditCostModal />
+      <ExternalIngestionModal />
+      <AgentBridgeModal />
+      <SeoPackagingModal />
+      <NewProjectModal />
     </div>
   );
 }

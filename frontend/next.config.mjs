@@ -5,7 +5,7 @@ const nextConfig = {
     unoptimized: true,
   },
   async rewrites() {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8080';
     return [
       {
         source: '/api/:path*',
@@ -62,6 +62,30 @@ const nextConfig = {
       {
         source: '/subtitles/:path*',
         destination: `${apiBase}/subtitles/:path*`,
+      },
+      {
+        source: '/seo/:path*',
+        destination: `${apiBase}/seo/:path*`,
+      },
+      {
+        source: '/agents/:path*',
+        destination: `${apiBase}/agents/:path*`,
+      },
+      {
+        source: '/external/:path*',
+        destination: `${apiBase}/external/:path*`,
+      },
+      {
+        source: '/tools/:path*',
+        destination: `${apiBase}/tools/:path*`,
+      },
+      {
+        source: '/documents/:path*',
+        destination: `${apiBase}/documents/:path*`,
+      },
+      {
+        source: '/knowledge/:path*',
+        destination: `${apiBase}/knowledge/:path*`,
       },
     ];
   },

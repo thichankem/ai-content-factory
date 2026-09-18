@@ -128,7 +128,7 @@ export function VideoMotionFXStudio() {
             }`}
           >
             <Gauge className="w-3.5 h-3.5 text-amber-400" />
-            <span>CapCut Speed Ramping (Điều tốc)</span>
+            <span>Dynamic Speed Ramping (Optical Flow)</span>
           </button>
 
           <button
@@ -140,7 +140,7 @@ export function VideoMotionFXStudio() {
             }`}
           >
             <Activity className="w-3.5 h-3.5 text-nle-violet" />
-            <span>After Effects Graph Editor (Keyframe Curves)</span>
+            <span>Keyframe Graph Editor (Bézier Easing)</span>
           </button>
 
           <button
@@ -152,7 +152,7 @@ export function VideoMotionFXStudio() {
             }`}
           >
             <Palette className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Premiere Lumetri Color & LUTs</span>
+            <span>Color Grading & 3D LUTs</span>
           </button>
 
           <button
@@ -164,7 +164,7 @@ export function VideoMotionFXStudio() {
             }`}
           >
             <GitBranch className="w-3.5 h-3.5 text-cyan-400" />
-            <span>DaVinci Fusion Node Graph</span>
+            <span>Visual Node Graph Compositor</span>
           </button>
         </div>
 
@@ -173,7 +173,7 @@ export function VideoMotionFXStudio() {
         </Badge>
       </div>
 
-      {/* Sub-Tab 1: CapCut Speed Ramping */}
+      {/* Sub-Tab 1: Dynamic Speed Ramping (Optical Flow) */}
       {activeSubTab === "speed" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-[440px]">
           {/* Visual Speed Curve Viewport */}
@@ -185,7 +185,7 @@ export function VideoMotionFXStudio() {
                   Đường cong Điều tốc Biến thiên (Dynamic Speed Ramp)
                 </h3>
                 <p className="text-[11px] text-gray-400">
-                  Tăng giảm tốc độ mượt mà từ 0.1x Slow-Mo đến 10x Fast-Forward theo phong cách CapCut Pro
+                  Tăng giảm tốc độ mượt mà từ 0.1x Slow-Mo đến 10x Fast-Forward với AI Optical Flow làm mượt khung hình
                 </p>
               </div>
 
@@ -315,7 +315,7 @@ export function VideoMotionFXStudio() {
         </div>
       )}
 
-      {/* Sub-Tab 2: After Effects Keyframe Graph Editor & Transform */}
+      {/* Sub-Tab 2: Bézier Keyframe Graph Editor & Transform */}
       {activeSubTab === "motion" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-[440px]">
           {/* Graph Editor Bezier Curves */}
@@ -324,7 +324,7 @@ export function VideoMotionFXStudio() {
               <div>
                 <h3 className="text-xs font-bold text-white flex items-center">
                   <Activity className="w-4 h-4 mr-1.5 text-nle-violet" />
-                  After Effects Bezier Graph Editor
+                  Bézier Keyframe Graph Editor (Temporal Easing)
                 </h3>
                 <p className="text-[11px] text-gray-400">
                   Điều chỉnh tiếp tuyến Ease In / Ease Out của keyframe cho chuyển động gia tốc thực tế
@@ -470,7 +470,7 @@ export function VideoMotionFXStudio() {
         </div>
       )}
 
-      {/* Sub-Tab 3: Premiere Lumetri Color & LUTs */}
+      {/* Sub-Tab 3: Color Grading & 3D LUTs */}
       {activeSubTab === "color" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-[440px]">
           {/* LUT Preset Selection Grid */}
@@ -478,10 +478,10 @@ export function VideoMotionFXStudio() {
             <div>
               <h3 className="text-xs font-bold text-white flex items-center mb-1">
                 <Palette className="w-4 h-4 mr-1.5 text-emerald-400" />
-                Bộ Lọc Màu Điện Ảnh (Cinema LUTs)
+                Bộ Lọc Màu Điện Ảnh (Cinema 3D LUTs)
               </h3>
               <p className="text-[11px] text-gray-400">
-                Áp dụng bảng màu điện ảnh Premiere Pro Lumetri Color 3D LUT
+                Áp dụng bảng màu điện ảnh 3D LUT Color Grading chuẩn Rec.709
               </p>
             </div>
 
@@ -597,7 +597,7 @@ export function VideoMotionFXStudio() {
         </div>
       )}
 
-      {/* Sub-Tab 4: DaVinci Resolve 19 Fusion Node Graph */}
+      {/* Sub-Tab 4: Visual Node Graph Compositor */}
       {activeSubTab === "fusion" && (
         <div className="flex-1 min-h-[460px]">
           <FusionNodeCompositor />

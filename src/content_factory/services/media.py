@@ -28,6 +28,14 @@ class MediaMixin(VoiceMixin):
     ) -> MediaItem:
         return self._media.upload_stream(filename, stream, language=language)
 
+    def media_from_url(
+        self, url: str, language: str = "vi", extract_audio: bool = False
+    ) -> MediaItem:
+        """Download an external video or audio by URL into the media library."""
+        return self._media.download_from_url(
+            url, language=language, extract_audio=extract_audio
+        )
+
     def media_list(self) -> list[MediaItem]:
         """List every item in the universal media library."""
         return self._media.list()

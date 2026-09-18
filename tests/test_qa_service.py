@@ -167,11 +167,13 @@ def test_deterministic_endpoint_service_parity(
     [
         ("/qa/platform", {}, "platform"),
         ("/qa/copyright", {}, "fingerprint"),
+        ("/qa/copyright", {}, "asset_ids"),
         ("/audit/record", {"actor": "", "action": "edit"}, "actor"),
         ("/audit/record", {"actor": "agent", "action": ""}, "action"),
         ("/cost/check", {"calls": {"tts": "bad"}}, "calls"),
         ("/media/dedup", {"media_ids": []}, "media_ids"),
         ("/script/virality", {"script": ""}, "script"),
+        ("/script/virality", {"script_text": "  "}, "script"),
         ("/render/duck", {"music_media_id": "a"}, "voice_media_id"),
         ("/thumbnail/generate", {"media_id": "a", "top_k": 0}, "top_k"),
         ("/thumbnail/generate", {"media_id": "a", "top_k": 11}, "top_k"),
@@ -180,9 +182,18 @@ def test_deterministic_endpoint_service_parity(
     ],
 )
 def test_request_validation_unchanged(qa_client, path, payload, field) -> None:
+    """An invalid request still 422s and still names the offending field.
+
+    Field-level validation reports the name in ``loc``; a model-level validator
+    (used where one of two alternative fields must be present) reports it in
+    ``msg``. Both must name the field, so the assertion accepts either.
+    """
     response = qa_client.post(path, json=payload)
     assert response.status_code == 422
-    assert any(field in error["loc"] for error in response.json()["detail"])
+    assert any(
+        field in error["loc"] or field in str(error.get("msg", ""))
+        for error in response.json()["detail"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -235,8 +246,15 @@ def test_audit_append_order_optional_fields_and_limits(
     response = qa_client.post("/audit/record", json=payload)
     assert response.status_code == 200
     second = response.json()
-    assert set(second) == {"ts", *payload}
+    # The stored fields must round-trip; the row also carries the client-facing
+    # projections (id, timestamp, sha256_hash, hash) a UI renders.
+    assert set(payload) <= set(second)
     assert {key: second[key] for key in payload} == payload
+    assert {"id", "timestamp", "sha256_hash", "hash", "ts"} <= set(second)
+    assert second["timestamp"] == second["ts"]
+    assert len(second["sha256_hash"]) == 64
+    assert second["hash"] == second["sha256_hash"]
+    assert second["id"] and first["id"] != second["id"]
     assert first["project_id"] is first["media_id"] is first["prompt"] is None
     assert first["detail"] is None
     for limit, expected in [
@@ -277,17 +295,23 @@ def test_cost_uses_settings_and_preserves_confirmation_boundary(
             "unknown": 99,
         }
     )
+    breakdown = {
+        "vision": 1,
+        "audio_llm": 2,
+        "tts": 3,
+        "stt": 4,
+        "embedding": 5,
+        "unknown": 0,
+    }
     expected = {
         "estimate_usd": 15,
-        "breakdown": {
-            "vision": 1,
-            "audio_llm": 2,
-            "tts": 3,
-            "stt": 4,
-            "embedding": 5,
-            "unknown": 0,
-        },
+        "breakdown": breakdown,
         "needs_confirmation": confirm,
+        # The same numbers under the names the web clients read.
+        "by_kind": breakdown,
+        "estimated_total_usd": 15,
+        "exceeds_budget": confirm,
+        "budget_limit": threshold,
     }
     assert service.cost_check(request) == expected
     assert qa_client.post("/cost/check", json=request.model_dump()).json() == expected

@@ -6,7 +6,7 @@ import enum
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .common import (
     IssueSeverity,
@@ -164,7 +164,15 @@ class OverlayPosition(enum.StrEnum):
 
 
 class VideoScene(BaseModel):
-    """A single editable scene in the video project."""
+    """A single editable scene in the video project.
+
+    Two spellings of the same facts live here on purpose. ``duration_seconds``
+    and ``image_url`` are the canonical stored fields; ``duration`` and
+    ``asset_url`` are the names the web editor binds to, and ``index`` is the
+    scene's position, which callers previously had to infer from list order.
+    A timeline that reads a field the payload never carried renders ``NaN``
+    widths, so the editor's names are projected rather than assumed.
+    """
 
     id: str
     label: str
@@ -208,9 +216,37 @@ class VideoScene(BaseModel):
     audio_fade_in: float = Field(default=0.0, ge=0.0, le=10.0)
     audio_fade_out: float = Field(default=0.0, ge=0.0, le=10.0)
 
+    # --- the editor's names for the same facts -------------------------------
+    # Kept as real fields rather than computed ones so a client can also *send*
+    # them: the editor round-trips the scenes it read, and a computed field would
+    # be rejected on the way back in.
+    index: int = Field(default=0, ge=0)
+    duration: float | None = None
+    asset_url: str | None = None
+
+    @model_validator(mode="after")
+    def _sync_editor_names(self) -> VideoScene:
+        """Mirror between the canonical fields and the editor's names, both ways."""
+        if self.duration is None:
+            self.duration = self.duration_seconds
+        else:
+            self.duration_seconds = self.duration
+        if self.asset_url is None:
+            self.asset_url = self.image_url or self.video_url
+        elif self.image_url is None and self.video_url is None:
+            self.image_url = self.asset_url
+        return self
+
 
 class VideoProject(BaseModel):
-    """Editable scene-based video project produced from the script."""
+    """Editable scene-based video project produced from the script.
+
+    ``background_music_url``/``music_volume`` are the canonical fields;
+    ``bgm_asset_url``/``bgm_volume`` are the older names the editor was written
+    against and are kept in sync as aliases. ``target_duration_seconds`` is
+    derived from the scenes so a client can show planned-vs-actual runtime
+    without summing the timeline itself.
+    """
 
     scenes: list[VideoScene] = Field(default_factory=list)
     aspect_ratio: str = "9:16"
@@ -227,6 +263,36 @@ class VideoProject(BaseModel):
     # (or the UI) detect that someone else moved the timeline underneath it.
     revision: int = Field(default=1, ge=1)
     updated_at: datetime = Field(default_factory=utcnow)
+    # --- the editor's names for the same facts (see the class docstring) -----
+    target_duration_seconds: float | None = None
+    bgm_asset_url: str | None = None
+    bgm_volume: float | None = None
+
+    @model_validator(mode="after")
+    def _sync_editor_names(self) -> VideoProject:
+        """Stamp each scene's position and mirror the editor-side aliases.
+
+        ``index`` is stamped here because a scene cannot know its own position —
+        only the list it sits in can. The editor previously assumed the payload
+        already carried it.
+        """
+        for position, scene in enumerate(self.scenes):
+            scene.index = position
+        if self.bgm_volume is None:
+            self.bgm_volume = self.music_volume
+        else:
+            # ``music_volume`` is the stored, bounded field (0..1): clamp the
+            # alias into it rather than letting a client's value fail validation.
+            self.music_volume = min(1.0, max(0.0, self.bgm_volume))
+        if self.bgm_asset_url is None:
+            self.bgm_asset_url = self.background_music_url
+        else:
+            self.background_music_url = self.bgm_asset_url
+        if self.target_duration_seconds is None:
+            self.target_duration_seconds = round(
+                sum(scene.duration_seconds for scene in self.scenes), 2
+            )
+        return self
 
 
 class TimelineStats(BaseModel):

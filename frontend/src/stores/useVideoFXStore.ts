@@ -17,7 +17,7 @@ export interface SpeedRampPoint {
 export type LUTPreset = "teal_orange" | "cyberpunk" | "noir" | "vintage" | "matrix" | "clean";
 
 interface VideoFXStore {
-  // After Effects Transform
+  // Spatial Transform & Motion Dynamics
   posX: number;
   posY: number;
   scale: number;
@@ -30,11 +30,11 @@ interface VideoFXStore {
   selectedProperty: "scale" | "opacity" | "position" | "rotation";
   keyframes: Record<string, KeyframePoint[]>;
 
-  // CapCut Speed Ramping Curve
+  // Dynamic Speed Ramping Velocity Curve
   speedRampPreset: "custom" | "hero_bullet" | "montage_fast" | "flash_in";
   speedPoints: SpeedRampPoint[];
 
-  // Premiere Lumetri Color
+  // Color Grading & 3D LUT Parameters
   lut: LUTPreset;
   colorTemp: number; // -100 to 100
   colorTint: number; // -100 to 100

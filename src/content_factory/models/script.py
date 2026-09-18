@@ -24,6 +24,27 @@ class ScriptSectionInfo(BaseModel):
     share: float
 
 
+class ScriptDocument(BaseModel):
+    """The structured view of a project's script that editors bind to.
+
+    ``Project.script`` stays the raw text, because that is what the renderer
+    narrates, what the linter analyses, and what every existing caller treats as a
+    string. An editor wants the bundle *around* that text — the topic it serves,
+    the style it was written in, its parsed sections and the timing plan — so the
+    bundle is its own field rather than overloading ``script`` into a union, which
+    would break every current consumer at once.
+    """
+
+    topic: str = ""
+    style: str = ""
+    raw_script: str = ""
+    sections: list[ScriptSectionInfo] = Field(default_factory=list)
+    timing_plan: ScriptPlan | None = None
+    language: str = "vi"
+    target_seconds: int = 0
+    estimated_seconds: float = 0.0
+
+
 class ScriptPlan(BaseModel):
     """Timing plan derived from a script and a target duration."""
 

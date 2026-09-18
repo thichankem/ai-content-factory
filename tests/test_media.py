@@ -218,3 +218,20 @@ def test_upload_bytes_wrapper_matches_stream_path(tmp_path) -> None:
     assert from_bytes.size_bytes == from_stream.size_bytes == len(b"payload-123")
     assert from_bytes.mime == from_stream.mime
     assert from_bytes.kind == from_stream.kind == MediaKind.VIDEO
+
+
+def test_download_from_url_fallback(tmp_path) -> None:
+    from unittest.mock import MagicMock, patch
+
+    lib = MediaLibrary(tmp_path / "media")
+    mock_resp = MagicMock()
+    mock_resp.read.side_effect = [b"fake-mp4-data", b""]
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("yt_dlp.YoutubeDL", side_effect=Exception("yt-dlp failed")):
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            item = lib.download_from_url("https://example.com/video.mp4", language="vi")
+            assert item.filename == "video.mp4"
+            assert item.kind == MediaKind.VIDEO
+            assert item.source == "url:https://example.com/video.mp4"
+            assert item.size_bytes == len(b"fake-mp4-data")

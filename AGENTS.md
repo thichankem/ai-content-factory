@@ -43,6 +43,13 @@ still planned.
   method calls another layer, add that layer to the mixin's base list rather
   than reaching across the composition. `service.py` is only a compatibility
   facade.
+- Compute policy is split the same way, read vs decide:
+  `compute.py` holds the value types (`JobKind`, `HardwareProfile`,
+  `FfmpegBuild`, `CodecChoice`, `Decision`), `hardware.py` contains only
+  *readings* of the machine, and `resources.py` turns those readings into policy
+  (`ResourceGovernor`). An encoder is a *(binary, encoder)* pair, never a name —
+  builds target different NVENC APIs, so `resolve_hardware_encoder()` opens every
+  candidate for real before believing it. See `docs/COMPUTE-RESOURCES.md`.
 - Shared helpers go in `src/content_factory/text.py` (or the module that owns
   the concept) — never copy a tokenizer, slug or error mapper into a second
   place.

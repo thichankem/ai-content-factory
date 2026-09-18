@@ -156,7 +156,7 @@ export function VideoPlayer() {
           )}
         </div>
 
-        {/* Audition Dual Stereo VU Meters */}
+        {/* Dual Stereo Master VU Meters */}
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex space-x-1 bg-black/60 p-1.5 rounded border border-nle-border h-48">
           {/* L Channel */}
           <div className="w-2 bg-nle-panel rounded-full overflow-hidden flex flex-col justify-end">

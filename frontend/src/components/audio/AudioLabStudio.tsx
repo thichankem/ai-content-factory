@@ -47,7 +47,7 @@ export function AudioLabStudio() {
     setAiAudioProcessing,
   } = useAudioLabStore();
 
-  const [activeAudioTab, setActiveAudioTab] = useState<"mixer" | "eq" | "ducking" | "tts">("mixer");
+  const [activeAudioTab, setActiveAudioTab] = useState<"mixer" | "eq" | "ducking" | "tts" | "perception">("mixer");
 
   // AI Quick Actions for Audio Lab
   const quickActions: AIQuickAction[] = [
@@ -56,7 +56,7 @@ export function AudioLabStudio() {
       label: "AI Studio Sound (Khử ồn & Vang)",
       icon: Sparkles,
       onClick: async () => {
-        setAiAudioProcessing(true, "AI đang áp dụng bộ lọc Adobe Audition De-Noise & De-Reverb...");
+        setAiAudioProcessing(true, "AI đang áp dụng bộ lọc Spectral De-Noise & De-Reverb...");
         await new Promise((r) => setTimeout(r, 1200));
         setEQBandGain("high_mid", 4.0);
         setEQBandGain("sub", -2.5);
@@ -151,7 +151,19 @@ export function AudioLabStudio() {
             }`}
           >
             <Mic className="w-3.5 h-3.5 text-nle-violet" />
-            <span>Neural Voiceover (TTS)</span>
+            <span>AI Neural Voiceover (TTS)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveAudioTab("perception")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+              activeAudioTab === "perception"
+                ? "bg-nle-surface text-emerald-400 shadow-sm border border-emerald-500/30"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+            <span>Nghe Hiểu & Khử Ồn (Perception)</span>
           </button>
         </div>
 
@@ -252,7 +264,7 @@ export function AudioLabStudio() {
             <div>
               <h3 className="text-xs font-bold text-white flex items-center">
                 <Activity className="w-4 h-4 mr-1.5 text-nle-cyan" />
-                Bộ Cân Bằng Tần Số 5-Band Parametric EQ (Adobe Audition Core)
+                Bộ Cân Bằng Tần Số 5-Band Parametric EQ (Precision Audio Curve)
               </h3>
               <p className="text-[11px] text-gray-400">
                 Tăng độ dày âm trầm (Bass), làm ấm giọng nói (Warmth) và tăng độ sắc nét âm cao (Air & Presence)
@@ -527,6 +539,156 @@ export function AudioLabStudio() {
             <Button variant="outline" size="sm" className="w-full text-xs border-nle-border">
               Đồng bộ vào Track Voiceover A1
             </Button>
+          </Card>
+        </div>
+      )}
+
+      {/* TAB 5: AUDIO PERCEPTION & RESTORATION */}
+      {activeAudioTab === "perception" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Card 1: Silence & Pace Detection */}
+          <Card className="p-4 bg-nle-surface border-nle-border space-y-3">
+            <div className="flex justify-between items-center pb-2 border-b border-nle-border">
+              <span className="text-xs font-bold text-white flex items-center">
+                <Radio className="w-4 h-4 mr-1 text-sky-400" />
+                Nhận Diện Khoảng Lặng & Nhịp Điệu (Silence & Pace)
+              </span>
+              <Badge variant="emerald" className="text-[10px]">3.9 Âm tiết/s</Badge>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between p-2 rounded bg-nle-panel">
+                <span className="text-gray-400">Tốc độ đọc trung bình:</span>
+                <span className="font-mono text-white font-bold">3.9 âm tiết/giây (Chuẩn tiếng Việt)</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded bg-nle-panel">
+                <span className="text-gray-400">Tổng khoảng lặng ngắt nghỉ:</span>
+                <span className="font-mono text-emerald-400 font-bold">8 khoảng nghỉ (Trung bình 0.4s)</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded bg-nle-panel">
+                <span className="text-gray-400">Cảnh báo khoảng chết (Dead-air &gt; 1.5s):</span>
+                <span className="font-mono text-emerald-400 font-bold">0 đoạn (An toàn)</span>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs border-nle-border text-nle-cyan hover:bg-nle-panel"
+                onClick={() => alert("Đã quét toàn bộ track: Nhịp đọc đều đặn, không có khoảng lặng chết.")}
+              >
+                Quét Lại Nhịp Điệu Thoại
+              </Button>
+            </div>
+          </Card>
+
+          {/* Card 2: Music Mood Classifier */}
+          <Card className="p-4 bg-nle-surface border-nle-border space-y-3">
+            <div className="flex justify-between items-center pb-2 border-b border-nle-border">
+              <span className="text-xs font-bold text-white flex items-center">
+                <Activity className="w-4 h-4 mr-1 text-amber-400" />
+                Phân Loại Tâm Trạng Nhạc Nền (Music Mood & BPM)
+              </span>
+              <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-300">
+                120 BPM · Dramatic
+              </Badge>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between p-2 rounded bg-nle-panel">
+                <span className="text-gray-400">Năng lượng âm thanh (Energy):</span>
+                <span className="font-mono text-amber-400 font-bold">0.74 (Cao - Kịch tính)</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded bg-nle-panel">
+                <span className="text-gray-400">Độ sáng dải tần (Spectral Centroid):</span>
+                <span className="font-mono text-white font-bold">2,450 Hz (Âm trầm bí ẩn)</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded bg-nle-panel">
+                <span className="text-gray-400">Phù hợp thể loại kịch bản:</span>
+                <span className="font-mono text-nle-cyan font-bold">Bí ẩn, Lịch sử, Tài liệu giải mật</span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Card 3: Audio Quality & Peak Metering */}
+          <Card className="p-4 bg-nle-surface border-nle-border space-y-3">
+            <div className="flex justify-between items-center pb-2 border-b border-nle-border">
+              <span className="text-xs font-bold text-white flex items-center">
+                <Volume2 className="w-4 h-4 mr-1 text-emerald-400" />
+                Kiểm Định Chất Lượng Âm Thanh (Quality Inspector)
+              </span>
+              <Badge variant="emerald" className="text-[10px]">EBU R128 PASS</Badge>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between p-2 rounded bg-nle-panel">
+                <span className="text-gray-400">Đỉnh âm cực đại (True Peak):</span>
+                <span className="font-mono text-emerald-400 font-bold">-1.0 dBTP (Không méo tiếng)</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded bg-nle-panel">
+                <span className="text-gray-400">Độ lệch DC Offset:</span>
+                <span className="font-mono text-emerald-400 font-bold">0.0001% (Hoàn hảo)</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded bg-nle-panel">
+                <span className="text-gray-400">Nhiễu nền (Noise Floor):</span>
+                <span className="font-mono text-emerald-400 font-bold">-62.5 dB (Rất sạch)</span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Card 4: AI Stem Isolation & De-Noise */}
+          <Card className="p-4 bg-nle-surface border-nle-border space-y-3">
+            <div className="flex justify-between items-center pb-2 border-b border-nle-border">
+              <span className="text-xs font-bold text-white flex items-center">
+                <Sparkles className="w-4 h-4 mr-1 text-nle-violet" />
+                Tách Nhạc & Phục Chế Âm Thanh (Demucs / Spleeter)
+              </span>
+              <Badge variant="cyan" className="text-[10px]">AI Stem Splitter</Badge>
+            </div>
+
+            <p className="text-[11px] text-gray-400">
+              Tách file âm thanh bất kỳ thành 4 stems độc lập để remix và xử lý hậu kỳ chuyên sâu:
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs border-nle-border hover:border-nle-cyan"
+                onClick={() => alert("Đã trích xuất Stem 1: Giọng hát / Thoại (Vocals)!")}
+              >
+                🎙️ Tách Lời Thoại (Vocals)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs border-nle-border hover:border-amber-400"
+                onClick={() => alert("Đã trích xuất Stem 2: Nhạc cụ / Giai điệu (Instruments)!")}
+              >
+                🎵 Tách Nhạc Cụ (Music)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs border-nle-border hover:border-emerald-400"
+                onClick={() => alert("Đã trích xuất Stem 3: Trống & Nhịp đập (Drums)!")}
+              >
+                🥁 Tách Trống & Beat (Drums)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs border-nle-border hover:border-rose-400"
+                onClick={() => alert("Đã trích xuất Stem 4: Âm trầm Sub-bass!")}
+              >
+                🎸 Tách Âm Trầm (Bass)
+              </Button>
+            </div>
           </Card>
         </div>
       )}

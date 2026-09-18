@@ -1,40 +1,126 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useProjectStore } from "../../stores/useProjectStore";
 import { useScriptEngine } from "../../hooks/useScriptEngine";
 import { useProjects } from "../../hooks/useProjects";
 import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
+import { ScriptBriefSettings, TargetScope, SpeechPacingConfig } from "../../types/script";
+import { ScriptPacingBar } from "./ScriptPacingBar";
+import { ScriptChatbot } from "./ScriptChatbot";
+import { ScriptBriefSettingsPanel, DEFAULT_BRIEF_SETTINGS } from "./ScriptBriefSettingsPanel";
+import { ScriptEditorView } from "./ScriptEditorView";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { ViralityScoreResult } from "../../types/api";
-import { Flame, CheckCircle2, AlertTriangle, Sparkles, Loader2, BookOpen, Clock, ShieldCheck } from "lucide-react";
+import {
+  Flame,
+  CheckCircle2,
+  AlertTriangle,
+  Sparkles,
+  Loader2,
+  BookOpen,
+  SlidersHorizontal,
+  FileText,
+  Columns,
+  ShieldCheck,
+  PanelRightClose,
+  PanelRightOpen,
+} from "lucide-react";
 
 export function ScriptStudio() {
   const { currentProject, confirmSourceRights } = useProjectStore();
-  const { viralityMutation, updateScriptMutation } = useScriptEngine(currentProject?.id);
+  const { viralityMutation } = useScriptEngine(currentProject?.id);
   const { approveScriptMutation } = useProjects();
 
+  // Navigation mode for the main work area
+  const [activeSubTab, setActiveSubTab] = useState<"brief" | "editor" | "split" | "virality">("brief");
+
+  // Briefing 10 dimensions state
+  const [brief, setBrief] = useState<ScriptBriefSettings>(DEFAULT_BRIEF_SETTINGS);
+
+  // Script text state
   const [scriptText, setScriptText] = useState(
     currentProject?.script?.raw_script ||
-      "[Hook]\nBạn có biết: 90% video ngắn thất bại ngay trong 3 giây đầu tiên?\n\n[Bằng chứng]\nLý do không phải vì nội dung dở, mà vì bạn chưa biết cách tạo Hook thu hút sự chú ý tức thì theo nguyên lý Curiosity Gap.\n\n[Cú lật Turn]\nHãy áp dụng ngay 3 bước này để giữ chân 100% khán giả đến giây cuối cùng.\n\n[Payoff & CTA]\nTheo dõi kênh để đón xem trọn bộ bí kíp tăng trưởng triệu view!"
+      `[Hook // 00:00 - 00:03]\n(Visual Cue: Quay cận cảnh thìa cơm trắng dẻo bóng bẩy, khói nghi ngút bốc lên chậm rãi)\nĐừng bao giờ dùng ngón tay đo nước khi nấu cơm nữa, nếu bạn không muốn cả nồi cơm biến thành cháo dính!\n\n[Bằng chứng // 00:03 - 00:20]\n(Visual Cue: Chèn hình minh họa bàn tay ngập trong nồi cơm có dấu gạch chéo đỏ, chuyển cảnh sang chiếc cân điện tử mini)\nNgón tay mỗi người dài ngắn khác nhau, đáy nồi lại có độ cong vát khác nhau. Công thức chuẩn của các đầu bếp Nhật là tỷ lệ nước 1:1.15 theo khối lượng.\n\n[Cú lật Turn // 00:20 - 00:45]\n(Visual Cue: Quay cảnh nhỏ 1 giọt dầu mè nguyên chất vào nồi trước khi bấm nút Cook, hạt cơm tơi xốp tách rời)\nVà đây là bí quyết ít ai chỉ cho bạn: Hãy nhỏ đúng một giọt dầu mè và ngâm 10 phút trước khi bật nồi. Lớp màng lipid tự nhiên sẽ bọc từng hạt tinh bột, giúp cơm nở đều mà không hề bị nát hay dính đáy.\n\n[Payoff & CTA // 00:45 - 00:60]\n(Visual Cue: Người cầm bát cơm nóng hổi ăn thử biểu cảm gật gù hài lòng, icon thả tim và lưu video nhấp nháy)\nThử ngay bữa tối nay xem cơm nhà bạn có ngon hơn hẳn ngoài quán không nhé! Thả tim và lưu lại kẻo lúc nấu lại quên mất công thức!`
   );
 
+  useEffect(() => {
+    if (currentProject?.script?.raw_script) {
+      setScriptText(currentProject.script.raw_script);
+    }
+  }, [currentProject?.script?.raw_script]);
+
+  // Speech Pacing State (Default: 160 WPM - natural TTS pacing)
+  const [pacingConfig, setPacingConfig] = useState<SpeechPacingConfig>({
+    wpm: 160,
+    label: "Chuẩn (160 WPM)",
+    preset: "normal",
+  });
+
+  // Targeted Scope for Chatbot editing (default: full script)
+  const [targetScope, setTargetScope] = useState<TargetScope>({
+    type: "full",
+    startLine: 1,
+    endLine: 10,
+    selectedText: "",
+    wordCount: 0,
+    estimatedSeconds: 0,
+  });
+
+  // Virality & AI status states
   const [viralityResult, setViralityResult] = useState<ViralityScoreResult | null>(null);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
+  const [showRightChatbot, setShowRightChatbot] = useState(true);
 
-  const wordCount = scriptText.trim().split(/\s+/).filter(Boolean).length;
-  const estimatedSeconds = (wordCount / 2.6).toFixed(1); // Vietnamese avg ~155 words per min
+  // Generate complete script from the 10 briefing dimensions
+  const handleGenerateFromBrief = async () => {
+    setIsAiProcessing(true);
+    setAiStatus(`AI Storyteller đang tổng hợp 10 tiêu chí để viết kịch bản cho: "${brief.topic}"...`);
+
+    // Simulate structured prompt synthesis
+    await new Promise((r) => setTimeout(r, 1400));
+
+    const generatedScript = `[Hook // 00:00 - 00:03]
+(Visual Cue: Quay cận cảnh góc máy sốc, xuất hiện text cảnh báo neon nhấp nháy, khung hình ${brief.aspectRatio})
+${
+  brief.hookType === "counter_intuitive"
+    ? `Nếu bạn vẫn nghĩ ${brief.topic.toLowerCase()} là chuyện đơn giản, thì 90% bạn đang làm sai ngay từ bước đầu tiên!`
+    : brief.hookType === "fatal_mistake"
+    ? `Sai lầm chết người khi ${brief.topic.toLowerCase()} mà 99% mọi người đều mắc phải!`
+    : `Dừng ngay việc làm này lại nếu bạn không muốn ${brief.audiencePainPoint.toLowerCase()}!`
+}
+
+[Bằng chứng & Thực tế // 00:03 - 00:20]
+(Visual Cue: Đưa đồ họa số liệu thực tế: ${brief.specificFactsAndData.slice(0, 80)}..., nhạc nền chuyển nhịp kịch tính)
+${brief.uniqueAngle}
+Theo dữ liệu thực nghiệm: ${brief.specificFactsAndData.slice(0, 100)}...
+
+[Giải pháp & Cú lật Turn // 00:20 - 00:45]
+(Visual Cue: Format ${brief.formatType === "talking_head" ? "Creator nói trực diện camera với biểu cảm thuyết phục" : "Cinematic B-Roll chi tiết từng động tác thực hành"}, phong cách ${brief.benchmarkCreatorOrChannel})
+${brief.includeMemeSlang ? `Bí kíp này ${brief.slangKeywords || "chuẩn đét"} mà ít ai tiết lộ: ` : "Giải pháp cốt lõi ở đây: "}
+Đừng làm theo lối mòn sáo rỗng. Hãy tập trung giải quyết đúng vấn đề ${brief.audienceDesire.toLowerCase()} để đạt hiệu quả cao nhất.
+
+[Payoff & CTA // 00:45 - 00:60]
+(Visual Cue: Xuất hiện nút kêu gọi hành động đồ họa động theo chuẩn nền tảng ${brief.platform.toUpperCase()})
+${brief.callToAction}`;
+
+    setScriptText(generatedScript);
+    setIsAiProcessing(false);
+    setAiStatus(`Đã tạo xong kịch bản chuẩn cho nền tảng ${brief.platform.toUpperCase()} (${brief.targetDuration})!`);
+    setActiveSubTab("editor");
+  };
 
   const handleScoreVirality = async () => {
     try {
       const res = await viralityMutation.mutateAsync({
         scriptText,
-        topic: currentProject?.topic || "Short-form video retention",
+        topic: brief.topic || currentProject?.topic || "Viral script retention",
       });
       setViralityResult(res);
+      setActiveSubTab("virality");
     } catch (err) {
       console.error("Failed to calculate virality:", err);
     }
@@ -43,215 +129,385 @@ export function ScriptStudio() {
   const handleApproveGate1 = async () => {
     if (!currentProject) return;
     if (!currentProject.source_rights_confirmed) {
-      alert("Bạn phải xác nhận bản quyền nguồn tư liệu (Source Rights) trước khi duyệt!");
+      alert("Bạn phải xác nhận bản quyền nguồn tư liệu (Source Rights) trước khi duyệt Gate 1!");
       return;
     }
     await approveScriptMutation.mutateAsync(currentProject.id);
   };
 
-  // AI Quick Actions for Script Studio
+  // Quick actions on top AI Agent Bar
   const quickActions: AIQuickAction[] = [
     {
       id: "ai-hook-gen",
-      label: "AI Viết Lại Hook 3s Giật Gân",
+      label: "AI Tối Ưu Lại Hook 3s",
       icon: Flame,
       onClick: async () => {
         setIsAiProcessing(true);
-        setAiStatus("AI đang phân tích tâm lý tò mò và tạo 3 biến thể Hook tỷ lệ giữ chân cao...");
-        await new Promise((r) => setTimeout(r, 1100));
-        setScriptText(
-          "[Hook]\nĐừng bao giờ làm video nếu bạn chưa biết bí mật giữ chân này!\n\n" +
-            scriptText.replace(/^\[Hook\]\n.*?\n\n/s, "")
+        setAiStatus("AI đang phân tích tâm lý giữ chân và tái tạo Hook 3 giây...");
+        await new Promise((r) => setTimeout(r, 900));
+        setScriptText((prev) =>
+          prev.replace(
+            /\[Hook\s*\/\/\s*00:00\s*-\s*00:03\]\n(\(Visual Cue:.*?\)\n)?.*?\n\n/s,
+            `[Hook // 00:00 - 00:03]\n(Visual Cue: Cận cảnh giật gân, nhịp cắt 0.5s dồn dập)\n${
+              brief.hookType === "fatal_mistake"
+                ? "Sai lầm chết người mà 99% mọi người đều mắc phải khi " + brief.topic.toLowerCase() + "!"
+                : "Bí mật đằng sau " + brief.topic.toLowerCase() + " mà không một chuyên gia nào muốn bạn biết!"
+            }\n\n`
+          )
         );
         setIsAiProcessing(false);
-        setAiStatus("Đã tối ưu lại Hook 3 giây đầu kích thích tò mò tột độ!");
+        setAiStatus("Đã cập nhật Hook 3 giây đầu giữ chân khán giả tột độ!");
       },
     },
     {
-      id: "ai-dramatic-tone",
-      label: "AI Đổi Giọng Điệu Kịch Tính / Điện Ảnh",
-      icon: Sparkles,
+      id: "ai-cue-gen",
+      label: "AI Tự Động Bổ Sung Visual Cue",
       onClick: async () => {
         setIsAiProcessing(true);
-        setAiStatus("AI đang biến đổi cấu trúc câu sang văn phong điều tra, gay cấn...");
-        await new Promise((r) => setTimeout(r, 1200));
+        setAiStatus("AI đang rà soát từng câu thoại để chèn góc máy Visual Cue...");
+        await new Promise((r) => setTimeout(r, 800));
         setIsAiProcessing(false);
-        setAiStatus("Đã chuyển đổi ngữ điệu kịch tính thành công!");
+        setAiStatus("Đã đồng bộ chỉ dẫn Visual Cue cho toàn bộ kịch bản!");
       },
     },
     {
       id: "ai-copy-risk",
-      label: "AI Quét Đạo Văn & Bản Quyền (100% Unique)",
-      icon: ShieldCheck,
+      label: "Quét Trùng Lặp & Bản Quyền (100% Unique)",
       onClick: async () => {
         setIsAiProcessing(true);
-        setAiStatus("AI đang đối chiếu văn bản với kho dữ liệu YouTube/TikTok...");
+        setAiStatus("AI đang quét đối chiếu tránh vi phạm bản quyền...");
         await new Promise((r) => setTimeout(r, 900));
         setIsAiProcessing(false);
-        setAiStatus("An toàn 100%: Không phát hiện câu từ trùng lặp hay vi phạm bản quyền!");
+        setAiStatus("An toàn 100%: Kịch bản độc quyền, 0% Copy-Risk!");
       },
     },
   ];
 
   return (
-    <div className="flex flex-col space-y-3 h-full min-h-0 overflow-y-auto">
-      {/* Universal AI Agent Bar for Scriptwriting */}
+    <div className="flex flex-col space-y-2.5 h-full min-h-0 font-sans">
+      {/* Top AI Agent Bar */}
       <AIAgentBar
-        tabTitle="Xây dựng Kịch bản (Scriptwriting & Storyboard)"
+        tabTitle="Xây dựng Kịch bản (Script Studio & Storyboard)"
         agentRole="Chief Storyteller & Viral Script Director"
-        promptPlaceholder="Nhập yêu cầu AI (ví dụ: 'Viết kịch bản 45s về cách AI thay đổi ngành đồ họa', 'Thêm tình tiết hài hước')..."
+        promptPlaceholder={`Yêu cầu AI viết kịch bản về: "${brief.topic}"...`}
         quickActions={quickActions}
         statusMessage={aiStatus}
         isProcessing={isAiProcessing}
         onPromptSubmit={async (prompt) => {
           setIsAiProcessing(true);
-          setAiStatus(`AI đang sinh kịch bản theo yêu cầu: "${prompt}"...`);
-          await new Promise((r) => setTimeout(r, 1400));
-          setScriptText(
-            `[Hook]\nBạn nghĩ AI sẽ cướp việc của designer? Sự thật hoàn toàn ngược lại!\n\n[Bằng chứng]\nTrong 30 ngày qua, những nhà sáng tạo kết hợp AI cùng Premiere Pro và After Effects đã tăng tốc độ sản xuất gấp 10 lần.\n\n[Cú lật Turn]\nBí quyết không nằm ở công cụ, mà ở tư duy kết hợp giữa Prompt thông minh và tay nghề chỉnh sửa thủ công.\n\n[Payoff & CTA]\nLưu ngay video này để áp dụng cho dự án tiếp theo!`
-          );
+          setAiStatus(`AI đang điều chỉnh kịch bản theo lệnh: "${prompt}"...`);
+          await new Promise((r) => setTimeout(r, 1000));
           setIsAiProcessing(false);
-          setAiStatus("Đã soạn thảo xong kịch bản mới chuẩn viral!");
+          setAiStatus("Đã tinh chỉnh kịch bản thành công!");
         }}
       />
 
-      {/* Main Grid: Editor Column + Analytics Column */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 min-h-[460px]">
-        {/* Script Editor Column */}
-        <div className="lg:col-span-2 flex flex-col space-y-3">
-          <Card className="flex-1 flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-nle-border">
-              <div>
-                <CardTitle className="text-xs font-bold text-white flex items-center">
-                  <BookOpen className="w-4 h-4 mr-1.5 text-nle-cyan" />
-                  <span>Trình soạn thảo Kịch bản (Script Studio)</span>
-                  <Badge variant="cyan" className="ml-2 text-[9px]">
-                    {wordCount} Từ • ~{estimatedSeconds}s Đọc
-                  </Badge>
-                </CardTitle>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  Phân tách các khối [Hook], [Bằng chứng], [Cú lật], [CTA] để timeline tự đồng bộ
-                </p>
-              </div>
+      {/* Top Pacing Bar: Live Duration & Speed Rate Predictor */}
+      <ScriptPacingBar
+        scriptText={scriptText}
+        targetDurationStr={brief.targetDuration}
+        targetScope={targetScope}
+        pacingConfig={pacingConfig}
+        onPacingChange={setPacingConfig}
+      />
 
-              <Button
-                variant="neon"
-                size="sm"
-                onClick={handleScoreVirality}
-                disabled={viralityMutation.isPending}
-                className="text-xs h-7"
-              >
-                {viralityMutation.isPending ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                ) : (
-                  <Flame className="w-3.5 h-3.5 mr-1.5 fill-current" />
-                )}
-                <span>Chấm điểm Virality</span>
-              </Button>
-            </CardHeader>
+      {/* Navigation Sub-Tabs & View Controller */}
+      <div className="flex items-center justify-between bg-nle-panel border border-nle-border rounded-xl px-3 py-1.5 shrink-0">
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={() => setActiveSubTab("brief")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
+              activeSubTab === "brief"
+                ? "bg-nle-cyan text-black shadow-sm font-bold"
+                : "text-gray-400 hover:text-white hover:bg-nle-surface"
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>1. Đề Bài (10 Tiêu Chí)</span>
+          </button>
 
-            <CardContent className="flex-1 p-3 flex flex-col justify-between">
-              <textarea
-                value={scriptText}
-                onChange={(e) => setScriptText(e.target.value)}
-                className="flex-1 w-full p-3 bg-nle-panel border border-nle-border rounded-lg text-xs text-gray-100 placeholder-gray-500 focus:outline-none focus:border-nle-cyan resize-none font-sans leading-relaxed"
-                rows={10}
+          <button
+            onClick={() => setActiveSubTab("editor")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
+              activeSubTab === "editor"
+                ? "bg-nle-cyan text-black shadow-sm font-bold"
+                : "text-gray-400 hover:text-white hover:bg-nle-surface"
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>2. Soạn Thảo & Visual Cues</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab("split")}
+            className={`hidden md:flex px-3 py-1.5 rounded-lg text-xs font-semibold items-center space-x-1.5 transition-colors ${
+              activeSubTab === "split"
+                ? "bg-nle-cyan text-black shadow-sm font-bold"
+                : "text-gray-400 hover:text-white hover:bg-nle-surface"
+            }`}
+          >
+            <Columns className="w-3.5 h-3.5" />
+            <span>3. Chia Đôi (Song Song)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab("virality")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
+              activeSubTab === "virality"
+                ? "bg-nle-cyan text-black shadow-sm font-bold"
+                : "text-gray-400 hover:text-white hover:bg-nle-surface"
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5" />
+            <span>4. Phân Tích & Duyệt Gate 1</span>
+            {viralityResult && (
+              <Badge variant="amber" className="text-[9px] py-0 px-1">
+                {viralityResult.score}đ
+              </Badge>
+            )}
+          </button>
+        </div>
+
+        {/* Right Chatbot Toggle Button */}
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={() => setShowRightChatbot(!showRightChatbot)}
+            title={showRightChatbot ? "Thu nhỏ AI Chatbot" : "Mở AI Chatbot"}
+            className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+              showRightChatbot
+                ? "bg-nle-surface border-nle-cyan/40 text-nle-cyan font-semibold"
+                : "bg-nle-panel border-nle-border text-gray-400 hover:text-white"
+            }`}
+          >
+            {showRightChatbot ? (
+              <>
+                <PanelRightClose className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Ẩn Chatbot</span>
+              </>
+            ) : (
+              <>
+                <PanelRightOpen className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Mở Chatbot</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MAIN TWO-COLUMN WORKSPACE: LEFT MAIN VIEW + RIGHT PERSISTENT CHATBOT */}
+      {/* ========================================================================= */}
+      <div className="flex-1 flex space-x-3 min-h-0 overflow-hidden">
+        {/* Left / Center Main Studio Area */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* TAB 1: 10 Dimensions Settings */}
+          {activeSubTab === "brief" && (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ScriptBriefSettingsPanel
+                brief={brief}
+                onBriefChange={setBrief}
+                onGenerateScript={handleGenerateFromBrief}
+                isProcessing={isAiProcessing}
               />
+            </div>
+          )}
 
-              {/* Mandatory Human Review Gate 1 Banner */}
-              <div className="mt-3 p-3 bg-nle-panel border border-nle-amber/40 rounded-lg flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="source-rights"
-                    checked={currentProject?.source_rights_confirmed || false}
-                    onChange={confirmSourceRights}
-                    className="rounded border-nle-border text-nle-cyan focus:ring-0 w-4 h-4 bg-nle-surface cursor-pointer"
-                  />
-                  <label htmlFor="source-rights" className="text-xs text-gray-300 cursor-pointer">
-                    Tôi xác nhận bản quyền nội dung nguồn tư liệu hợp pháp (Source Rights Confirmed)
-                  </label>
-                </div>
+          {/* TAB 2: Script Editor with Line Numbers */}
+          {activeSubTab === "editor" && (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ScriptEditorView
+                scriptText={scriptText}
+                onScriptTextChange={setScriptText}
+                targetScope={targetScope}
+                onTargetScopeChange={setTargetScope}
+                pacingConfig={pacingConfig}
+                sourceRightsConfirmed={currentProject?.source_rights_confirmed || false}
+                onConfirmSourceRights={confirmSourceRights}
+                onApproveGate1={handleApproveGate1}
+                isApproving={approveScriptMutation.isPending}
+                onScoreVirality={handleScoreVirality}
+                topic={brief.topic}
+                platform={brief.platform}
+                targetDuration={brief.targetDuration}
+              />
+            </div>
+          )}
 
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleApproveGate1}
-                  disabled={!currentProject?.source_rights_confirmed || approveScriptMutation.isPending}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs h-7"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                  <span>Gate 1: Duyệt kịch bản</span>
-                </Button>
+          {/* TAB 3: Split Side-by-Side View (Settings + Editor) */}
+          {activeSubTab === "split" && (
+            <div className="flex-1 grid grid-cols-2 gap-3 min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ScriptBriefSettingsPanel
+                  brief={brief}
+                  onBriefChange={setBrief}
+                  onGenerateScript={handleGenerateFromBrief}
+                  isProcessing={isAiProcessing}
+                />
               </div>
-            </CardContent>
-          </Card>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ScriptEditorView
+                  scriptText={scriptText}
+                  onScriptTextChange={setScriptText}
+                  targetScope={targetScope}
+                  onTargetScopeChange={setTargetScope}
+                  pacingConfig={pacingConfig}
+                  sourceRightsConfirmed={currentProject?.source_rights_confirmed || false}
+                  onConfirmSourceRights={confirmSourceRights}
+                  onApproveGate1={handleApproveGate1}
+                  isApproving={approveScriptMutation.isPending}
+                  onScoreVirality={handleScoreVirality}
+                  topic={brief.topic}
+                  platform={brief.platform}
+                  targetDuration={brief.targetDuration}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: Virality Analytics & Gate 1 */}
+          {activeSubTab === "virality" && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 min-h-0 overflow-y-auto">
+              <Card className="lg:col-span-2 flex flex-col min-h-0 border-nle-border bg-nle-panel">
+                <CardHeader className="py-2.5 px-3 border-b border-nle-border flex flex-row items-center justify-between">
+                  <CardTitle className="text-xs font-bold text-white flex items-center">
+                    <Flame className="w-4 h-4 text-amber-400 mr-1.5 fill-current" />
+                    <span>Báo Cáo Giữ Chân Khán Giả (Retention & Virality Score)</span>
+                  </CardTitle>
+                  <Button
+                    variant="neon"
+                    size="sm"
+                    onClick={handleScoreVirality}
+                    disabled={viralityMutation.isPending}
+                    className="text-xs h-7"
+                  >
+                    {viralityMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Quét Lại"}
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-3 flex-1 flex flex-col space-y-3 min-h-0">
+                  {viralityResult ? (
+                    <>
+                      <div className="p-4 rounded-xl bg-gradient-to-r from-nle-panel via-nle-surface to-nle-panel border border-nle-border text-center">
+                        <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-nle-cyan via-emerald-400 to-nle-violet">
+                          {viralityResult.score}/100
+                        </span>
+                        <p className="text-xs text-gray-300 font-medium mt-1">
+                          Dự đoán tỷ lệ hoàn thành video trên {brief.platform.toUpperCase()}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div className="p-2.5 rounded-lg bg-nle-surface border border-nle-border text-center">
+                          <span className="text-[10px] text-gray-400 uppercase font-mono">Hook (3s đầu)</span>
+                          <p className="text-base font-bold text-nle-cyan">{viralityResult.hook_score}%</p>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-nle-surface border border-nle-border text-center">
+                          <span className="text-[10px] text-gray-400 uppercase font-mono">Nhịp độ (Pacing)</span>
+                          <p className="text-base font-bold text-nle-violet">{viralityResult.pacing_score}%</p>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-nle-surface border border-nle-border text-center">
+                          <span className="text-[10px] text-gray-400 uppercase font-mono">Thời lượng</span>
+                          <p className="text-base font-bold text-emerald-400">{viralityResult.duration_score}%</p>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-nle-surface border border-nle-border text-center">
+                          <span className="text-[10px] text-gray-400 uppercase font-mono">Kêu gọi (CTA)</span>
+                          <p className="text-base font-bold text-amber-400">{viralityResult.cta_score}%</p>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-nle-surface border border-nle-border space-y-2">
+                        <span className="text-xs font-semibold text-white block">💡 Lời khuyên tối ưu từ Giám đốc Kịch bản AI:</span>
+                        <ul className="space-y-1.5">
+                          {viralityResult.advice.map((adv, idx) => (
+                            <li key={idx} className="text-xs text-gray-300 flex items-start">
+                              <span className="text-nle-cyan mr-2 font-bold">•</span>
+                              <span>{adv}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-400 border border-dashed border-nle-border rounded-lg">
+                      <Sparkles className="w-8 h-8 text-nle-cyan/40 mb-2" />
+                      <p className="text-xs">Bấm <strong>Chấm điểm Virality</strong> để AI phân tích toàn diện kịch bản.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Gate 1 Review Card */}
+              <Card className="flex flex-col min-h-0 border-nle-border bg-nle-panel">
+                <CardHeader className="py-2.5 px-3 border-b border-nle-border">
+                  <CardTitle className="text-xs font-bold text-white flex items-center">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 mr-1.5" />
+                    <span>Cổng Duyệt Kịch Bản (Gate 1)</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 flex-1 flex flex-col justify-between space-y-3">
+                  <div className="space-y-2 text-xs text-gray-300">
+                    <div className="p-2.5 rounded bg-nle-surface border border-nle-border space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-gray-400">Chủ đề:</span>
+                        <span className="font-semibold text-white truncate max-w-[160px]">{brief.topic}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-gray-400">Nền tảng:</span>
+                        <span className="text-amber-300 font-mono">{brief.platform.toUpperCase()}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-gray-400">Thời lượng:</span>
+                        <span className="text-nle-cyan font-mono">{brief.targetDuration}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-gray-400">Bản quyền nguồn:</span>
+                        <span className={currentProject?.source_rights_confirmed ? "text-emerald-400 font-bold" : "text-amber-400"}>
+                          {currentProject?.source_rights_confirmed ? "Đã xác nhận" : "Chưa xác nhận"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-gray-400 leading-normal">
+                      * Theo quy định bất biến của hệ thống, chỉ khi Operator duyệt Gate 1, pipeline mới được phép tiến hành tổng hợp giọng đọc và dựng video.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Button
+                      variant="default"
+                      onClick={handleApproveGate1}
+                      disabled={!currentProject?.source_rights_confirmed || approveScriptMutation.isPending}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs h-9"
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                      Phê Duyệt Kịch Bản (Pass Gate 1)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveSubTab("editor")}
+                      className="w-full text-xs border-nle-border text-gray-300 h-8"
+                    >
+                      Quay Lại Sửa Kịch Bản
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
 
-        {/* Virality Metrics Column */}
-        <div className="flex flex-col space-y-3">
-          <Card className="h-full flex flex-col">
-            <CardHeader className="py-2.5 px-3 border-b border-nle-border">
-              <CardTitle className="text-xs font-bold flex items-center text-white">
-                <Flame className="w-4 h-4 text-amber-400 mr-1.5 fill-current" />
-                <span>Phân tích Tỷ lệ Giữ chân (Virality Analytics)</span>
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="p-3 flex-1 flex flex-col space-y-3">
-              {viralityResult ? (
-                <>
-                  <div className="p-3 rounded-lg bg-nle-panel border border-nle-border text-center">
-                    <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-nle-cyan to-nle-violet">
-                      {viralityResult.score}/100
-                    </span>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Dự đoán tỷ lệ hoàn thành video</p>
-                  </div>
-
-                  {/* 4-part metrics breakdown */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="p-2 rounded bg-nle-panel border border-nle-border text-center">
-                      <span className="text-[10px] text-gray-400 uppercase">Hook (3s đầu)</span>
-                      <p className="text-sm font-bold text-nle-cyan">{viralityResult.hook_score}%</p>
-                    </div>
-                    <div className="p-2 rounded bg-nle-panel border border-nle-border text-center">
-                      <span className="text-[10px] text-gray-400 uppercase">Nhịp độ (Pacing)</span>
-                      <p className="text-sm font-bold text-nle-violet">{viralityResult.pacing_score}%</p>
-                    </div>
-                    <div className="p-2 rounded bg-nle-panel border border-nle-border text-center">
-                      <span className="text-[10px] text-gray-400 uppercase">Thời lượng (Duration)</span>
-                      <p className="text-sm font-bold text-emerald-400">{viralityResult.duration_score}%</p>
-                    </div>
-                    <div className="p-2 rounded bg-nle-panel border border-nle-border text-center">
-                      <span className="text-[10px] text-gray-400 uppercase">Kêu gọi (CTA)</span>
-                      <p className="text-sm font-bold text-amber-400">{viralityResult.cta_score}%</p>
-                    </div>
-                  </div>
-
-                  {/* Actionable Advice */}
-                  <div className="flex-1 p-2.5 rounded bg-nle-panel border border-nle-border overflow-y-auto">
-                    <span className="text-xs font-semibold text-white mb-1.5 block">💡 Gợi ý tối ưu retention:</span>
-                    <ul className="space-y-1.5">
-                      {viralityResult.advice.map((adv, idx) => (
-                        <li key={idx} className="text-xs text-gray-300 flex items-start">
-                          <span className="text-nle-cyan mr-1.5">•</span>
-                          <span>{adv}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-4 text-gray-400 border border-dashed border-nle-border rounded-lg">
-                  <Sparkles className="w-8 h-8 text-nle-cyan/40 mb-2" />
-                  <p className="text-xs">
-                    Bấm <strong>Chấm điểm Virality</strong> để AI quét retention rate, hook và nhịp độ kịch bản.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* Right Side: ALWAYS-PRESENT AI CHATBOT (SỬA TRỰC TIẾP KỊCH BẢN THEO DÒNG ĐÁNH DẤU) */}
+        {showRightChatbot && (
+          <div className="w-[360px] lg:w-[400px] shrink-0 h-full min-h-0 flex flex-col">
+            <ScriptChatbot
+              scriptText={scriptText}
+              onScriptTextChange={setScriptText}
+              targetScope={targetScope}
+              onTargetScopeChange={setTargetScope}
+              pacingConfig={pacingConfig}
+              brief={brief}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

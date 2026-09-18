@@ -13,6 +13,7 @@ This directory contains technical specifications, architecture blueprints, agent
 | [`TOOLCHAIN.md`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/docs/TOOLCHAIN.md) | **Local Media & AI Toolchain**: Recommended local utilities (`ffmpeg`, `piper`, `whisper`, `imagemagick`, `yt-dlp`), installation instructions, and fallback strategies. | English |
 | [`TOOLS-FOR-AGENTS.md`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/docs/TOOLS-FOR-AGENTS.md) | **Agent Tool Surface**: How an external agent (Claude, Codex, DeepSeek, Gemini) discovers and calls everything through `GET /tools` + `POST /tools/call`, with curl recipes. | English / Vietnamese |
 | [`SEO-SCORING.md`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/docs/SEO-SCORING.md) | **SEO Scoring & Packaging Audit**: The research-backed scoring model for YouTube/Shorts/TikTok, the verified optimiser contract, the A/B and calibration statistics, and how to score a real project. | English |
+| [`COMPUTE-RESOURCES.md`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/docs/COMPUTE-RESOURCES.md) | **Compute Resources**: How the GPU is discovered and used — multi-build NVENC unlock, measured encode/decode numbers, the admission ladder, the overload abort thresholds, and how to unlock the GPU for torch models. | English |
 
 ---
 

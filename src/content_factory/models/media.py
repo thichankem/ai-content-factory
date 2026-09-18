@@ -86,3 +86,11 @@ class ReCookResult(BaseModel):
     estimated_seconds: int
     status: str
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class MediaIngestUrlRequest(BaseModel):
+    """Request to ingest an external video or audio file by URL."""
+
+    url: str
+    language: str = "vi"
+    extract_audio: bool = False
