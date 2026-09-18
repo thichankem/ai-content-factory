@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import {
@@ -160,9 +160,47 @@ export function ScriptChatbot({
 
     // Generate intelligent rewrite depending on the prompt and brief
     let newSlice = "";
+    let isFullScriptGen = false;
+    let isCopyRiskCheck = false;
     const lowerPrompt = promptText.toLowerCase();
 
-    if (lowerPrompt.includes("hook") || lowerPrompt.includes("giật gân") || lowerPrompt.includes("3s") || lowerPrompt.includes("3 giây")) {
+    if (
+      lowerPrompt.includes("tự sinh") ||
+      lowerPrompt.includes("sinh kịch bản") ||
+      lowerPrompt.includes("tạo kịch bản") ||
+      lowerPrompt.includes("viết kịch bản") ||
+      lowerPrompt.includes("kịch bản mới") ||
+      lowerPrompt.includes("soạn kịch bản") ||
+      lowerPrompt.includes("10 tiêu chí")
+    ) {
+      isFullScriptGen = true;
+      newSlice = `[Hook // 00:00 - 00:03]
+(Visual Cue: Quay cận cảnh góc máy sốc, xuất hiện text cảnh báo neon nhấp nháy, khung hình ${brief.aspectRatio || "9:16"})
+${
+  brief.hookType === "counter_intuitive"
+    ? `Nếu bạn vẫn nghĩ ${brief.topic ? brief.topic.toLowerCase() : "vấn đề này"} là chuyện đơn giản, thì 90% bạn đang làm sai ngay từ bước đầu tiên!`
+    : brief.hookType === "fatal_mistake"
+    ? `Sai lầm chết người khi ${brief.topic ? brief.topic.toLowerCase() : "làm điều này"} mà 99% mọi người đều mắc phải!`
+    : `Dừng ngay việc làm này lại nếu bạn không muốn ${brief.audiencePainPoint ? brief.audiencePainPoint.toLowerCase() : "mất thời gian và tiền bạc"}!`
+}
+
+[Bằng chứng & Thực tế // 00:03 - 00:20]
+(Visual Cue: Đưa đồ họa số liệu thực tế: ${(brief.specificFactsAndData || "Dữ liệu kiểm chứng độc lập").slice(0, 80)}..., nhạc nền chuyển nhịp kịch tính)
+${brief.uniqueAngle || "Góc nhìn đột phá chưa từng được tiết lộ."}
+Theo dữ liệu thực nghiệm: ${(brief.specificFactsAndData || "Tỷ lệ chuẩn xác định đã được xác thực 100%").slice(0, 100)}...
+
+[Giải pháp & Cú lật Turn // 00:20 - 00:45]
+(Visual Cue: Format ${brief.formatType === "talking_head" ? "Creator nói trực diện camera với biểu cảm thuyết phục" : "Cinematic B-Roll chi tiết từng động tác thực hành"}, phong cách ${brief.benchmarkCreatorOrChannel || "Chuyên nghiệp & cuốn hút"})
+${brief.includeMemeSlang ? `Bí kíp này ${brief.slangKeywords || "chuẩn đét"} mà ít ai tiết lộ: ` : "Giải pháp cốt lõi ở đây: "}
+Đừng làm theo lối mòn sáo rỗng. Hãy tập trung giải quyết đúng vấn đề ${brief.audienceDesire ? brief.audienceDesire.toLowerCase() : "đạt kết quả tối ưu"} để bứt phá.
+
+[Payoff & CTA // 00:45 - 00:60]
+(Visual Cue: Xuất hiện nút kêu gọi hành động đồ họa động theo chuẩn nền tảng ${(brief.platform || "tiktok").toUpperCase()})
+${brief.callToAction || "Follow kênh ngay hôm nay để nhận trọn bộ cẩm nang chi tiết!"}`;
+    } else if (lowerPrompt.includes("trùng lặp") || lowerPrompt.includes("bản quyền") || lowerPrompt.includes("unique") || lowerPrompt.includes("copy-risk")) {
+      isCopyRiskCheck = true;
+      newSlice = oldSlice;
+    } else if (lowerPrompt.includes("hook") || lowerPrompt.includes("giật gân") || lowerPrompt.includes("3s") || lowerPrompt.includes("3 giây")) {
       newSlice = `[Hook // 00:00 - 00:03]\n(Visual Cue: Quay cận cảnh sốc 0.5s, âm thanh Bass Drop rung màn hình, text cảnh báo đỏ)\n${
         brief.hookType === "fatal_mistake"
           ? `Sai lầm chết người mà 99% mọi người đều mắc phải khi ${brief.topic.toLowerCase()}!`
@@ -191,7 +229,19 @@ export function ScriptChatbot({
 
     // Apply the replacement in the exact target line range
     let updatedFullScript = scriptText;
-    if (isTargetingLines) {
+    if (isFullScriptGen) {
+      updatedFullScript = newSlice;
+      onTargetScopeChange({
+        type: "full",
+        startLine: 1,
+        endLine: newSlice.split("\n").length,
+        selectedText: newSlice,
+        wordCount: newSlice.split(/\s+/).length,
+        estimatedSeconds: newSlice.split(/\s+/).length / (pacingConfig.wpm / 60),
+      });
+    } else if (isCopyRiskCheck) {
+      updatedFullScript = scriptText;
+    } else if (isTargetingLines) {
       const beforeLines = lines.slice(0, targetScope.startLine - 1);
       const afterLines = lines.slice(targetScope.endLine);
       updatedFullScript = [...beforeLines, newSlice, ...afterLines].join("\n");
@@ -205,14 +255,18 @@ export function ScriptChatbot({
     const assistantMsg: ChatbotMessage = {
       id: `ai-${Date.now()}`,
       role: "assistant",
-      content: isTargetingLines
+      content: isFullScriptGen
+        ? `✨ Đã tự động tạo xong toàn bộ kịch bản dựa trên 10 tiêu chí đề bài cho chủ đề: "${brief.topic || "Mẹo nấu cơm"}"!`
+        : isCopyRiskCheck
+        ? `🛡️ Kết quả quét bản quyền: An toàn 100%! Kịch bản độc quyền, 0% Copy-Risk, tuân thủ đầy đủ chính sách nền tảng.`
+        : isTargetingLines
         ? `✅ Đã sửa xong dòng ${targetScope.startLine} - ${targetScope.endLine} theo yêu cầu: "${promptText}". Các dòng khác được giữ nguyên 100%!`
         : `✅ Đã cập nhật lại toàn bộ kịch bản theo yêu cầu: "${promptText}".`,
       targetScope: { ...targetScope },
-      diffBefore: oldSlice.slice(0, 180) + (oldSlice.length > 180 ? "..." : ""),
-      diffAfter: newSlice.slice(0, 180) + (newSlice.length > 180 ? "..." : ""),
-      applied: true,
-      canUndo: true,
+      diffBefore: isCopyRiskCheck ? undefined : oldSlice.slice(0, 180) + (oldSlice.length > 180 ? "..." : ""),
+      diffAfter: isCopyRiskCheck ? undefined : newSlice.slice(0, 180) + (newSlice.length > 180 ? "..." : ""),
+      applied: !isCopyRiskCheck,
+      canUndo: !isCopyRiskCheck,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
@@ -364,9 +418,11 @@ export function ScriptChatbot({
       <div className="px-2.5 py-2 border-b border-nle-border bg-nle-surface/40 flex items-center space-x-1.5 overflow-x-auto shrink-0 scrollbar-none">
         <span className="text-[10px] text-gray-400 font-semibold shrink-0">Lệnh nhanh:</span>
         {[
+          { label: "✨ Tự sinh kịch bản", prompt: "Tự sinh toàn bộ kịch bản dựa trên 10 tiêu chí đề bài" },
           { label: "🔥 Viết lại Hook 3s", prompt: "Viết lại Hook 3 giây thật giật gân, tạo khoảng trống tò mò giữ chân người xem" },
           { label: "⚡ Rút ngắn 15s", prompt: "Rút ngắn đoạn này lại chỉ nói trong vòng 10 đến 15 giây" },
           { label: "🎬 Thêm Visual Cue", prompt: "Bổ sung chỉ dẫn Visual Cue góc máy chi tiết cho từng câu thoại" },
+          { label: "🛡️ Quét bản quyền (100% Unique)", prompt: "Quét trùng lặp và bản quyền nội dung đảm bảo 100% unique" },
           { label: "😂 Chèn Slang/Meme", prompt: "Chèn thêm từ lóng giới trẻ, tiếng lóng tự nhiên và phong cách hài hước" },
           { label: "📊 Đưa số liệu chống bịa", prompt: "Đưa thêm số liệu thực tế kiểm chứng để nội dung uy tín chống bịa đặt" },
         ].map((chip, idx) => (

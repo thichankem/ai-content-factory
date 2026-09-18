@@ -4,12 +4,12 @@ import React, { useState, useEffect } from "react";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { useScriptEngine } from "@/hooks/useScriptEngine";
 import { useProjects } from "@/hooks/useProjects";
-import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
-import { ScriptBriefSettings, SpeechPacingConfig, TargetScope } from "@/types/studio";
+import { ScriptBriefSettings, SpeechPacingConfig, TargetScope, SectionHistoryEntry } from "@/types/studio";
 import { ScriptPacingBar } from "@/components/script/ScriptPacingBar";
 import { ScriptChatbot } from "@/components/script/ScriptChatbot";
 import { ScriptBriefSettingsPanel, DEFAULT_BRIEF_SETTINGS } from "@/components/script/ScriptBriefSettingsPanel";
 import { ScriptEditorView } from "@/components/script/ScriptEditorView";
+import { ScriptSectionHistoryModal } from "@/components/script/ScriptSectionHistoryModal";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,10 +23,10 @@ import {
   BookOpen,
   SlidersHorizontal,
   FileText,
-  Columns,
   ShieldCheck,
-  PanelRightClose,
-  PanelRightOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  History,
 } from "lucide-react";
 
 export function ScriptStudio() {
@@ -35,7 +35,7 @@ export function ScriptStudio() {
   const { approveScriptMutation, saveScriptMutation } = useProjects();
 
   // Navigation mode for the main work area
-  const [activeSubTab, setActiveSubTab] = useState<"brief" | "editor" | "split" | "virality">("brief");
+  const [activeSubTab, setActiveSubTab] = useState<"brief" | "editor" | "virality">("brief");
 
   // Briefing 10 dimensions state
   const [brief, setBrief] = useState<ScriptBriefSettings>(DEFAULT_BRIEF_SETTINGS);
@@ -81,7 +81,48 @@ export function ScriptStudio() {
   const [viralityResult, setViralityResult] = useState<ViralityResult | null>(null);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
-  const [showRightChatbot, setShowRightChatbot] = useState(true);
+  const [showChatbot, setShowChatbot] = useState(true);
+
+  // Section History Tracking State
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyEntries, setHistoryEntries] = useState<SectionHistoryEntry[]>([
+    {
+      id: "h-init",
+      sectionKey: "full",
+      sectionLabel: "Toàn văn kịch bản",
+      version: 1,
+      text: currentProject?.script_document?.raw_script || "Bản thảo khởi tạo ban đầu",
+      summary: "Khởi tạo kịch bản dự án",
+      wordCount: (currentProject?.script_document?.raw_script || "").split(/\s+/).filter(Boolean).length,
+      estimatedSeconds: (currentProject?.script_document?.raw_script || "").split(/\s+/).filter(Boolean).length / (160 / 60),
+      author: "ai",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    },
+  ]);
+
+  const handleSaveManualSnapshot = (note: string, sectionKey: string) => {
+    setHistoryEntries((prev) => [
+      {
+        id: `h-${Date.now()}`,
+        sectionKey: sectionKey || "full",
+        sectionLabel: sectionKey === "full" ? "Toàn văn kịch bản" : `Phân đoạn [${sectionKey}]`,
+        version: prev.length + 1,
+        text: scriptText,
+        summary: note || "Snapshot thủ công bởi Operator",
+        wordCount: scriptText.split(/\s+/).filter(Boolean).length,
+        estimatedSeconds: scriptText.split(/\s+/).filter(Boolean).length / (pacingConfig.wpm / 60),
+        author: "snapshot",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      },
+      ...prev,
+    ]);
+  };
+
+  const handleRestoreHistoryEntry = (entry: SectionHistoryEntry) => {
+    setScriptText(entry.text);
+    setGateStatus(`Đã khôi phục kịch bản về phiên bản #${entry.version} (${entry.summary})`);
+    setIsHistoryOpen(false);
+  };
 
   // Generate complete script from the 10 briefing dimensions
   const handleGenerateFromBrief = async () => {
@@ -116,6 +157,21 @@ ${brief.includeMemeSlang ? `Bí kíp này ${brief.slangKeywords || "chuẩn đé
 ${brief.callToAction}`;
 
     setScriptText(generatedScript);
+    setHistoryEntries((prev) => [
+      {
+        id: `h-${Date.now()}`,
+        sectionKey: "full",
+        sectionLabel: "Toàn văn kịch bản (10 Tiêu chí)",
+        version: prev.length + 1,
+        text: generatedScript,
+        summary: `Tự sinh kịch bản từ 10 tiêu chí cho "${brief.topic}"`,
+        wordCount: generatedScript.split(/\s+/).filter(Boolean).length,
+        estimatedSeconds: generatedScript.split(/\s+/).filter(Boolean).length / (pacingConfig.wpm / 60),
+        author: "ai",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      },
+      ...prev,
+    ]);
     setIsAiProcessing(false);
     setAiStatus(`Đã tạo xong kịch bản chuẩn cho nền tảng ${brief.platform.toUpperCase()} (${brief.targetDuration})!`);
     setActiveSubTab("editor");
@@ -197,72 +253,8 @@ ${brief.callToAction}`;
     }
   };
 
-  // Quick actions on top AI Agent Bar
-  const quickActions: AIQuickAction[] = [
-    {
-      id: "ai-hook-gen",
-      label: "AI Tối Ưu Lại Hook 3s",
-      icon: Flame,
-      onClick: async () => {
-        setIsAiProcessing(true);
-        setAiStatus("AI đang phân tích tâm lý giữ chân và tái tạo Hook 3 giây...");
-        await new Promise((r) => setTimeout(r, 900));
-        setScriptText((prev) =>
-          prev.replace(
-            /\[Hook\s*\/\/\s*00:00\s*-\s*00:03\]\n(\(Visual Cue:.*?\)\n)?.*?\n\n/s,
-            `[Hook // 00:00 - 00:03]\n(Visual Cue: Cận cảnh giật gân, nhịp cắt 0.5s dồn dập)\n${
-              brief.hookType === "fatal_mistake"
-                ? "Sai lầm chết người mà 99% mọi người đều mắc phải khi " + brief.topic.toLowerCase() + "!"
-                : "Bí mật đằng sau " + brief.topic.toLowerCase() + " mà không một chuyên gia nào muốn bạn biết!"
-            }\n\n`
-          )
-        );
-        setIsAiProcessing(false);
-        setAiStatus("Đã cập nhật Hook 3 giây đầu giữ chân khán giả tột độ!");
-      },
-    },
-    {
-      id: "ai-cue-gen",
-      label: "AI Tự Động Bổ Sung Visual Cue",
-      onClick: async () => {
-        setIsAiProcessing(true);
-        setAiStatus("AI đang rà soát từng câu thoại để chèn góc máy Visual Cue...");
-        await new Promise((r) => setTimeout(r, 800));
-        setIsAiProcessing(false);
-        setAiStatus("Đã đồng bộ chỉ dẫn Visual Cue cho toàn bộ kịch bản!");
-      },
-    },
-    {
-      id: "ai-copy-risk",
-      label: "Quét Trùng Lặp & Bản Quyền (100% Unique)",
-      onClick: async () => {
-        setIsAiProcessing(true);
-        setAiStatus("AI đang quét đối chiếu tránh vi phạm bản quyền...");
-        await new Promise((r) => setTimeout(r, 900));
-        setIsAiProcessing(false);
-        setAiStatus("An toàn 100%: Kịch bản độc quyền, 0% Copy-Risk!");
-      },
-    },
-  ];
-
   return (
     <div className="flex flex-col space-y-2.5 h-full min-h-0 font-sans">
-      {/* Top AI Agent Bar */}
-      <AIAgentBar
-        tabTitle="Xây dựng Kịch bản (Script Studio & Storyboard)"
-        agentRole="Chief Storyteller & Viral Script Director"
-        promptPlaceholder={`Yêu cầu AI viết kịch bản về: "${brief.topic}"...`}
-        quickActions={quickActions}
-        statusMessage={aiStatus}
-        isProcessing={isAiProcessing}
-        onPromptSubmit={async (prompt) => {
-          setIsAiProcessing(true);
-          setAiStatus(`AI đang điều chỉnh kịch bản theo lệnh: "${prompt}"...`);
-          await new Promise((r) => setTimeout(r, 1000));
-          setIsAiProcessing(false);
-          setAiStatus("Đã tinh chỉnh kịch bản thành công!");
-        }}
-      />
 
       {/* Top Pacing Bar: Live Duration & Speed Rate Predictor */}
       <ScriptPacingBar

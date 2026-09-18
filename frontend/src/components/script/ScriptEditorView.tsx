@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import { SpeechPacingConfig, TargetScope } from "@/types/studio";
@@ -20,6 +20,7 @@ import {
   Layers,
   Save,
   Loader2,
+  History,
 } from "lucide-react";
 
 interface StoryboardScene {
@@ -44,6 +45,8 @@ interface ScriptEditorViewProps {
   onApproveGate1: () => void;
   isApproving?: boolean;
   onScoreVirality?: () => void;
+  onOpenHistory?: () => void;
+  historyCount?: number;
   topic: string;
   platform: string;
   targetDuration: string;
@@ -62,6 +65,8 @@ export function ScriptEditorView({
   onApproveGate1,
   isApproving = false,
   onScoreVirality,
+  onOpenHistory,
+  historyCount,
   topic,
   platform,
   targetDuration,
@@ -205,7 +210,7 @@ export function ScriptEditorView({
             </Badge>
           </CardTitle>
           <p className="text-[11px] text-gray-400 mt-0.5 truncate">
-            Bôi đen văn bản hoặc click số dòng để AI Copilot bên phải chỉnh sửa đúng phạm vi đó
+            Bôi đen văn bản hoặc click số dòng để AI Copilot chỉnh sửa đúng phạm vi đó
           </p>
         </div>
 
@@ -226,9 +231,22 @@ export function ScriptEditorView({
                 viewMode === "storyboard" ? "bg-nle-panel text-nle-cyan font-bold shadow-sm" : "text-gray-400 hover:text-white"
               }`}
             >
-              Phân cảnh 2 cột (Storyboard)
+              Thẻ phân cảnh (Storyboard Feed)
             </button>
           </div>
+
+          {onOpenHistory && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenHistory}
+              className="text-[11px] border-nle-border text-amber-300 hover:text-white h-7 px-2"
+              title="Xem lịch sử các phiên bản từng phân đoạn"
+            >
+              <History className="w-3.5 h-3.5 mr-1 text-amber-400" />
+              Lịch sử {historyCount !== undefined && historyCount > 0 ? `(${historyCount})` : ""}
+            </Button>
+          )}
 
           <Button
             variant="outline"
@@ -302,33 +320,45 @@ export function ScriptEditorView({
             />
           </div>
         ) : (
-          /* Two-Column Storyboard View */
-          <div className="flex-1 overflow-y-auto border border-nle-border rounded-lg bg-nle-panel divide-y divide-nle-border">
-            <div className="grid grid-cols-12 gap-2 p-2.5 bg-nle-surface text-[10px] font-mono uppercase text-gray-400 font-bold sticky top-0 z-10 border-b border-nle-border">
-              <div className="col-span-1 text-center">Scene</div>
-              <div className="col-span-2">Thời gian / Phần</div>
-              <div className="col-span-5">🎙️ Lời thoại Voiceover (TTS)</div>
-              <div className="col-span-4">🎬 Chỉ dẫn Hình ảnh Visual Cue</div>
-            </div>
+          /* Single-Column Storyboard Feed View */
+          <div className="flex-1 overflow-y-auto border border-nle-border rounded-lg bg-nle-panel p-3 space-y-3">
             {storyboardScenes.map((sc, idx) => (
               <div
                 key={sc.id}
-                className="grid grid-cols-12 gap-2 p-2.5 text-xs hover:bg-nle-surface/50 transition-colors"
+                className="p-3.5 rounded-lg border border-nle-border bg-nle-surface/80 hover:border-nle-cyan/40 transition-colors space-y-2.5 shadow-sm"
               >
-                <div className="col-span-1 text-center font-mono font-bold text-nle-cyan">
-                  #{idx + 1}
+                <div className="flex items-center justify-between border-b border-nle-border/60 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-mono font-bold text-black bg-nle-cyan px-2 py-0.5 rounded">
+                      Cảnh #{idx + 1}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] text-amber-300 border-amber-500/30">
+                      {sc.section}
+                    </Badge>
+                  </div>
+                  <span className="text-[10px] font-mono text-gray-400">
+                    ⏱️ {sc.timeRange}
+                  </span>
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <Badge variant="outline" className="text-[10px] text-amber-300 border-amber-500/30">
-                    {sc.section}
-                  </Badge>
-                  <div className="text-[10px] font-mono text-gray-400">{sc.timeRange}</div>
-                </div>
-                <div className="col-span-5 text-gray-100 font-sans leading-relaxed">
-                  {sc.voiceover}
-                </div>
-                <div className="col-span-4 text-emerald-300/90 text-[11px] bg-nle-surface/60 p-2 rounded border border-emerald-500/20 font-sans italic">
-                  {sc.visualCue}
+
+                <div className="space-y-2 text-xs">
+                  <div className="p-2.5 rounded bg-nle-panel border border-nle-border/80 space-y-1">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center">
+                      🎙️ Lời thoại Voiceover (TTS)
+                    </span>
+                    <p className="text-gray-100 font-sans leading-relaxed text-[12px]">
+                      {sc.voiceover || <span className="text-gray-500 italic">(Chưa có lời thoại)</span>}
+                    </p>
+                  </div>
+
+                  <div className="p-2.5 rounded bg-emerald-950/20 border border-emerald-500/30 space-y-1">
+                    <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wide flex items-center">
+                      🎬 Chỉ dẫn Hình ảnh Visual Cue
+                    </span>
+                    <p className="text-emerald-300 text-[11px] font-sans italic">
+                      {sc.visualCue || <span className="text-emerald-600/70 italic">(Chưa có chỉ dẫn khung hình)</span>}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
