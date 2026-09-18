@@ -9,7 +9,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { mediaApi } from "@/lib/api";
+import { libraryApi, mediaApi } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { DedupResult, MediaItem, MediaSearchHit } from "@/types/media";
 import { LibraryResponse } from "@/types/library";
@@ -36,7 +36,7 @@ export function useMediaSearch(query: string, topK = 10) {
 export function useMediaLibrary() {
   const libraryQuery = useQuery<LibraryResponse>({
     queryKey: queryKeys.library,
-    queryFn: () => mediaApi.listMedia().then(() => mediaApiLibrary()),
+    queryFn: () => libraryApi.getLibrary(),
   });
 
   const dedupMutation = useMutation<DedupResult, Error>({
