@@ -14,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { projectsApi, timelineApi } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import { syncProject } from "@/lib/projectSync";
+import { invalidateTimeline, syncProject } from "@/lib/projectSync";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { ProjectCreate } from "@/types/project";
 
@@ -103,8 +103,9 @@ export function useProjects() {
   /**
    * Publish to the approved platforms.
    *
-   * ``platforms`` is the backend's field name (not ``destinations``). Omitting it
-   * — the default — lets the backend publish to the project's default platform.
+   * ``platforms`` is required by the payload — the backend's field is
+   * ``platforms`` (not ``destinations``), and omitting it publishes to the
+   * default platform only.
    */
   const publishMutation = useMutation({
     mutationFn: ({
@@ -112,12 +113,8 @@ export function useProjects() {
       platforms,
     }: {
       projectId: string;
-      platforms?: string[];
-    }) =>
-      projectsApi.publishProject(
-        projectId,
-        platforms && platforms.length > 0 ? { platforms } : {}
-      ),
+      platforms: string[];
+    }) => projectsApi.publishProject(projectId, { platforms }),
     onSuccess: (project) => syncProject(queryClient, project),
   });
 
@@ -131,10 +128,17 @@ export function useProjects() {
     onSuccess: (project) => syncProject(queryClient, project),
   });
 
-  /** Fit, beat-sync and re-time the timeline through the AI-assist block. */
+  /**
+   * Auto-edit the timeline: fit the script to the target duration, snap cuts to
+   * the beat and re-time the captions. The endpoint lives under the video project
+   * because it edits the timeline, but it returns the whole project.
+   */
   const aiAssistMutation = useMutation({
     mutationFn: (projectId: string) => timelineApi.aiAssist(projectId),
-    onSuccess: (project) => syncProject(queryClient, project),
+    onSuccess: (project) => {
+      syncProject(queryClient, project);
+      invalidateTimeline(queryClient, project.id);
+    },
   });
 
   return {

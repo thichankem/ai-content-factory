@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { SpeechPacingConfig, TargetScope } from "@/types/script";
+import { SpeechPacingConfig, TargetScope } from "@/types/studio";
 import { Badge } from "@/components/ui/badge";
 import {
   Clock,

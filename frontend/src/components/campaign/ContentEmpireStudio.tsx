@@ -160,8 +160,12 @@ Nhưng đây là nghịch lý: chính công cụ đang phân tán sự chú ý c
     try {
       await generateCampaignMutation.mutateAsync({});
       setAiStatus("✅ Đã tái lập thành công chiến dịch 5 Shorts và 15 Prompts!");
-    } catch {
-      setAiStatus("Đã làm mới chiến dịch đa kênh với 5 góc nhìn viral!");
+    } catch (error) {
+      // The catch block used to announce a fresh campaign, so a failure looked
+      // like a successful regeneration.
+      setAiStatus(
+        `Tạo lại chiến dịch thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
     } finally {
       setIsAiProcessing(false);
     }
@@ -604,16 +608,18 @@ Nhưng đây là nghịch lý: chính công cụ đang phân tán sự chú ý c
           </div>
 
           <div className="flex space-x-1 overflow-x-auto">
-            {[
-              { id: "kling", label: "🎬 Kling / Veo", color: "text-rose-400" },
-              { id: "mj", label: "🖼️ Midjourney / Thumb", color: "text-sky-400" },
-              { id: "suno", label: "🎵 Suno Nhạc Nền", color: "text-amber-400" },
-              { id: "eleven", label: "🎙️ ElevenLabs Voice", color: "text-emerald-400" },
-              { id: "factcheck", label: "🔍 Fact-Check Dossier", color: "text-nle-cyan" },
-            ].map((tab) => (
+            {(
+              [
+                { id: "kling", label: "🎬 Kling / Veo", color: "text-rose-400" },
+                { id: "mj", label: "🖼️ Midjourney / Thumb", color: "text-sky-400" },
+                { id: "suno", label: "🎵 Suno Nhạc Nền", color: "text-amber-400" },
+                { id: "eleven", label: "🎙️ ElevenLabs Voice", color: "text-emerald-400" },
+                { id: "factcheck", label: "🔍 Fact-Check Dossier", color: "text-nle-cyan" },
+              ] as const
+            ).map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActivePromptTab(tab.id as any)}
+                onClick={() => setActivePromptTab(tab.id)}
                 className={`px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap transition-colors ${
                   activePromptTab === tab.id
                     ? "bg-nle-panel text-white border border-nle-cyan/50"

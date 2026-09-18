@@ -4,9 +4,21 @@ Everything in the scripting stage is driven by a **style preset**: tone, section
 structure, hook rules, sentence budget, call to action, banned phrases, and the
 speech rate used for duration estimates.
 
-Five presets ship with the package (`viral-short`, `documentary`,
-`educational`, `story`, `product-review`). This directory is where **you**
-override them or add your own.
+Five presets ship inside the package (`viral-short`, `documentary`,
+`educational`, `story`, `product-review` — see `BUILTIN_STYLES` in
+[`../src/content_factory/presets.py`](../src/content_factory/presets.py)). This
+directory is where **you** override one of them or add your own.
+
+What ships here today are five **additions** for this project's subject matter,
+none of which shadows a built-in:
+
+| File | Built for |
+| :--- | :--- |
+| `disaster-retelling.json` | Retelling a disaster with restraint and sourced numbers |
+| `historical-documentary.json` | Measured long-form historical narration |
+| `mystery-investigation.json` | Open-question investigation pacing |
+| `on-this-day.json` | The “Ngày này năm xưa” calendar format |
+| `vietnamese-short.json` | Vietnamese vertical short: short sentences, colloquial, hook in the first six words |
 
 ## How loading works
 
@@ -66,6 +78,21 @@ cta: Save this.
 ## Speech rate overrides
 - vi: 2.9
 ```
+
+## Verified behaviour
+
+Checked against `StyleCatalog.reload()` in
+[`../src/content_factory/presets.py`](../src/content_factory/presets.py) and the
+fixtures in [`../tests/test_presets.py`](../tests/test_presets.py):
+
+- Built-ins are loaded first, then every file in the directory **overrides by
+  slug**, iterated in sorted filename order — so of two files sharing a slug, the
+  later filename wins (`test_saved_preset_overrides_builtin`).
+- Recognised extensions are `.json`, `.md` and `.markdown`.
+- A malformed file is skipped with a `logger.warning`, never fatal
+  (`test_invalid_files_are_ignored`).
+- Built-in presets cannot be deleted through the API; user presets can
+  (`test_builtin_presets_cannot_be_deleted`, `test_user_preset_can_be_deleted`).
 
 ## Score reference
 

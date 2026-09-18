@@ -87,6 +87,27 @@ export interface DedupRequest {
   media_ids?: string[];
 }
 
+/**
+ * One card in the media bin.
+ *
+ * A view model, not a contract: the bin mixes library items (which have a
+ * `MediaItem` behind them), client-built slide decks (which have nothing on the
+ * server yet) and nothing else. Keeping the display fields in one shape is what
+ * lets the grid render one list instead of branching per source — and it is why
+ * `MediaItem` is mapped into it rather than being rendered directly.
+ */
+export interface MediaBinRow {
+  id: string;
+  name: string;
+  type: "video" | "audio" | "image" | "document" | "slide" | "other";
+  /** Human-readable size, or a note that it was not measured. */
+  size: string;
+  /** Human-readable duration, or a note that it was not measured. */
+  duration: string;
+  /** Where it came from; for a library item this is the backend's `source`. */
+  source: string;
+}
+
 /** Result of a duplicate sweep. */
 export interface DedupResult {
   groups: string[][];

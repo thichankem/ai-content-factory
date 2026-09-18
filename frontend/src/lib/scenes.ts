@@ -1,17 +1,15 @@
 /**
- * Building scenes and video projects on the client.
+ * Building a valid `VideoScene` from the few values a screen actually knows.
  *
- * The backend serialises *every* field of a :interface:`VideoScene`, and it
- * validates the ones it receives, so a scene the studio invents for itself has to
- * carry the full set — the screens used to build a four-key object
- * (``index``/``label``/``duration``/``text``) and the save was rejected. The
- * factories here hold the defaults in one place, so a screen describes only the
- * parts it actually decides and every locally-built scene round-trips.
+ * `VideoScene` mirrors the backend model and carries around thirty fields with
+ * defaults (speed, transitions, text styling, keyframes, trim points, audio
+ * ramps). Screens that assemble a scene locally — the auto-assemble action, a
+ * slide deck, a re-cooked script — only have a label, a duration and some text,
+ * and hand-writing the other two dozen fields in every one of them is how those
+ * screens drifted out of the contract in the first place.
  *
- * The defaults mirror ``models/timeline.py``: ``score``-bearing fields stay inside
- * their documented ranges (``font_size``/``pitch``/``volume``), and the editor's
- * names (``duration``, ``asset_url``) are stamped beside the canonical ones the
- * way the backend's ``_sync_editor_names`` validator does.
+ * `makeScene` fills the defaults in one place. The backend re-normalises whatever
+ * it receives, so these values are a starting point, not an authority.
  */
 
 import {
@@ -24,66 +22,63 @@ import {
   TextPosition,
   TextStyle,
   VideoFilter,
-  VideoProject,
   VideoScene,
   VideoTransition,
 } from "@/types/timeline";
 
-/** What a caller may decide about a new scene; everything else is defaulted. */
-export interface SceneDraft {
-  id?: string;
-  label?: string;
+/** The values a screen has when it creates a scene by hand. */
+export interface SceneSeed {
+  /** Position in the timeline. */
+  index: number;
+  label: string;
+  /** Duration in seconds. */
+  duration: number;
   text?: string;
-  /** Duration in seconds; ``duration`` is the editor's name for it. */
-  duration?: number;
+  /** A URL for the visual — image or video. */
+  assetUrl?: string | null;
   filter?: VideoFilter;
   grade?: ColorGrade;
   transition?: VideoTransition;
-  effect?: SceneEffect;
   background?: string;
-  image_url?: string | null;
-  video_url?: string | null;
-  narration?: string | null;
 }
 
 /**
- * Build a complete :interface:`VideoScene` at ``index``.
+ * Create a normalised scene.
  *
- * ``index`` is passed in rather than defaulted because only the caller knows the
- * position; the backend re-stamps it on save, but the local timeline renders it
- * before that happens.
+ * `duration` is clamped away from zero: a zero-length scene divides badly in the
+ * render-plan compiler and in the timeline percentage maths.
  */
-export function createScene(index: number, draft: SceneDraft = {}): VideoScene {
-  const duration = draft.duration ?? 5;
+export function makeScene(seed: SceneSeed): VideoScene {
+  const duration = seed.duration > 0 ? seed.duration : 1;
   return {
-    id: draft.id ?? `scene-${index + 1}-${Date.now()}`,
-    index,
-    label: draft.label ?? `Scene ${index + 1}`,
-    text: draft.text ?? "",
-    narration: draft.narration ?? null,
+    id: `scene-${seed.index}-${Math.random().toString(36).slice(2, 8)}`,
+    index: seed.index,
+    label: seed.label,
+    text: seed.text ?? "",
+    narration: null,
     duration_seconds: duration,
     duration,
     speed: 1,
-    background: draft.background ?? "#000000",
-    image_url: draft.image_url ?? null,
-    video_url: draft.video_url ?? null,
-    asset_url: draft.image_url ?? draft.video_url ?? null,
-    asset_type: draft.video_url ? "video" : draft.image_url ? "image" : null,
+    background: seed.background ?? "#090a0f",
+    image_url: seed.assetUrl ?? null,
+    video_url: null,
+    asset_url: seed.assetUrl ?? null,
+    asset_type: null,
     source_attribution: null,
-    transition: draft.transition ?? "fade",
-    text_position: "center" satisfies TextPosition,
+    transition: seed.transition ?? "cut",
+    text_position: "center" as TextPosition,
     text_color: "#ffffff",
     font_size: 48,
-    text_style: "normal" satisfies TextStyle,
-    filter: draft.filter ?? "none",
-    ken_burns: "none" satisfies KenBurns,
-    entrance: "fade" satisfies EntranceEffect,
-    exit: "none" satisfies ExitEffect,
+    text_style: "normal" as TextStyle,
+    filter: seed.filter ?? ("none" as VideoFilter),
+    ken_burns: "none" as KenBurns,
+    entrance: "fade" as EntranceEffect,
+    exit: "none" as ExitEffect,
     motion: null,
-    effect: draft.effect ?? "none",
-    grade: draft.grade ?? "none",
+    effect: "none" as SceneEffect,
+    grade: seed.grade ?? ("none" as ColorGrade),
     overlay_emoji: null,
-    overlay_pos: "top-right" satisfies OverlayPosition,
+    overlay_pos: "center" as OverlayPosition,
     overlay_size: 48,
     pitch: 1,
     keyframes: [],
@@ -96,29 +91,7 @@ export function createScene(index: number, draft: SceneDraft = {}): VideoScene {
   };
 }
 
-/** Build a complete :interface:`VideoProject` around a list of scenes. */
-export function createVideoProject(
-  scenes: VideoScene[],
-  overrides: Partial<VideoProject> = {}
-): VideoProject {
-  const musicVolume = overrides.music_volume ?? 0;
-  return {
-    scenes,
-    aspect_ratio: overrides.aspect_ratio ?? "9:16",
-    fps: overrides.fps ?? 30,
-    captions: overrides.captions ?? true,
-    background_music: overrides.background_music ?? false,
-    background_music_url: overrides.background_music_url ?? null,
-    music_volume: musicVolume,
-    bgm_volume: overrides.bgm_volume ?? musicVolume,
-    voiceover_volume: overrides.voiceover_volume ?? 1,
-    export_quality: overrides.export_quality ?? "high",
-    bpm: overrides.bpm ?? 120,
-    markers: overrides.markers ?? [],
-    revision: overrides.revision ?? 1,
-    updated_at: overrides.updated_at ?? new Date().toISOString(),
-    target_duration_seconds:
-      overrides.target_duration_seconds ??
-      Math.round(scenes.reduce((total, scene) => total + scene.duration_seconds, 0) * 100) / 100,
-  };
+/** Build a whole timeline from seeds, numbering the scenes from zero. */
+export function makeScenes(seeds: Omit<SceneSeed, "index">[]): VideoScene[] {
+  return seeds.map((seed, index) => makeScene({ ...seed, index }));
 }

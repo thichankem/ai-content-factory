@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useTimelineStore } from "@/stores/useTimelineStore";
-import { createScene } from "@/lib/scenes";
+import { makeScene } from "@/lib/scenes";
+import { MediaBinRow } from "@/types/media";
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 import {
   Code,
   Eye,
@@ -174,7 +181,14 @@ body, html { width: 100%; height: 100%; background: #050811; display: flex; alig
 ];
 
 interface HtmlSlideDeckStudioProps {
-  onAddSlideToMedia?: (slideAsset: any) => void;
+  /**
+   * The bin row for a slide that has just been laid onto the timeline.
+   *
+   * Typed as :interface:`MediaBinRow` — same shape the bin renders for library
+   * items — so the media bin can hold a client-built slide and a server-side
+   * `MediaItem` in one list.
+   */
+  onAddSlideToMedia?: (slideAsset: MediaBinRow) => void;
 }
 
 export function HtmlSlideDeckStudio({ onAddSlideToMedia }: HtmlSlideDeckStudioProps) {
@@ -196,12 +210,11 @@ export function HtmlSlideDeckStudio({ onAddSlideToMedia }: HtmlSlideDeckStudioPr
   };
 
   const handleInsertIntoTimeline = () => {
-    const newSceneIndex = scenes.length;
-    const newScene = createScene(newSceneIndex, {
+    const newScene = makeScene({
+      index: scenes.length,
       label: `Slide: ${selectedTemplate.name}`,
       duration: slideDuration,
       text: `HTML Slide [${selectedTemplate.category.toUpperCase()}]`,
-      filter: "none",
     });
 
     setScenes([...scenes, newScene]);
@@ -211,9 +224,11 @@ export function HtmlSlideDeckStudio({ onAddSlideToMedia }: HtmlSlideDeckStudioPr
         id: `slide-${Date.now()}`,
         name: `slide_${selectedTemplate.id}.html`,
         type: "slide",
-        size: "12 KB",
+        // Measured from the document actually built, not a placeholder: this used
+        // to claim "12 KB" for every slide.
+        size: formatBytes(new Blob([`${htmlCode}${cssCode}`]).size),
         duration: `${slideDuration}s`,
-        source: "HTML/CSS Deck Studio",
+        source: "HTML/CSS Deck Studio (cục bộ)",
       });
     }
 

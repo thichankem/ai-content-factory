@@ -1,24 +1,18 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useProjectStore } from "../../stores/useProjectStore";
-import { useScriptEngine } from "../../hooks/useScriptEngine";
-import { useProjects } from "../../hooks/useProjects";
-import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
-import {
-  ScriptBriefSettings,
-  TargetScope,
-  SpeechPacingConfig,
-  SectionHistoryEntry,
-} from "../../types/script";
-import { ScriptPacingBar } from "./ScriptPacingBar";
-import { ScriptChatbot } from "./ScriptChatbot";
-import { ScriptBriefSettingsPanel, DEFAULT_BRIEF_SETTINGS } from "./ScriptBriefSettingsPanel";
-import { ScriptEditorView } from "./ScriptEditorView";
-import { ScriptSectionHistoryModal } from "./ScriptSectionHistoryModal";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
+import { useProjectStore } from "@/stores/useProjectStore";
+import { useScriptEngine } from "@/hooks/useScriptEngine";
+import { useProjects } from "@/hooks/useProjects";
+import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
+import { ScriptBriefSettings, SpeechPacingConfig, TargetScope } from "@/types/studio";
+import { ScriptPacingBar } from "@/components/script/ScriptPacingBar";
+import { ScriptChatbot } from "@/components/script/ScriptChatbot";
+import { ScriptBriefSettingsPanel, DEFAULT_BRIEF_SETTINGS } from "@/components/script/ScriptBriefSettingsPanel";
+import { ScriptEditorView } from "@/components/script/ScriptEditorView";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ViralityResult } from "@/types/qa";
 import {
   Flame,
@@ -33,25 +27,32 @@ import {
   ShieldCheck,
   PanelRightClose,
   PanelRightOpen,
-  History,
 } from "lucide-react";
 
 export function ScriptStudio() {
-  const { currentProject, confirmSourceRights } = useProjectStore();
+  const { currentProject } = useProjectStore();
   const { viralityMutation } = useScriptEngine(currentProject?.id);
-  const { approveScriptMutation } = useProjects();
+  const { approveScriptMutation, saveScriptMutation } = useProjects();
 
-  // Navigation mode for the main work area: 1-column sequential workflow
-  const [activeSubTab, setActiveSubTab] = useState<"brief" | "editor" | "virality">("brief");
+  // Navigation mode for the main work area
+  const [activeSubTab, setActiveSubTab] = useState<"brief" | "editor" | "split" | "virality">("brief");
 
   // Briefing 10 dimensions state
   const [brief, setBrief] = useState<ScriptBriefSettings>(DEFAULT_BRIEF_SETTINGS);
 
-  // Script text state
+  /*
+   * The editor opens on the project's saved script, and on nothing at all when
+   * there is none. It used to open on a ~1,100-character "cơm trắng" demo script
+   * hardcoded in this file, which read as the project's own narration before
+   * anything had been drafted — and which the operator could then approve.
+   */
   const [scriptText, setScriptText] = useState(
-    currentProject?.script_document?.raw_script ||
-      `[Hook // 00:00 - 00:03]\n(Visual Cue: Quay cận cảnh thìa cơm trắng dẻo bóng bẩy, khói nghi ngút bốc lên chậm rãi)\nĐừng bao giờ dùng ngón tay đo nước khi nấu cơm nữa, nếu bạn không muốn cả nồi cơm biến thành cháo dính!\n\n[Bằng chứng // 00:03 - 00:20]\n(Visual Cue: Chèn hình minh họa bàn tay ngập trong nồi cơm có dấu gạch chéo đỏ, chuyển cảnh sang chiếc cân điện tử mini)\nNgón tay mỗi người dài ngắn khác nhau, đáy nồi lại có độ cong vát khác nhau. Công thức chuẩn của các đầu bếp Nhật là tỷ lệ nước 1:1.15 theo khối lượng.\n\n[Cú lật Turn // 00:20 - 00:45]\n(Visual Cue: Quay cảnh nhỏ 1 giọt dầu mè nguyên chất vào nồi trước khi bấm nút Cook, hạt cơm tơi xốp tách rời)\nVà đây là bí quyết ít ai chỉ cho bạn: Hãy nhỏ đúng một giọt dầu mè và ngâm 10 phút trước khi bật nồi. Lớp màng lipid tự nhiên sẽ bọc từng hạt tinh bột, giúp cơm nở đều mà không hề bị nát hay dính đáy.\n\n[Payoff & CTA // 00:45 - 00:60]\n(Visual Cue: Người cầm bát cơm nóng hổi ăn thử biểu cảm gật gù hài lòng, icon thả tim và lưu video nhấp nháy)\nThử ngay bữa tối nay xem cơm nhà bạn có ngon hơn hẳn ngoài quán không nhé! Thả tim và lưu lại kẻo lúc nấu lại quên mất công thức!`
+    currentProject?.script_document?.raw_script ?? ""
   );
+
+  /** Result of the last save / approval, and the last failure. */
+  const [gateStatus, setGateStatus] = useState<string | null>(null);
+  const [gateError, setGateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentProject?.script_document?.raw_script) {
@@ -76,147 +77,16 @@ export function ScriptStudio() {
     estimatedSeconds: 0,
   });
 
-  // Section History Tracking State
-  const [historyEntries, setHistoryEntries] = useState<SectionHistoryEntry[]>([
-    {
-      id: "hist-init-hook",
-      sectionKey: "hook",
-      sectionLabel: "[Hook 3s]",
-      version: 1,
-      text: `[Hook // 00:00 - 00:03]\n(Visual Cue: Quay cận cảnh thìa cơm trắng dẻo bóng bẩy, khói nghi ngút bốc lên chậm rãi)\nĐừng bao giờ dùng ngón tay đo nước khi nấu cơm nữa, nếu bạn không muốn cả nồi cơm biến thành cháo dính!`,
-      summary: "Bản gốc khởi tạo từ 10 tiêu chí đề bài",
-      wordCount: 28,
-      estimatedSeconds: 10.5,
-      author: "snapshot",
-      timestamp: "14:20",
-    },
-    {
-      id: "hist-init-evidence",
-      sectionKey: "evidence",
-      sectionLabel: "[Bằng chứng / Nội dung]",
-      version: 1,
-      text: `[Bằng chứng // 00:03 - 00:20]\n(Visual Cue: Chèn hình minh họa bàn tay ngập trong nồi cơm có dấu gạch chéo đỏ, chuyển cảnh sang chiếc cân điện tử mini)\nNgón tay mỗi người dài ngắn khác nhau, đáy nồi lại có độ cong vát khác nhau. Công thức chuẩn của các đầu bếp Nhật là tỷ lệ nước 1:1.15 theo khối lượng.`,
-      summary: "Bản gốc khởi tạo từ 10 tiêu chí đề bài",
-      wordCount: 48,
-      estimatedSeconds: 18.0,
-      author: "snapshot",
-      timestamp: "14:20",
-    },
-    {
-      id: "hist-init-turn",
-      sectionKey: "turn",
-      sectionLabel: "[Cú lật Turn]",
-      version: 1,
-      text: `[Cú lật Turn // 00:20 - 00:45]\n(Visual Cue: Quay cảnh nhỏ 1 giọt dầu mè nguyên chất vào nồi trước khi bấm nút Cook, hạt cơm tơi xốp tách rời)\nVà đây là bí quyết ít ai chỉ cho bạn: Hãy nhỏ đúng một giọt dầu mè và ngâm 10 phút trước khi bật nồi. Lớp màng lipid tự nhiên sẽ bọc từng hạt tinh bột, giúp cơm nở đều mà không hề bị nát hay dính đáy.`,
-      summary: "Bản gốc khởi tạo từ 10 tiêu chí đề bài",
-      wordCount: 65,
-      estimatedSeconds: 24.3,
-      author: "snapshot",
-      timestamp: "14:20",
-    },
-    {
-      id: "hist-init-cta",
-      sectionKey: "cta",
-      sectionLabel: "[Payoff & CTA]",
-      version: 1,
-      text: `[Payoff & CTA // 00:45 - 00:60]\n(Visual Cue: Người cầm bát cơm nóng hổi ăn thử biểu cảm gật gù hài lòng, icon thả tim và lưu video nhấp nháy)\nThử ngay bữa tối nay xem cơm nhà bạn có ngon hơn hẳn ngoài quán không nhé! Thả tim và lưu lại kẻo lúc nấu lại quên mất công thức!`,
-      summary: "Bản gốc khởi tạo từ 10 tiêu chí đề bài",
-      wordCount: 36,
-      estimatedSeconds: 13.5,
-      author: "snapshot",
-      timestamp: "14:20",
-    },
-  ]);
-
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-
   // Virality & AI status states
   const [viralityResult, setViralityResult] = useState<ViralityResult | null>(null);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [showRightChatbot, setShowRightChatbot] = useState(true);
 
-  // Record a history entry
-  const handleRecordHistory = (newEntry: SectionHistoryEntry) => {
-    const sameSectionCount = historyEntries.filter((e) => e.sectionKey === newEntry.sectionKey).length;
-    const entryWithVer: SectionHistoryEntry = {
-      ...newEntry,
-      version: sameSectionCount + 1,
-    };
-    setHistoryEntries((prev) => [entryWithVer, ...prev]);
-  };
-
-  // Restore a historical section entry directly into the script
-  const handleRestoreHistoryEntry = (entry: SectionHistoryEntry) => {
-    if (entry.sectionKey === "full") {
-      setScriptText(entry.text);
-      setAiStatus(`Đã khôi phục toàn bộ kịch bản về Phiên bản #${entry.version}!`);
-      return;
-    }
-
-    let regex: RegExp | null = null;
-    if (entry.sectionKey === "hook") {
-      regex = /\[Hook[\s\S]*?\][\s\S]*?(?=\n\s*\n\[|$)/i;
-    } else if (entry.sectionKey === "turn") {
-      regex = /\[(Cú lật|Turn)[\s\S]*?\][\s\S]*?(?=\n\s*\n\[|$)/i;
-    } else if (entry.sectionKey === "cta") {
-      regex = /\[(Payoff|CTA|Kêu gọi)[\s\S]*?\][\s\S]*?(?=\n\s*\n\[|$)/i;
-    } else if (entry.sectionKey === "evidence") {
-      regex = /\[(Bằng chứng|Nội dung|Context)[\s\S]*?\][\s\S]*?(?=\n\s*\n\[|$)/i;
-    }
-
-    if (regex && regex.test(scriptText)) {
-      setScriptText((prev) => prev.replace(regex!, entry.text));
-      setAiStatus(`Đã khôi phục đoạn ${entry.sectionLabel} về Phiên bản #${entry.version}!`);
-    } else {
-      setScriptText((prev) => `${entry.text}\n\n${prev}`);
-      setAiStatus(`Đã khôi phục đoạn ${entry.sectionLabel}!`);
-    }
-  };
-
-  // Manual snapshot saver
-  const handleSaveManualSnapshot = (note: string, sectionKey: string) => {
-    let textToSave = scriptText;
-    let label = "Toàn bộ kịch bản";
-
-    if (sectionKey === "hook") {
-      const match = scriptText.match(/\[Hook[\s\S]*?\][\s\S]*?(?=\n\s*\n\[|$)/i);
-      if (match) textToSave = match[0];
-      label = "[Hook 3s]";
-    } else if (sectionKey === "turn") {
-      const match = scriptText.match(/\[(Cú lật|Turn)[\s\S]*?\][\s\S]*?(?=\n\s*\n\[|$)/i);
-      if (match) textToSave = match[0];
-      label = "[Cú lật Turn]";
-    } else if (sectionKey === "cta") {
-      const match = scriptText.match(/\[(Payoff|CTA|Kêu gọi)[\s\S]*?\][\s\S]*?(?=\n\s*\n\[|$)/i);
-      if (match) textToSave = match[0];
-      label = "[Payoff & CTA]";
-    } else if (sectionKey === "evidence") {
-      const match = scriptText.match(/\[(Bằng chứng|Nội dung|Context)[\s\S]*?\][\s\S]*?(?=\n\s*\n\[|$)/i);
-      if (match) textToSave = match[0];
-      label = "[Bằng chứng / Nội dung]";
-    }
-
-    const words = textToSave.replace(/\[.*?\]/g, " ").split(/\s+/).filter(Boolean).length;
-    handleRecordHistory({
-      id: `manual-${Date.now()}`,
-      sectionKey,
-      sectionLabel: label,
-      version: 1,
-      text: textToSave,
-      summary: note,
-      wordCount: words,
-      estimatedSeconds: words / (pacingConfig.wpm / 60),
-      author: "snapshot",
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-    });
-    setAiStatus(`Đã lưu bản nháp: "${note}"!`);
-  };
-
   // Generate complete script from the 10 briefing dimensions
   const handleGenerateFromBrief = async () => {
     setIsAiProcessing(true);
-    setAiStatus(`AI Storyteller đang tổng hợp 10 tiêu chí & dữ liệu đính kèm để viết kịch bản...`);
+    setAiStatus(`AI Storyteller đang tổng hợp 10 tiêu chí để viết kịch bản cho: "${brief.topic}"...`);
 
     // Simulate structured prompt synthesis
     await new Promise((r) => setTimeout(r, 1400));
@@ -234,7 +104,7 @@ ${
 [Bằng chứng & Thực tế // 00:03 - 00:20]
 (Visual Cue: Đưa đồ họa số liệu thực tế: ${brief.specificFactsAndData.slice(0, 80)}..., nhạc nền chuyển nhịp kịch tính)
 ${brief.uniqueAngle}
-Theo dữ liệu thực nghiệm đã kiểm chứng: ${brief.specificFactsAndData.slice(0, 100)}...
+Theo dữ liệu thực nghiệm: ${brief.specificFactsAndData.slice(0, 100)}...
 
 [Giải pháp & Cú lật Turn // 00:20 - 00:45]
 (Visual Cue: Format ${brief.formatType === "talking_head" ? "Creator nói trực diện camera với biểu cảm thuyết phục" : "Cinematic B-Roll chi tiết từng động tác thực hành"}, phong cách ${brief.benchmarkCreatorOrChannel})
@@ -246,21 +116,6 @@ ${brief.includeMemeSlang ? `Bí kíp này ${brief.slangKeywords || "chuẩn đé
 ${brief.callToAction}`;
 
     setScriptText(generatedScript);
-
-    // Also record full script snapshot
-    handleRecordHistory({
-      id: `gen-${Date.now()}`,
-      sectionKey: "full",
-      sectionLabel: "Toàn bộ kịch bản",
-      version: 1,
-      text: generatedScript,
-      summary: `Tạo mới từ 10 tiêu chí đề bài (${brief.platform.toUpperCase()} • ${brief.targetDuration})`,
-      wordCount: generatedScript.replace(/\[.*?\]/g, " ").split(/\s+/).filter(Boolean).length,
-      estimatedSeconds: generatedScript.replace(/\[.*?\]/g, " ").split(/\s+/).filter(Boolean).length / (pacingConfig.wpm / 60),
-      author: "ai",
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-    });
-
     setIsAiProcessing(false);
     setAiStatus(`Đã tạo xong kịch bản chuẩn cho nền tảng ${brief.platform.toUpperCase()} (${brief.targetDuration})!`);
     setActiveSubTab("editor");
@@ -279,13 +134,67 @@ ${brief.callToAction}`;
     }
   };
 
-  const handleApproveGate1 = async () => {
-    if (!currentProject) return;
-    if (!currentProject.source_rights_confirmed) {
-      alert("Bạn phải xác nhận bản quyền nguồn tư liệu (Source Rights) trước khi duyệt Gate 1!");
+  /**
+   * Persist the editor's text to the server.
+   *
+   * No screen in the Next client used to save the script: the save mutation
+   * existed but nothing called it, so Gate 1 was decided against a script the
+   * backend had never received — and ``source_rights_confirmed`` could never
+   * become true there. Saving is now an explicit, reportable action.
+   */
+  const handleSaveScript = async (sourceRightsConfirmed?: boolean) => {
+    if (!currentProject) {
+      setGateError("Chưa chọn dự án — không có gì để lưu.");
       return;
     }
-    await approveScriptMutation.mutateAsync(currentProject.id);
+    setGateError(null);
+    try {
+      await saveScriptMutation.mutateAsync({
+        projectId: currentProject.id,
+        script: scriptText,
+        ...(sourceRightsConfirmed === undefined ? {} : { sourceRightsConfirmed }),
+      });
+      setGateStatus(
+        sourceRightsConfirmed
+          ? "Đã lưu kịch bản và ghi nhận xác nhận bản quyền nguồn tư liệu lên server."
+          : "Đã lưu kịch bản lên server."
+      );
+    } catch (error) {
+      setGateError(
+        `Lưu kịch bản thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  };
+
+  /** Record the source-rights confirmation on the server, with the script. */
+  const handleConfirmSourceRights = () => {
+    if (currentProject?.source_rights_confirmed) return;
+    void handleSaveScript(true);
+  };
+
+  const handleApproveGate1 = async () => {
+    setGateError(null);
+    if (!currentProject) {
+      setGateError("Chưa chọn dự án để duyệt Gate 1.");
+      return;
+    }
+    if (!currentProject.source_rights_confirmed) {
+      // Stated in the page instead of an `alert()`, which the previous version
+      // used here — and which the studio also used to announce approvals that
+      // the server had rejected.
+      setGateError(
+        "Phải ghi nhận xác nhận bản quyền nguồn tư liệu (Source Rights) lên server trước khi duyệt Gate 1."
+      );
+      return;
+    }
+    try {
+      await approveScriptMutation.mutateAsync(currentProject.id);
+      setGateStatus("Gate 1 đã được duyệt trên server. Dự án chuyển sang bước 2.");
+    } catch (error) {
+      setGateError(
+        `Duyệt Gate 1 thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   };
 
   // Quick actions on top AI Agent Bar
@@ -298,32 +207,16 @@ ${brief.callToAction}`;
         setIsAiProcessing(true);
         setAiStatus("AI đang phân tích tâm lý giữ chân và tái tạo Hook 3 giây...");
         await new Promise((r) => setTimeout(r, 900));
-        const newHook = `[Hook // 00:00 - 00:03]\n(Visual Cue: Cận cảnh giật gân, nhịp cắt 0.5s dồn dập)\n${
-          brief.hookType === "fatal_mistake"
-            ? "Sai lầm chết người mà 99% mọi người đều mắc phải khi " + brief.topic.toLowerCase() + "!"
-            : "Bí mật đằng sau " + brief.topic.toLowerCase() + " mà không một chuyên gia nào muốn bạn biết!"
-        }\n\n`;
-
         setScriptText((prev) =>
           prev.replace(
             /\[Hook\s*\/\/\s*00:00\s*-\s*00:03\]\n(\(Visual Cue:.*?\)\n)?.*?\n\n/s,
-            newHook
+            `[Hook // 00:00 - 00:03]\n(Visual Cue: Cận cảnh giật gân, nhịp cắt 0.5s dồn dập)\n${
+              brief.hookType === "fatal_mistake"
+                ? "Sai lầm chết người mà 99% mọi người đều mắc phải khi " + brief.topic.toLowerCase() + "!"
+                : "Bí mật đằng sau " + brief.topic.toLowerCase() + " mà không một chuyên gia nào muốn bạn biết!"
+            }\n\n`
           )
         );
-
-        handleRecordHistory({
-          id: `hook-${Date.now()}`,
-          sectionKey: "hook",
-          sectionLabel: "[Hook 3s]",
-          version: 1,
-          text: newHook.trim(),
-          summary: "AI tối ưu lại Hook 3s giật gân",
-          wordCount: newHook.replace(/\[.*?\]/g, " ").split(/\s+/).filter(Boolean).length,
-          estimatedSeconds: newHook.replace(/\[.*?\]/g, " ").split(/\s+/).filter(Boolean).length / (pacingConfig.wpm / 60),
-          author: "ai",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-        });
-
         setIsAiProcessing(false);
         setAiStatus("Đã cập nhật Hook 3 giây đầu giữ chân khán giả tột độ!");
       },
@@ -380,6 +273,21 @@ ${brief.callToAction}`;
         onPacingChange={setPacingConfig}
       />
 
+      {/* Gate 1 outcome — shown, not alerted. The server's answer is the only one
+          that counts, so a rejection has to be readable here. */}
+      {gateError && (
+        <div className="shrink-0 text-xs text-rose-300 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/30 flex items-start">
+          <AlertTriangle className="w-3.5 h-3.5 mr-1.5 shrink-0 mt-0.5" />
+          <span>{gateError}</span>
+        </div>
+      )}
+      {gateStatus && (
+        <div className="shrink-0 text-xs text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/30 flex items-start">
+          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 shrink-0 mt-0.5" />
+          <span>{gateStatus}</span>
+        </div>
+      )}
+
       {/* Navigation Sub-Tabs & View Controller */}
       <div className="flex items-center justify-between bg-nle-panel border border-nle-border rounded-xl px-3 py-1.5 shrink-0">
         <div className="flex items-center space-x-1">
@@ -408,6 +316,18 @@ ${brief.callToAction}`;
           </button>
 
           <button
+            onClick={() => setActiveSubTab("split")}
+            className={`hidden md:flex px-3 py-1.5 rounded-lg text-xs font-semibold items-center space-x-1.5 transition-colors ${
+              activeSubTab === "split"
+                ? "bg-nle-cyan text-black shadow-sm font-bold"
+                : "text-gray-400 hover:text-white hover:bg-nle-surface"
+            }`}
+          >
+            <Columns className="w-3.5 h-3.5" />
+            <span>3. Chia Đôi (Song Song)</span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab("virality")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
               activeSubTab === "virality"
@@ -416,7 +336,7 @@ ${brief.callToAction}`;
             }`}
           >
             <Flame className="w-3.5 h-3.5" />
-            <span>3. Phân Tích & Duyệt Gate 1</span>
+            <span>4. Phân Tích & Duyệt Gate 1</span>
             {viralityResult && (
               <Badge variant="amber" className="text-[9px] py-0 px-1">
                 {viralityResult.score}đ
@@ -425,18 +345,8 @@ ${brief.callToAction}`;
           </button>
         </div>
 
-        {/* Right Toolbar: History Button & Chatbot Toggle Button */}
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsHistoryModalOpen(true)}
-            className="text-xs h-7 px-2.5 border-amber-500/40 text-amber-300 hover:bg-amber-500/10 font-medium"
-          >
-            <History className="w-3.5 h-3.5 mr-1 text-amber-400" />
-            <span>Lịch Sử Phân Đoạn ({historyEntries.length})</span>
-          </Button>
-
+        {/* Right Chatbot Toggle Button */}
+        <div className="flex items-center space-x-1">
           <button
             onClick={() => setShowRightChatbot(!showRightChatbot)}
             title={showRightChatbot ? "Thu nhỏ AI Chatbot" : "Mở AI Chatbot"}
@@ -489,20 +399,53 @@ ${brief.callToAction}`;
                 onTargetScopeChange={setTargetScope}
                 pacingConfig={pacingConfig}
                 sourceRightsConfirmed={currentProject?.source_rights_confirmed || false}
-                onConfirmSourceRights={confirmSourceRights}
+                onConfirmSourceRights={handleConfirmSourceRights}
+                onSaveScript={() => void handleSaveScript()}
+                isSaving={saveScriptMutation.isPending}
                 onApproveGate1={handleApproveGate1}
                 isApproving={approveScriptMutation.isPending}
                 onScoreVirality={handleScoreVirality}
                 topic={brief.topic}
                 platform={brief.platform}
                 targetDuration={brief.targetDuration}
-                onOpenHistory={() => setIsHistoryModalOpen(true)}
-                historyCount={historyEntries.length}
               />
             </div>
           )}
 
-          {/* TAB 3: Virality Analytics & Gate 1 */}
+          {/* TAB 3: Split Side-by-Side View (Settings + Editor) */}
+          {activeSubTab === "split" && (
+            <div className="flex-1 grid grid-cols-2 gap-3 min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ScriptBriefSettingsPanel
+                  brief={brief}
+                  onBriefChange={setBrief}
+                  onGenerateScript={handleGenerateFromBrief}
+                  isProcessing={isAiProcessing}
+                />
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ScriptEditorView
+                  scriptText={scriptText}
+                  onScriptTextChange={setScriptText}
+                  targetScope={targetScope}
+                  onTargetScopeChange={setTargetScope}
+                  pacingConfig={pacingConfig}
+                  sourceRightsConfirmed={currentProject?.source_rights_confirmed || false}
+                  onConfirmSourceRights={handleConfirmSourceRights}
+                  onSaveScript={() => void handleSaveScript()}
+                  isSaving={saveScriptMutation.isPending}
+                  onApproveGate1={handleApproveGate1}
+                  isApproving={approveScriptMutation.isPending}
+                  onScoreVirality={handleScoreVirality}
+                  topic={brief.topic}
+                  platform={brief.platform}
+                  targetDuration={brief.targetDuration}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: Virality Analytics & Gate 1 */}
           {activeSubTab === "virality" && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 min-h-0 overflow-y-auto">
               <Card className="lg:col-span-2 flex flex-col min-h-0 border-nle-border bg-nle-panel">
@@ -643,23 +586,10 @@ ${brief.callToAction}`;
               onTargetScopeChange={setTargetScope}
               pacingConfig={pacingConfig}
               brief={brief}
-              onRecordHistory={handleRecordHistory}
-              onOpenHistory={() => setIsHistoryModalOpen(true)}
-              historyCount={historyEntries.length}
             />
           </div>
         )}
       </div>
-
-      {/* Section-by-Section Version History Modal */}
-      <ScriptSectionHistoryModal
-        isOpen={isHistoryModalOpen}
-        onClose={() => setIsHistoryModalOpen(false)}
-        historyEntries={historyEntries}
-        onRestoreEntry={handleRestoreHistoryEntry}
-        onSaveManualSnapshot={handleSaveManualSnapshot}
-        onDeleteEntry={(id) => setHistoryEntries((prev) => prev.filter((e) => e.id !== id))}
-      />
     </div>
   );
 }

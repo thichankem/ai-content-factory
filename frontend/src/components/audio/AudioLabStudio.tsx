@@ -19,7 +19,47 @@ import {
   Play,
   RotateCcw,
   Zap,
+  PlugZap,
 } from "lucide-react";
+
+/**
+ * An audio capability the backend implements but does not publish.
+ *
+ * ``content_factory/perception.py`` genuinely detects silence and pace,
+ * classifies music mood and measures loudness and true peak, and
+ * ``content_factory/audio.py`` genuinely ducks music under speech. No router
+ * exposes any of it, so the studio cannot call it.
+ *
+ * These four cards used to print invented readings — "3.9 âm tiết/s",
+ * "8 khoảng nghỉ", "EBU R128 PASS", "-62.5 dB" — as if a scan had run, and their
+ * buttons called ``alert()`` announcing results nothing had produced. The panel
+ * now says which module holds the logic and which route is missing, so the gap
+ * is visible instead of being papered over.
+ */
+function PerceptionUnavailable({
+  feature,
+  module,
+  endpoint,
+}: {
+  feature: string;
+  module: string;
+  endpoint: string;
+}) {
+  return (
+    <div className="p-3 rounded-lg bg-nle-panel border border-dashed border-nle-border space-y-1.5 text-xs">
+      <span className="flex items-center text-amber-300 font-semibold">
+        <PlugZap className="w-3.5 h-3.5 mr-1.5" />
+        {feature}: chưa nối được
+      </span>
+      <p className="text-gray-400 leading-relaxed">
+        Engine đã có sẵn logic trong <code className="font-mono text-nle-cyan">{module}</code>, nhưng
+        chưa có route nào công bố nó. Cần thêm một endpoint (ví dụ{" "}
+        <code className="font-mono text-nle-cyan">{endpoint}</code>) trước khi màn hình này có số
+        liệu thật.
+      </p>
+    </div>
+  );
+}
 
 export function AudioLabStudio() {
   const {
@@ -553,34 +593,14 @@ export function AudioLabStudio() {
                 <Radio className="w-4 h-4 mr-1 text-sky-400" />
                 Nhận Diện Khoảng Lặng & Nhịp Điệu (Silence & Pace)
               </span>
-              <Badge variant="emerald" className="text-[10px]">3.9 Âm tiết/s</Badge>
+              <Badge variant="amber" className="text-[10px]">Chưa có endpoint</Badge>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between p-2 rounded bg-nle-panel">
-                <span className="text-gray-400">Tốc độ đọc trung bình:</span>
-                <span className="font-mono text-white font-bold">3.9 âm tiết/giây (Chuẩn tiếng Việt)</span>
-              </div>
-
-              <div className="flex justify-between p-2 rounded bg-nle-panel">
-                <span className="text-gray-400">Tổng khoảng lặng ngắt nghỉ:</span>
-                <span className="font-mono text-emerald-400 font-bold">8 khoảng nghỉ (Trung bình 0.4s)</span>
-              </div>
-
-              <div className="flex justify-between p-2 rounded bg-nle-panel">
-                <span className="text-gray-400">Cảnh báo khoảng chết (Dead-air &gt; 1.5s):</span>
-                <span className="font-mono text-emerald-400 font-bold">0 đoạn (An toàn)</span>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full text-xs border-nle-border text-nle-cyan hover:bg-nle-panel"
-                onClick={() => alert("Đã quét toàn bộ track: Nhịp đọc đều đặn, không có khoảng lặng chết.")}
-              >
-                Quét Lại Nhịp Điệu Thoại
-              </Button>
-            </div>
+            <PerceptionUnavailable
+              feature="Nhận diện khoảng lặng & nhịp điệu"
+              module="content_factory/perception.py — detect_silence_and_pace"
+              endpoint="POST /audio/perception/silence"
+            />
           </Card>
 
           {/* Card 2: Music Mood Classifier */}
@@ -590,27 +610,14 @@ export function AudioLabStudio() {
                 <Activity className="w-4 h-4 mr-1 text-amber-400" />
                 Phân Loại Tâm Trạng Nhạc Nền (Music Mood & BPM)
               </span>
-              <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-300">
-                120 BPM · Dramatic
-              </Badge>
+              <Badge variant="amber" className="text-[10px]">Chưa có endpoint</Badge>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between p-2 rounded bg-nle-panel">
-                <span className="text-gray-400">Năng lượng âm thanh (Energy):</span>
-                <span className="font-mono text-amber-400 font-bold">0.74 (Cao - Kịch tính)</span>
-              </div>
-
-              <div className="flex justify-between p-2 rounded bg-nle-panel">
-                <span className="text-gray-400">Độ sáng dải tần (Spectral Centroid):</span>
-                <span className="font-mono text-white font-bold">2,450 Hz (Âm trầm bí ẩn)</span>
-              </div>
-
-              <div className="flex justify-between p-2 rounded bg-nle-panel">
-                <span className="text-gray-400">Phù hợp thể loại kịch bản:</span>
-                <span className="font-mono text-nle-cyan font-bold">Bí ẩn, Lịch sử, Tài liệu giải mật</span>
-              </div>
-            </div>
+            <PerceptionUnavailable
+              feature="Phân loại tâm trạng & BPM nhạc nền"
+              module="content_factory/perception.py — classify_music_mood"
+              endpoint="POST /audio/perception/mood"
+            />
           </Card>
 
           {/* Card 3: Audio Quality & Peak Metering */}
@@ -620,25 +627,14 @@ export function AudioLabStudio() {
                 <Volume2 className="w-4 h-4 mr-1 text-emerald-400" />
                 Kiểm Định Chất Lượng Âm Thanh (Quality Inspector)
               </span>
-              <Badge variant="emerald" className="text-[10px]">EBU R128 PASS</Badge>
+              <Badge variant="amber" className="text-[10px]">Chưa có endpoint</Badge>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between p-2 rounded bg-nle-panel">
-                <span className="text-gray-400">Đỉnh âm cực đại (True Peak):</span>
-                <span className="font-mono text-emerald-400 font-bold">-1.0 dBTP (Không méo tiếng)</span>
-              </div>
-
-              <div className="flex justify-between p-2 rounded bg-nle-panel">
-                <span className="text-gray-400">Độ lệch DC Offset:</span>
-                <span className="font-mono text-emerald-400 font-bold">0.0001% (Hoàn hảo)</span>
-              </div>
-
-              <div className="flex justify-between p-2 rounded bg-nle-panel">
-                <span className="text-gray-400">Nhiễu nền (Noise Floor):</span>
-                <span className="font-mono text-emerald-400 font-bold">-62.5 dB (Rất sạch)</span>
-              </div>
-            </div>
+            <PerceptionUnavailable
+              feature="Kiểm định chất lượng (loudness, true peak)"
+              module="content_factory/perception.py — check_audio_quality"
+              endpoint="POST /audio/perception/quality"
+            />
           </Card>
 
           {/* Card 4: AI Stem Isolation & De-Noise */}
@@ -652,43 +648,36 @@ export function AudioLabStudio() {
             </div>
 
             <p className="text-[11px] text-gray-400">
-              Tách file âm thanh bất kỳ thành 4 stems độc lập để remix và xử lý hậu kỳ chuyên sâu:
+              Tách file âm thanh thành các stem độc lập để remix và xử lý hậu kỳ chuyên sâu.
             </p>
 
+            {/*
+              The four buttons here used to be live and each one called
+              ``alert("Đã trích xuất Stem N…")`` — announcing four extractions
+              that never happened, with no request behind them. They are disabled
+              until a stem-split route exists.
+            */}
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs border-nle-border hover:border-nle-cyan"
-                onClick={() => alert("Đã trích xuất Stem 1: Giọng hát / Thoại (Vocals)!")}
-              >
-                🎙️ Tách Lời Thoại (Vocals)
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs border-nle-border hover:border-amber-400"
-                onClick={() => alert("Đã trích xuất Stem 2: Nhạc cụ / Giai điệu (Instruments)!")}
-              >
-                🎵 Tách Nhạc Cụ (Music)
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs border-nle-border hover:border-emerald-400"
-                onClick={() => alert("Đã trích xuất Stem 3: Trống & Nhịp đập (Drums)!")}
-              >
-                🥁 Tách Trống & Beat (Drums)
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs border-nle-border hover:border-rose-400"
-                onClick={() => alert("Đã trích xuất Stem 4: Âm trầm Sub-bass!")}
-              >
-                🎸 Tách Âm Trầm (Bass)
-              </Button>
+              {["🎙️ Lời Thoại (Vocals)", "🎵 Nhạc Cụ (Music)", "🥁 Trống & Beat (Drums)", "🎸 Âm Trầm (Bass)"].map(
+                (stem) => (
+                  <Button
+                    key={stem}
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    title="Chưa có route tách stem ở backend"
+                    className="text-xs border-nle-border opacity-60"
+                  >
+                    {stem}
+                  </Button>
+                )
+              )}
             </div>
+            <p className="text-[10px] text-gray-500">
+              Chưa có endpoint tách stem. Cần một route (ví dụ{" "}
+              <code className="font-mono text-nle-cyan">POST /audio/stems</code>) chạy Demucs
+              hoặc Spleeter trên server.
+            </p>
           </Card>
         </div>
       )}

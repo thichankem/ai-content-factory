@@ -1,29 +1,53 @@
 # Knowledge & Asset Library: `library/`
 
-This directory serves as the local media asset repository and document knowledge base for research, RAG retrieval, and video synthesis in the **AI Content Factory**.
+The local document corpus and media asset repository for research, RAG retrieval and video synthesis. It is backed by **`documents.py` and `library.py`**, and it is **created on demand** — a fresh checkout contains only this file.
 
 ---
 
-## Directory Organization
+## Layout
 
 ```text
 library/
-├── .index.db           # SQLite database with FTS5 BM25 full-text search index
-├── media/              # Curated uploaded media assets (images, b-roll, overlays)
-├── audio/              # Voiceover recordings, sound effects, ambient stems
-├── music/              # Background music tracks with BPM and mood tags
-├── videos/             # Source footage clips and rendered intermediates
-└── edited/             # Exported video cuts and completed reels
+├── .index.db       # SQLite FTS5 BM25 index (created on first ingest)
+├── media/          # Curated media assets: images, b-roll, overlays
+├── audio/          # Voiceover recordings, SFX, ambient stems
+├── music/          # Background music with BPM and mood tags
+├── videos/         # Source footage and rendered intermediates
+└── edited/         # Exported cuts and completed reels
 ```
+
+Configured in `config.py`:
+
+| Setting | Default |
+| :--- | :--- |
+| `library_dir` | `./library` |
+| `library_db_path` | `./library/.index.db` |
+| `media_dir` | `./library/media` |
+
+Only `library_dir` and `library_db_path` are referenced by the code today; `media/`, `audio/`, `music/`, `videos/` and `edited/` are the intended organisation and appear as the corresponding features write to them. Nothing is lost by treating this directory as generated output — as with `storage/`, it is gitignored and fully reproducible.
 
 ---
 
-## Knowledge & Search Subsystem
+## Knowledge & search subsystem
 
-1. **SQLite FTS5 Full-Text Search**:
-   - Managed via [`src/content_factory/documents.py`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/src/content_factory/documents.py).
-   - Ingests text documents, PDFs, and metadata into `.index.db` using BM25 ranking for ultra-fast local keyword queries (`GET /library/search?q=...`).
-2. **Media Deduplication**:
-   - Uses perceptual difference hashing (dHash) implemented in [`src/content_factory/media.py`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/src/content_factory/media.py) to identify visually redundant b-roll and prevent repetitive shot selection.
-3. **Federated Ingest**:
-   - Extensible adapters allow importing public domain papers and books from arXiv, Project Gutenberg, and Wikimedia Commons.
+### 1. SQLite FTS5 full-text search
+
+Implemented in [`src/content_factory/library.py`](../src/content_factory/library.py). Ingested text, PDFs and metadata go into `.index.db` and are queried through BM25 ranking for fast local keyword search — no embedding model, no network, no external index server.
+
+### 2. Federated document ingestion
+
+[`src/content_factory/documents.py`](../src/content_factory/documents.py) fans a query out across public scholarly sources (arXiv, Crossref, Project Gutenberg, Open Library, Wikipedia, Internet Archive) and runs a zero-dependency lexical reranker over the merged results. Web access is controlled by `CONTENT_FACTORY_DOCUMENTS_WEB_ENABLED`; with it off, everything still runs, just from whatever is already local.
+
+### 3. Retrieval and grounding
+
+[`src/content_factory/rag.py`](../src/content_factory/rag.py) does template-driven chunking and hybrid retrieval (vector + BM25) with reciprocal-rank fusion, then attaches citations so a claim can be traced back to its source.
+
+### 4. Media deduplication
+
+[`src/content_factory/media.py`](../src/content_factory/media.py) computes perceptual difference hashes (dHash) so visually redundant b-roll is detected before it produces a repetitive cut. `POST /media/dedup` returns the duplicate pairs, the groups they form, and the distance threshold used.
+
+---
+
+## Quality note on this corpus
+
+Nothing in this directory is auto-approved. A document landing here is a *candidate* source, and the source-rights confirmation that Gate 1 requires is always a human decision — see `docs/QA-LAYER.md` and the root `README.md`.

@@ -144,17 +144,19 @@ export function PropertiesInspector() {
               {/* Alignment & Styles Button Bar */}
               <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center space-x-1 bg-nle-base p-0.5 rounded border border-nle-border">
-                  {[
-                    { id: "left", icon: AlignLeft },
-                    { id: "center", icon: AlignCenter },
-                    { id: "right", icon: AlignRight },
-                    { id: "justify", icon: AlignJustify },
-                  ].map((align) => {
+                  {(
+                    [
+                      { id: "left", icon: AlignLeft },
+                      { id: "center", icon: AlignCenter },
+                      { id: "right", icon: AlignRight },
+                      { id: "justify", icon: AlignJustify },
+                    ] as const
+                  ).map((align) => {
                     const Icon = align.icon;
                     return (
                       <button
                         key={align.id}
-                        onClick={() => setTextAlign(align.id as any)}
+                        onClick={() => setTextAlign(align.id)}
                         className={`p-1 rounded ${
                           textAlign === align.id ? "bg-nle-cyan text-black" : "text-gray-400 hover:text-white"
                         }`}

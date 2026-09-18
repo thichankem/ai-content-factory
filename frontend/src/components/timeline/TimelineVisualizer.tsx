@@ -2,8 +2,8 @@
 
 import React from "react";
 import { useTimelineStore } from "@/stores/useTimelineStore";
-import { createScene } from "@/lib/scenes";
 import { usePlayerStore } from "@/stores/usePlayerStore";
+import { makeScenes } from "@/lib/scenes";
 import { Slider } from "@/components/ui/slider";
 import { ZoomIn, ZoomOut, Scissors, Magnet, Layers } from "lucide-react";
 
@@ -16,12 +16,18 @@ export function TimelineVisualizer() {
   const pixelsPerSecond = 16 * zoom;
   const playheadLeft = currentTime * pixelsPerSecond;
 
-  const defaultScenes = scenes.length > 0 ? scenes : [
-    createScene(0, { label: "Scene 1 • Hook", duration: 4.5, text: "Hook mở đầu", filter: "contrast" }),
-    createScene(1, { label: "Scene 2 • Evidence", duration: 18.0, text: "Bằng chứng chính", filter: "cool" }),
-    createScene(2, { label: "Scene 3 • Turn", duration: 12.5, text: "Bước ngoặt", filter: "warm" }),
-    createScene(3, { label: "Scene 4 • Payoff & CTA", duration: 10.0, text: "Kêu gọi hành động", filter: "none" }),
-  ];
+  // Placeholder lanes for an empty timeline. Built through `makeScenes` so they
+  // stay the same shape as real scenes; an earlier hand-written literal had
+  // already drifted (`vibrant`/`cinema` are not `VideoFilter` values).
+  const defaultScenes =
+    scenes.length > 0
+      ? scenes
+      : makeScenes([
+          { label: "Scene 1 • Hook", duration: 4.5, text: "Hook mở đầu", filter: "warm" },
+          { label: "Scene 2 • Evidence", duration: 18.0, text: "Bằng chứng chính", grade: "teal-orange" },
+          { label: "Scene 3 • Turn", duration: 12.5, text: "Bước ngoặt", filter: "cool" },
+          { label: "Scene 4 • Payoff & CTA", duration: 10.0, text: "Kêu gọi hành động", filter: "none" },
+        ]);
 
   return (
     <div className="flex flex-col h-full bg-nle-surface border border-nle-border rounded-lg overflow-hidden">
@@ -106,7 +112,7 @@ export function TimelineVisualizer() {
             {/* Lane V1 (Video Clips) */}
             <div className="h-14 border-b border-nle-border relative flex items-center px-1">
               {defaultScenes.map((scene, idx) => {
-                const width = (scene.duration ?? scene.duration_seconds) * pixelsPerSecond;
+                const width = scene.duration_seconds * pixelsPerSecond;
                 const isSelected = selectedSceneIndex === idx;
 
                 return (
@@ -125,7 +131,7 @@ export function TimelineVisualizer() {
                   >
                     <div className="flex justify-between items-center text-[10px]">
                       <span className="font-semibold text-white truncate">{scene.label}</span>
-                      <span className="text-gray-400">{(scene.duration ?? scene.duration_seconds).toFixed(1)}s</span>
+                      <span className="text-gray-400">{scene.duration_seconds.toFixed(1)}s</span>
                     </div>
                     <div className="text-[9px] text-nle-cyan/80 truncate">
                       {scene.filter ? `FX: ${scene.filter}` : "Normal"}

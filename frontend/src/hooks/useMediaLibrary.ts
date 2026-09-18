@@ -7,11 +7,18 @@
  * its own hook, :func:`useMediaSearch`, taking the query as an argument.
  */
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { libraryApi, mediaApi } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import { DedupResult, MediaItem, MediaSearchHit } from "@/types/media";
+import {
+  DedupResult,
+  MediaIngestUrlRequest,
+  MediaItem,
+  MediaSearchHit,
+  ReCookRequest,
+  ReCookResult,
+} from "@/types/media";
 import { LibraryResponse } from "@/types/library";
 
 /** Every item in the library. */
@@ -52,4 +59,35 @@ export function useMediaLibrary() {
     dedupMutation,
     uploadMutation,
   };
+}
+
+/**
+ * Bring a reference clip in by URL and re-cut it into a new project.
+ *
+ * Both halves are server work: ``POST /media/from-url`` downloads and registers
+ * the clip, and ``POST /media/{id}/recook`` returns a new project together with
+ * the script it wrote. The re-cook studio used to call the first one with a raw
+ * ``fetch`` to a hardcoded ``http://127.0.0.1:8000``, and when that failed it
+ * invented a video, a duration and a transcript locally rather than reporting the
+ * failure.
+ */
+export function useMediaRecook() {
+  const queryClient = useQueryClient();
+
+  const ingestMutation = useMutation<MediaItem, Error, MediaIngestUrlRequest>({
+    mutationFn: (payload: MediaIngestUrlRequest) => mediaApi.ingestMediaUrl(payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mediaItems });
+    },
+  });
+
+  const recookMutation = useMutation<
+    ReCookResult,
+    Error,
+    { mediaId: string; payload: ReCookRequest }
+  >({
+    mutationFn: ({ mediaId, payload }) => mediaApi.recookMedia(mediaId, payload),
+  });
+
+  return { ingestMutation, recookMutation };
 }

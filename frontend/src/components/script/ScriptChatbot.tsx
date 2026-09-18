@@ -2,12 +2,11 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import {
-  ScriptBriefSettings,
-  TargetScope,
-  SpeechPacingConfig,
   ChatbotMessage,
-  SectionHistoryEntry,
-} from "@/types/script";
+  ScriptBriefSettings,
+  SpeechPacingConfig,
+  TargetScope,
+} from "@/types/studio";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +30,6 @@ import {
   Minimize2,
   Split,
   FileEdit,
-  History,
 } from "lucide-react";
 
 interface ScriptChatbotProps {
@@ -41,9 +39,6 @@ interface ScriptChatbotProps {
   onTargetScopeChange: (scope: TargetScope) => void;
   pacingConfig: SpeechPacingConfig;
   brief: ScriptBriefSettings;
-  onRecordHistory?: (entry: SectionHistoryEntry) => void;
-  onOpenHistory?: () => void;
-  historyCount?: number;
 }
 
 export function ScriptChatbot({
@@ -53,9 +48,6 @@ export function ScriptChatbot({
   onTargetScopeChange,
   pacingConfig,
   brief,
-  onRecordHistory,
-  onOpenHistory,
-  historyCount = 0,
 }: ScriptChatbotProps) {
   const [messages, setMessages] = useState<ChatbotMessage[]>([
     {
@@ -209,42 +201,6 @@ export function ScriptChatbot({
 
     onScriptTextChange(updatedFullScript);
 
-    // Automatically record section history entry
-    if (onRecordHistory) {
-      const lowerPrompt = promptText.toLowerCase();
-      let sectionKey = "full";
-      let sectionLabel = "Toàn bộ kịch bản";
-
-      if (isTargetingLines) {
-        if (targetScope.startLine <= 4 || lowerPrompt.includes("hook")) {
-          sectionKey = "hook";
-          sectionLabel = "[Hook 3s]";
-        } else if (lowerPrompt.includes("lật") || lowerPrompt.includes("turn") || oldSlice.includes("Turn")) {
-          sectionKey = "turn";
-          sectionLabel = "[Cú lật Turn]";
-        } else if (lowerPrompt.includes("cta") || oldSlice.includes("CTA")) {
-          sectionKey = "cta";
-          sectionLabel = "[Payoff & CTA]";
-        } else {
-          sectionKey = "evidence";
-          sectionLabel = "[Bằng chứng / Nội dung]";
-        }
-      }
-
-      onRecordHistory({
-        id: `hist-${Date.now()}`,
-        sectionKey,
-        sectionLabel: isTargetingLines ? `${sectionLabel} (Dòng ${targetScope.startLine}-${targetScope.endLine})` : "Toàn bộ kịch bản",
-        version: 1,
-        text: newSlice,
-        summary: `AI Copilot: "${promptText.slice(0, 45)}..."`,
-        wordCount: newSlice.replace(/\[.*?\]/g, " ").split(/\s+/).filter(Boolean).length,
-        estimatedSeconds: newSlice.replace(/\[.*?\]/g, " ").split(/\s+/).filter(Boolean).length / (pacingConfig.wpm / 60),
-        author: "ai",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-      });
-    }
-
     // Add assistant response message with diff and undo capability
     const assistantMsg: ChatbotMessage = {
       id: `ai-${Date.now()}`,
@@ -299,32 +255,17 @@ export function ScriptChatbot({
           </div>
         </div>
 
-        <div className="flex items-center space-x-1.5 shrink-0">
-          {onOpenHistory && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenHistory}
-              className="text-[10px] h-6 px-2 border-nle-border text-amber-300 hover:text-white hover:bg-nle-border"
-              title="Xem lịch sử các phiên bản phân đoạn"
-            >
-              <History className="w-3 h-3 mr-1" />
-              <span>Lịch sử ({historyCount})</span>
-            </Button>
-          )}
-
-          {undoStack.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleUndo}
-              className="text-[10px] h-6 px-2 border-nle-border text-amber-300 hover:text-white hover:bg-nle-border"
-            >
-              <RotateCcw className="w-3 h-3 mr-1" />
-              Hoàn tác ({undoStack.length})
-            </Button>
-          )}
-        </div>
+        {undoStack.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUndo}
+            className="text-[10px] h-6 px-2 border-nle-border text-amber-300 hover:text-white hover:bg-nle-border"
+          >
+            <RotateCcw className="w-3 h-3 mr-1" />
+            Hoàn tác ({undoStack.length})
+          </Button>
+        )}
       </CardHeader>
 
       {/* Target Scope Controller Bar */}

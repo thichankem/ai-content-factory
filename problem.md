@@ -2,6 +2,29 @@
 
 Updated: 2026-09-16
 
+> ## ⚠️ This report is a historical record. Its verdicts no longer hold.
+>
+> Every check below is reported as `PASS` against a workspace that has since
+> diverged. Re-measured on **2026-09-18**, the same commands give:
+>
+> | Check | This report (2026-09-16) | Re-measured (2026-09-18) |
+> | --- | --- | --- |
+> | `python -m pytest -q` | PASS | **11 failures** of ~634 — all need `ffmpeg` on `PATH` |
+> | `python -m ruff check src tests` | PASS | **242 findings** (`E501` ×154, `F821` ×20, …) |
+> | `python -m ruff format --check src tests` | PASS, 54 files | **13 files would be reformatted** |
+> | `python -m mypy src` | PASS, 27 files | **43 errors in 7 files**, 129 checked |
+> | `python scripts/toolcheck.py --strict` | PASS — `ffmpeg`/`ffprobe` available | **`ffmpeg` is not on `PATH`** in this environment |
+>
+> The most likely explanation is a different machine: `--strict` passed there
+> because `ffmpeg` was installed, and here it is not. The type and lint counts
+> are a different matter — 129 source files are type-checked now against 27 then,
+> and the newest modules (`fusion_graph.py`, `photo_compositor.py`,
+> `media_tools.py`) account for most of the failures. They were added after this
+> report was written.
+>
+> **Treat the table below as history, not as current state.** The authoritative
+> numbers live in the root `README.md` → *Status*.
+
 This report records the checks run in the current Windows workspace and the
 remaining problems or unverified capabilities. It does not claim that an
 external provider or tool was tested when it was not available locally.

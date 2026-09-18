@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { TargetScope, SpeechPacingConfig } from "@/types/script";
+import { SpeechPacingConfig, TargetScope } from "@/types/studio";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,8 @@ import {
   Film,
   Sparkles,
   Layers,
-  History,
+  Save,
+  Loader2,
 } from "lucide-react";
 
 interface StoryboardScene {
@@ -37,14 +38,15 @@ interface ScriptEditorViewProps {
   pacingConfig: SpeechPacingConfig;
   sourceRightsConfirmed: boolean;
   onConfirmSourceRights: () => void;
+  /** Persist the editor's text; Gate 1 reads the saved copy, not this one. */
+  onSaveScript?: () => void;
+  isSaving?: boolean;
   onApproveGate1: () => void;
   isApproving?: boolean;
   onScoreVirality?: () => void;
   topic: string;
   platform: string;
   targetDuration: string;
-  onOpenHistory?: () => void;
-  historyCount?: number;
 }
 
 export function ScriptEditorView({
@@ -55,14 +57,14 @@ export function ScriptEditorView({
   pacingConfig,
   sourceRightsConfirmed,
   onConfirmSourceRights,
+  onSaveScript,
+  isSaving = false,
   onApproveGate1,
   isApproving = false,
   onScoreVirality,
   topic,
   platform,
   targetDuration,
-  onOpenHistory,
-  historyCount = 0,
 }: ScriptEditorViewProps) {
   const [viewMode, setViewMode] = useState<"raw" | "storyboard">("raw");
   const [copied, setCopied] = useState(false);
@@ -224,22 +226,9 @@ export function ScriptEditorView({
                 viewMode === "storyboard" ? "bg-nle-panel text-nle-cyan font-bold shadow-sm" : "text-gray-400 hover:text-white"
               }`}
             >
-              Thẻ Phân Cảnh (Storyboard)
+              Phân cảnh 2 cột (Storyboard)
             </button>
           </div>
-
-          {onOpenHistory && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenHistory}
-              className="text-[11px] border-amber-500/30 text-amber-300 hover:text-white hover:bg-amber-500/10 h-7 px-2"
-              title="Lịch sử các phiên bản phân đoạn"
-            >
-              <History className="w-3.5 h-3.5 mr-1 text-amber-400" />
-              Lịch sử ({historyCount})
-            </Button>
-          )}
 
           <Button
             variant="outline"
@@ -313,41 +302,33 @@ export function ScriptEditorView({
             />
           </div>
         ) : (
-          /* Single-Column Storyboard Scene Cards */
-          <div className="flex-1 overflow-y-auto space-y-3 p-1 pr-2 scrollbar-thin scrollbar-thumb-nle-border">
+          /* Two-Column Storyboard View */
+          <div className="flex-1 overflow-y-auto border border-nle-border rounded-lg bg-nle-panel divide-y divide-nle-border">
+            <div className="grid grid-cols-12 gap-2 p-2.5 bg-nle-surface text-[10px] font-mono uppercase text-gray-400 font-bold sticky top-0 z-10 border-b border-nle-border">
+              <div className="col-span-1 text-center">Scene</div>
+              <div className="col-span-2">Thời gian / Phần</div>
+              <div className="col-span-5">🎙️ Lời thoại Voiceover (TTS)</div>
+              <div className="col-span-4">🎬 Chỉ dẫn Hình ảnh Visual Cue</div>
+            </div>
             {storyboardScenes.map((sc, idx) => (
               <div
                 key={sc.id}
-                className="p-3.5 rounded-xl border border-nle-border bg-nle-panel hover:border-nle-cyan/40 transition-colors space-y-2.5 shadow-sm"
+                className="grid grid-cols-12 gap-2 p-2.5 text-xs hover:bg-nle-surface/50 transition-colors"
               >
-                <div className="flex items-center justify-between border-b border-nle-border/60 pb-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-6 h-6 rounded bg-nle-cyan/20 text-nle-cyan font-mono font-bold text-xs flex items-center justify-center">
-                      #{idx + 1}
-                    </span>
-                    <Badge variant="outline" className="text-xs text-amber-300 border-amber-500/40 font-semibold">
-                      {sc.section}
-                    </Badge>
-                  </div>
-                  <span className="font-mono text-xs text-gray-400 font-medium">
-                    ⏱️ {sc.timeRange}
-                  </span>
+                <div className="col-span-1 text-center font-mono font-bold text-nle-cyan">
+                  #{idx + 1}
                 </div>
-
-                {sc.visualCue && (
-                  <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 text-xs font-sans leading-relaxed">
-                    <span className="font-bold text-emerald-400 mr-1.5 uppercase text-[10px] tracking-wider block sm:inline">
-                      🎬 Visual Cue:
-                    </span>
-                    <span className="italic">{sc.visualCue}</span>
-                  </div>
-                )}
-
-                <div className="p-3 rounded-lg bg-nle-surface border border-nle-border text-xs text-gray-100 font-sans leading-relaxed">
-                  <span className="font-bold text-nle-cyan mr-1.5 uppercase text-[10px] tracking-wider block sm:inline">
-                    🎙️ Lời thoại Voiceover:
-                  </span>
-                  <span>{sc.voiceover}</span>
+                <div className="col-span-2 space-y-1">
+                  <Badge variant="outline" className="text-[10px] text-amber-300 border-amber-500/30">
+                    {sc.section}
+                  </Badge>
+                  <div className="text-[10px] font-mono text-gray-400">{sc.timeRange}</div>
+                </div>
+                <div className="col-span-5 text-gray-100 font-sans leading-relaxed">
+                  {sc.voiceover}
+                </div>
+                <div className="col-span-4 text-emerald-300/90 text-[11px] bg-nle-surface/60 p-2 rounded border border-emerald-500/20 font-sans italic">
+                  {sc.visualCue}
                 </div>
               </div>
             ))}
@@ -365,20 +346,44 @@ export function ScriptEditorView({
               className="rounded border-nle-border text-nle-cyan focus:ring-0 w-4 h-4 bg-nle-panel cursor-pointer"
             />
             <label htmlFor="source-rights-gate" className="text-xs text-gray-200 cursor-pointer">
+              {/* Ticking this saves the script with the confirmation attached; the
+                  backend records it, which is what actually opens Gate 1. */}
               Xác nhận bản quyền nguồn tư liệu hợp pháp (Source Rights Confirmed - Không vi phạm bản quyền)
             </label>
           </div>
 
-          <Button
-            variant="default"
-            size="sm"
-            onClick={onApproveGate1}
-            disabled={!sourceRightsConfirmed || isApproving}
-            className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs h-8 px-4 shadow-lg shadow-emerald-500/20"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-            <span>Gate 1: Duyệt Kịch Bản & Chuyển Bước 2</span>
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSaveScript}
+              disabled={!onSaveScript || isSaving}
+              title="Lưu kịch bản lên server trước khi duyệt Gate 1"
+              className="text-xs h-8 border-nle-border text-gray-200 hover:text-white"
+            >
+              {isSaving ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5 mr-1.5" />
+              )}
+              Lưu Kịch Bản
+            </Button>
+
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onApproveGate1}
+              disabled={!sourceRightsConfirmed || isApproving}
+              className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs h-8 px-4 shadow-lg shadow-emerald-500/20"
+            >
+              {isApproving ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+              )}
+              <span>Gate 1: Duyệt Kịch Bản & Chuyển Bước 2</span>
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

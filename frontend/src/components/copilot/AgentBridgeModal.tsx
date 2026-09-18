@@ -61,8 +61,10 @@ export function AgentBridgeModal() {
       setImportStatus("✅ Đã nhập thành công kịch bản và phân cảnh mới vào dự án!");
       setImportText("");
       setTimeout(() => setImportStatus(null), 3000);
-    } catch (e: any) {
-      setImportStatus(`Lỗi phân tích: ${e.message || "Không tìm thấy block script hợp lệ"}`);
+    } catch (error) {
+      setImportStatus(
+        `Lỗi phân tích: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   };
 

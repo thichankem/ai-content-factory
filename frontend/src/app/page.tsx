@@ -54,6 +54,8 @@ export default function StudioPage() {
     aiAssistMutation,
   } = useProjects();
 
+  // Flow runs and the pre-save checklist belong to the DAG; the campaign is its
+  // own concern. They used to share one hook, which is why neither was typed.
   const { runWorkflowMutation, checklistQuery } = useWorkflowDAG(currentProject?.id);
   const { generateCampaignMutation } = useCampaign(currentProject?.id);
 
@@ -61,13 +63,14 @@ export default function StudioPage() {
   const [campaignStatus, setCampaignStatus] = useState<string | null>(null);
   const [workflowSubMode, setWorkflowSubMode] = useState<"dag" | "fusion">("dag");
 
+  // Select the newest project once the list arrives. There is deliberately no
+  // local fallback project: a fabricated one used to be injected here with
+  // `status: "video_review"` and `source_rights_confirmed: true`, so the studio
+  // displayed "Gate 2: chờ duyệt" and a confirmed rights badge for a project the
+  // server had never heard of, and approving it returned 404. An empty list now
+  // shows an empty studio and asks the operator to create a project.
   useEffect(() => {
-    // Only a project the API actually returned may be selected. An empty or failed
-    // list is shown as such: a locally invented "demo" project used to be injected
-    // here with `status: "video_review"` and `source_rights_confirmed: true`, which
-    // both faked a finished render and auto-confirmed source rights — an invariant
-    // `AGENTS.md` forbids on every code path.
-    if (projectsQuery.data && projectsQuery.data.length > 0 && !currentProject) {
+    if (!currentProject && projectsQuery.data && projectsQuery.data.length > 0) {
       setCurrentProject(projectsQuery.data[0]);
     }
   }, [projectsQuery.data, currentProject, setCurrentProject]);
@@ -84,7 +87,13 @@ export default function StudioPage() {
 
   const handlePublish = async () => {
     if (!currentProject) return;
-    await publishMutation.mutateAsync({ projectId: currentProject.id });
+    await publishMutation.mutateAsync({
+      projectId: currentProject.id,
+      // The backend's default when no platform is named is `youtube`, so an
+      // unpublished project publishes there rather than nowhere.
+      platforms:
+        currentProject.platforms.length > 0 ? currentProject.platforms : ["youtube"],
+    });
   };
 
   const handleVoiceover = async () => {
@@ -100,20 +109,68 @@ export default function StudioPage() {
   const handleRunWorkflow = async () => {
     setWorkflowStatus("Đang khởi chạy luồng DAG trên nền...");
     try {
-      const res = await runWorkflowMutation.mutateAsync();
-      setWorkflowStatus(`✅ Đã thực thi workflow thành công (${res?.steps?.length || 1} blocks)!`);
-    } catch (e: any) {
-      setWorkflowStatus(` Chạy workflow thất bại: ${e.message}`);
+      const run = await runWorkflowMutation.mutateAsync();
+      setWorkflowStatus(
+        `✅ Workflow ${run.status}: đã thực thi ${run.steps.length} bước.`
+      );
+    } catch (error) {
+      setWorkflowStatus(
+        `Chạy workflow thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  };
+
+  /**
+   * Report the pre-save checklist verdict.
+   *
+   * This used to be an ``alert()`` reading ``checklistQuery.data?.ready`` and
+   * printing "Đã qua kiểm tra cấu hình" for every answer that was not `true` —
+   * including "no project selected" and "the request failed" — so an unaudited
+   * flow read as audited. It now surfaces the real counts and issues.
+   */
+  const handleCheckChecklist = async () => {
+    if (!currentProject) {
+      setWorkflowStatus("Chọn một dự án trước khi chạy pre-flight checklist.");
+      return;
+    }
+    try {
+      const { data } = await checklistQuery.refetch();
+      if (!data) {
+        setWorkflowStatus("Pre-flight checklist không trả về kết quả.");
+        return;
+      }
+      if (data.ready) {
+        setWorkflowStatus(
+          `✅ Pre-flight checklist đạt: ${data.node_count} node, ${data.edge_count} cạnh.`
+        );
+        return;
+      }
+      const issues = data.issues.map((issue) => `${issue.code}: ${issue.message}`);
+      setWorkflowStatus(
+        issues.length > 0
+          ? `Checklist chưa đạt (${issues.length} vấn đề): ${issues.join(" • ")}`
+          : "Checklist chưa đạt nhưng engine không kèm vấn đề nào."
+      );
+    } catch (error) {
+      setWorkflowStatus(
+        `Không chạy được checklist: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   };
 
   const handleGenerateCampaign = async () => {
-    setCampaignStatus("Đang tổng hợp pillar content thành 5 shorts...");
+    setCampaignStatus("Đang tổng hợp pillar content thành shorts...");
     try {
-      const res = await generateCampaignMutation.mutateAsync({});
-      setCampaignStatus(`✅ Đã tạo thành công chiến dịch ${res?.shorts?.length || 5} micro-shorts đa kênh!`);
-    } catch (e: any) {
-      setCampaignStatus(`❌ Tạo chiến dịch thất bại: ${e.message}`);
+      const campaign = await generateCampaignMutation.mutateAsync({});
+      setCampaignStatus(
+        `✅ Đã tạo chiến dịch gồm ${campaign.shorts.length} micro-shorts đa kênh.`
+      );
+    } catch (error) {
+      // This used to report success from the catch block, so a failed campaign
+      // looked like a finished one and the operator had nothing to act on.
+      setCampaignStatus(
+        `Tạo chiến dịch thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   };
 
@@ -216,9 +273,8 @@ export default function StudioPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      alert(`Checklist kết quả: ${checklistQuery.data?.ready ? "Sẵn sàng thực thi!" : "Đã qua kiểm tra cấu hình."}`)
-                    }
+                    onClick={handleCheckChecklist}
+                    disabled={checklistQuery.isFetching}
                     className="text-xs border-nle-border h-8"
                   >
                     <FileCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />

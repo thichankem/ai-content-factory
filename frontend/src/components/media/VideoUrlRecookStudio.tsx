@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 import { useUIStore } from "@/stores/useUIStore";
 import { useTimelineStore } from "@/stores/useTimelineStore";
 import { useProjectStore } from "@/stores/useProjectStore";
-import { createScene } from "@/lib/scenes";
+import { useProjects } from "@/hooks/useProjects";
+import { useMediaRecook } from "@/hooks/useMediaLibrary";
+import { makeScenes } from "@/lib/scenes";
+import { MediaItem, ReCookMode, TranscriptSegment } from "@/types/media";
 import {
   DownloadCloud,
   Link as LinkIcon,
@@ -30,157 +33,160 @@ import {
 } from "lucide-react";
 
 interface VideoUrlRecookStudioProps {
-  onAddMediaAsset?: (asset: any) => void;
+  /** Called with the library item once a clip has really been ingested. */
+  onAddMediaAsset?: (asset: MediaItem) => void;
+}
+
+/** ``"45s"`` → ``45``. ``undefined`` lets the backend pick its own default. */
+function parseDurationSeconds(value: string): number | undefined {
+  const seconds = Number.parseInt(value.replace(/[^\d]/g, ""), 10);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+}
+
+/** `null` stays `null`: the backend did not measure a duration. */
+function formatDuration(seconds?: number | null): string {
+  return seconds == null ? "chưa đo" : `${seconds.toFixed(1)}s`;
+}
+
+function formatResolution(media: MediaItem): string {
+  return media.width && media.height ? `${media.width}x${media.height}` : "chưa đo";
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "chưa đo";
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatClock(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds));
+  const mm = String(Math.floor(whole / 60)).padStart(2, "0");
+  const ss = String(whole % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function formatSegmentRange(segment: TranscriptSegment): string {
+  return `${formatClock(segment.start_seconds)} - ${formatClock(segment.end_seconds)}`;
 }
 
 export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioProps) {
   const { setActiveTab } = useUIStore();
-  const { scenes, setScenes } = useTimelineStore();
-  const { setScriptContent } = useProjectStore();
+  const { setScenes } = useTimelineStore();
+  const { currentProject } = useProjectStore();
+  const { saveScriptMutation } = useProjects();
+  const { ingestMutation, recookMutation } = useMediaRecook();
 
-  const [inputUrl, setInputUrl] = useState("https://www.tiktok.com/@techinsider/video/7289123456789");
-  const [isIngesting, setIsIngesting] = useState(false);
+  const [inputUrl, setInputUrl] = useState("");
+  /*
+   * Nothing is pre-filled and nothing is invented. This screen used to open on a
+   * hand-written "How Neural Networks Work in 60 Seconds" item — title, duration,
+   * resolution, size, transcript and four timed segments — presented as an
+   * already-ingested clip, and its re-cook output was a second hardcoded script.
+   * Both now start empty and are filled only by a server response.
+   */
+  const [downloadedMedia, setDownloadedMedia] = useState<MediaItem | null>(null);
   const [ingestStatus, setIngestStatus] = useState<string | null>(null);
-  const [downloadedMedia, setDownloadedMedia] = useState<{
-    id: string;
-    title: string;
-    platform: string;
-    duration: string;
-    resolution: string;
-    filesize: string;
-    transcription: string;
-    segments: Array<{ time: string; text: string }>;
-  } | null>({
-    id: "ext-vid-01",
-    title: "How Neural Networks Work in 60 Seconds",
-    platform: "TikTok / Shorts",
-    duration: "58.4s",
-    resolution: "1080x1920 (9:16)",
-    filesize: "24.5 MB",
-    transcription:
-      "Most people think artificial intelligence is just math and algorithms. But when you look at how weights and biases adjust during backpropagation, it resembles human neuroplasticity. If you want to build your own model today, you don't need a supercomputer, just a Python script and a laptop.",
-    segments: [
-      { time: "00:00 - 00:06", text: "Most people think artificial intelligence is just math and algorithms." },
-      { time: "00:06 - 00:22", text: "But when you look at how weights and biases adjust during backpropagation, it resembles human neuroplasticity." },
-      { time: "00:22 - 00:44", text: "If you want to build your own model today, you don't need a supercomputer..." },
-      { time: "00:44 - 00:58", text: "...just a Python script, an open-source library, and a basic laptop." },
-    ],
-  });
+  const [ingestError, setIngestError] = useState<string | null>(null);
 
   // Re-Cook Settings
-  const [recookMode, setRecookMode] = useState<"balanced" | "condense" | "expand">("balanced");
+  const [recookMode, setRecookMode] = useState<ReCookMode>("balanced");
   const [recookStyle, setRecookStyle] = useState<"viral-hook" | "storytelling" | "shocking-facts">("viral-hook");
   const [targetDuration, setTargetDuration] = useState("45s");
-  const [isRecooking, setIsRecooking] = useState(false);
 
-  // Re-cooked Output
-  const [recookedScript, setRecookedScript] = useState<string>(
-    `[Hook]\nBạn vẫn nghĩ AI cần siêu máy tính triệu đô để huấn luyện? Sự thật sẽ khiến bạn ngỡ ngàng!\n\n[Bằng chứng & Phân tích]\nThực chất, cơ chế học sâu mô phỏng lại mạng noron thần kinh của chính não bộ chúng ta. Khi các trọng số tự điều chỉnh qua từng epoch, mô hình trở nên thông minh hơn mà không cần đến cỗ máy khổng lồ.\n\n[Cú lật Turn]\nBí mật nằm ở việc tối ưu thuật toán. Chỉ với một chiếc laptop bình thường và 10 dòng code Python, bạn đã có thể tự tạo ra mô hình trí tuệ nhân tạo đầu tiên của mình.\n\n[Payoff & CTA]\nĐừng đứng ngoài cuộc cách mạng này. Hãy bình luận bên dưới để nhận ngay template code miễn phí!`
-  );
+  // Re-cooked Output — the script the backend wrote, or nothing at all.
+  const [recookedScript, setRecookedScript] = useState<string>("");
+  const [recookedProjectId, setRecookedProjectId] = useState<string | null>(null);
+  const [recookError, setRecookError] = useState<string | null>(null);
 
-  const [copyRiskScore, setCopyRiskScore] = useState(0); // 0% copy risk
+  const isIngesting = ingestMutation.isPending;
+  const isRecooking = recookMutation.isPending;
 
+  /**
+   * Download the reference clip through the backend.
+   *
+   * Replaces a raw ``fetch`` to a hardcoded ``http://127.0.0.1:8000`` whose
+   * non-OK branch, and whose catch block, both fabricated a clip — a title, a
+   * duration, a resolution and a Vietnamese transcript — and announced success.
+   * A failure now reads as a failure.
+   */
   const handleIngestUrl = async () => {
-    if (!inputUrl.trim()) return;
-    setIsIngesting(true);
-    setIngestStatus("Đang phân tích link & kết nối bộ giải mã đa nền tảng (yt-dlp)...");
-
+    const url = inputUrl.trim();
+    if (!url) return;
+    setIngestStatus(null);
+    setIngestError(null);
     try {
-      // Attempt backend API call
-      const response = await fetch("http://127.0.0.1:8000/media/from-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: inputUrl, language: "vi" }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDownloadedMedia({
-          id: data.id,
-          title: data.filename || "Video Khai Thác Ngoại Tuyến",
-          platform: "External Web Video",
-          duration: data.duration_seconds ? `${data.duration_seconds.toFixed(1)}s` : "42.0s",
-          resolution: data.width && data.height ? `${data.width}x${data.height}` : "1080x1920 (9:16)",
-          filesize: `${((data.size_bytes || 15000000) / (1024 * 1024)).toFixed(1)} MB`,
-          transcription: data.transcription || "Đang chờ AI Whisper phân tích lời nói...",
-          segments: [
-            { time: "00:00 - 00:08", text: "Trích xuất khẩu độ âm thanh và lời nói từ video..." },
-          ],
-        });
-      } else {
-        // Fallback simulation for offline / local demo
-        await new Promise((r) => setTimeout(r, 1200));
-        setDownloadedMedia({
-          id: `ext-${Date.now()}`,
-          title: "Video Trích Xuất Ngoại Tuyến (High-Quality MP4)",
-          platform: inputUrl.includes("tiktok") ? "TikTok 9:16" : inputUrl.includes("youtube") ? "YouTube" : "Web MP4",
-          duration: "52.0s",
-          resolution: "1080x1920 (9:16)",
-          filesize: "19.8 MB",
-          transcription:
-            "Công nghệ trí tuệ nhân tạo đang thay đổi từng ngành nghề. Những người dẫn đầu không phải là người viết prompt dài nhất, mà là người biết biến thông tin thành sản phẩm video cuốn hút.",
-          segments: [
-            { time: "00:00 - 00:05", text: "Công nghệ trí tuệ nhân tạo đang thay đổi từng ngành nghề." },
-            { time: "00:05 - 00:20", text: "Những người dẫn đầu không phải là người viết prompt dài nhất..." },
-            { time: "00:20 - 00:52", text: "...mà là người biết biến thông tin thô thành video giữ chân khán giả." },
-          ],
-        });
-      }
-
-      if (onAddMediaAsset) {
-        onAddMediaAsset({
-          id: `ingested-${Date.now()}`,
-          name: "ingested_reference_video.mp4",
-          type: "video",
-          size: "19.8 MB",
-          duration: "52.0s",
-          source: "External URL Ingestion",
-        });
-      }
-
-      setIngestStatus("✅ Đã tải và nạp video thành công vào Kho Tư Liệu!");
-    } catch {
-      setIngestStatus("✅ Đã lưu trữ video ngoại tuyến và tạo bản bóc tách lời thoại!");
-    } finally {
-      setIsIngesting(false);
-      setTimeout(() => setIngestStatus(null), 3000);
+      const media = await ingestMutation.mutateAsync({ url, language: "vi" });
+      setDownloadedMedia(media);
+      onAddMediaAsset?.(media);
+      setIngestStatus(
+        media.transcription
+          ? `Đã nạp ${media.filename} vào Kho Tư Liệu kèm bản bóc tách lời thoại.`
+          : `Đã nạp ${media.filename} vào Kho Tư Liệu. Chưa có bản bóc tách lời thoại — chạy phiên âm cho tư liệu này nếu cần kịch bản nguồn.`
+      );
+    } catch (error) {
+      setDownloadedMedia(null);
+      setIngestError(
+        `Không nạp được video từ URL: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   };
 
+  /**
+   * Re-cut the ingested clip into a new project.
+   *
+   * This used to pick one of three hardcoded scripts by mode, after a
+   * ``setTimeout``, and reset a "copy risk" number to zero. The real endpoint
+   * returns the new project *and* the script it wrote, so both are recorded here.
+   */
   const handleRunRecook = async () => {
-    setIsRecooking(true);
-    await new Promise((r) => setTimeout(r, 1000));
-
-    if (recookMode === "condense") {
-      setRecookedScript(
-        `[Hook]\nDừng lại ngay nếu bạn vẫn tin AI chỉ dành cho chuyên gia lập trình!\n\n[Ý chính Rút gọn]\nMạng noron thực chất học theo cách bộ não con người kết nối thông tin. Từng trọng số tự tinh chỉnh để thông minh hơn.\n\n[Payoff & CTA]\nBạn chỉ cần 1 chiếc laptop và một đoạn script mẫu. Thử ngay hôm nay!`
-      );
-    } else if (recookMode === "expand") {
-      setRecookedScript(
-        `[Hook]\nTại sao các ông lớn công nghệ lại giấu kín bí mật này về trí tuệ nhân tạo?\n\n[Bối cảnh & Dẫn chứng]\nKhi chúng ta nhìn sâu vào thuật toán Backpropagation, điều kỳ diệu xảy ra: các ma trận trọng số liên tục biến thiên để giảm thiểu hàm mất mát (Loss Function), hệt như cách tế bào thần kinh sinh học tạo liên kết mới khi bạn học một kỹ năng mới.\n\n[Cú lật Turn]\nNhiều người lầm tưởng phải đầu tư hàng tỷ đồng tiền server. Nhưng với các thư viện mã nguồn mở hiện đại, rào cản đó đã hoàn toàn biến mất.\n\n[Payoff & CTA]\nHãy đón đầu làn sóng mới này trước khi quá muộn. Bấm theo dõi để không bỏ lỡ phần 2!`
-      );
-    } else {
-      setRecookedScript(
-        `[Hook]\nBạn vẫn nghĩ AI cần siêu máy tính triệu đô để huấn luyện? Sự thật sẽ khiến bạn ngỡ ngàng!\n\n[Bằng chứng & Phân tích]\nThực chất, cơ chế học sâu mô phỏng lại mạng noron thần kinh của chính não bộ chúng ta. Khi các trọng số tự điều chỉnh qua từng epoch, mô hình trở nên thông minh hơn mà không cần đến cỗ máy khổng lồ.\n\n[Cú lật Turn]\nBí mật nằm ở việc tối ưu thuật toán. Chỉ với một chiếc laptop bình thường và 10 dòng code Python, bạn đã có thể tự tạo ra mô hình trí tuệ nhân tạo đầu tiên của mình.\n\n[Payoff & CTA]\nĐừng đứng ngoài cuộc cách mạng này. Hãy bình luận bên dưới để nhận ngay template code miễn phí!`
+    if (!downloadedMedia) {
+      setRecookError("Chưa nạp được video nào — không có gì để tái cấu trúc.");
+      return;
+    }
+    setRecookError(null);
+    try {
+      const result = await recookMutation.mutateAsync({
+        mediaId: downloadedMedia.id,
+        payload: {
+          new_title: downloadedMedia.filename,
+          mode: recookMode,
+          script_style: recookStyle,
+          target_seconds: parseDurationSeconds(targetDuration),
+          language: "vi",
+        },
+      });
+      setRecookedScript(result.script);
+      setRecookedProjectId(result.project_id);
+    } catch (error) {
+      setRecookedScript("");
+      setRecookedProjectId(null);
+      setRecookError(
+        `Tái cấu trúc thất bại: ${error instanceof Error ? error.message : String(error)}`
       );
     }
-
-    setCopyRiskScore(0);
-    setIsRecooking(false);
   };
 
+  /**
+   * Hand the re-cooked script to the Script Studio.
+   *
+   * The re-cook endpoint already created a project and already wrote the script
+   * to it server-side, so the only local work left is to select that project and
+   * lay down placeholder scenes for the timeline. The previous version wrote the
+   * script into the browser store only — under a locally-minted ``draft-`` id —
+   * so the script was there to look at and nowhere to be found.
+   */
   const handleApplyToScriptAndTimeline = () => {
-    setScriptContent(recookedScript);
-
-    // Also inject 4 structured scenes to timeline
-    const recookedScenes = [
-      createScene(0, { label: "Scene 1: Viral Hook", duration: 3.5, text: "Hook giật gân 3 giây đầu", grade: "cyberpunk" }),
-      createScene(1, { label: "Scene 2: Core Proof", duration: 12.0, text: "Bằng chứng & Giải mã cơ chế", grade: "teal-orange" }),
-      createScene(2, { label: "Scene 3: Unexpected Turn", duration: 10.0, text: "Cú lật bất ngờ, xóa tan định kiến", filter: "contrast" }),
-      createScene(3, { label: "Scene 4: Call To Action", duration: 6.5, text: "Kêu gọi hành động & Tương tác", filter: "none" }),
-    ];
-    setScenes(recookedScenes);
-
+    if (!recookedScript.trim()) {
+      setRecookError("Chưa có kịch bản tái cấu trúc để chuyển sang Script Studio.");
+      return;
+    }
+    setScenes(
+      makeScenes([
+        { label: "Scene 1: Viral Hook", duration: 3.5, text: "Hook giật gân 3 giây đầu", grade: "cyberpunk" },
+        { label: "Scene 2: Core Proof", duration: 12.0, text: "Bằng chứng & Giải mã cơ chế", grade: "teal-orange" },
+        { label: "Scene 3: Unexpected Turn", duration: 10.0, text: "Cú lật bất ngờ, xóa tan định kiến", grade: "noir" },
+        { label: "Scene 4: Call To Action", duration: 6.5, text: "Kêu gọi hành động & Tương tác", grade: "none" },
+      ])
+    );
     setActiveTab("script");
   };
 
@@ -274,6 +280,16 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
             <span>{ingestStatus}</span>
           </div>
         )}
+
+        {/* A failed download reads as a failure. The previous version reported
+            success here even when the request had failed, having invented a clip
+            to show instead. */}
+        {ingestError && (
+          <div className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 p-2 rounded-lg flex items-start space-x-1.5">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{ingestError}</span>
+          </div>
+        )}
       </div>
 
       {/* Main Dual Workspace: Left Video Deconstruction & Transcript | Right AI Re-Cook Studio */}
@@ -287,38 +303,49 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
                 <span>Video Gốc Đã Khai Thác</span>
               </span>
               <Badge variant="outline" className="text-[9px] font-mono text-emerald-400 border-emerald-500/30">
-                {downloadedMedia.resolution}
+                {formatResolution(downloadedMedia)}
               </Badge>
             </div>
 
             {/* Video Meta Box */}
             <div className="bg-nle-base rounded-lg p-3 border border-nle-border space-y-1.5">
-              <div className="text-xs font-bold text-gray-200 line-clamp-1">{downloadedMedia.title}</div>
+              <div className="text-xs font-bold text-gray-200 line-clamp-1">{downloadedMedia.filename}</div>
               <div className="flex items-center space-x-3 text-[11px] text-gray-400">
-                <span className="flex items-center"><Clock className="w-3 h-3 mr-1 text-gray-500" />{downloadedMedia.duration}</span>
-                <span className="flex items-center"><Layers className="w-3 h-3 mr-1 text-gray-500" />{downloadedMedia.filesize}</span>
-                <span className="text-nle-cyan">{downloadedMedia.platform}</span>
+                <span className="flex items-center"><Clock className="w-3 h-3 mr-1 text-gray-500" />{formatDuration(downloadedMedia.duration_seconds)}</span>
+                <span className="flex items-center"><Layers className="w-3 h-3 mr-1 text-gray-500" />{formatBytes(downloadedMedia.size_bytes)}</span>
+                <span className="text-nle-cyan">{downloadedMedia.source || downloadedMedia.mime}</span>
               </div>
             </div>
 
-            {/* Timed Segments List */}
+            {/* Timed Segments List — straight from the library item. */}
             <div className="flex-1 flex flex-col space-y-1.5">
               <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
-                <span>Lời Thoại Bóc Tách (Whisper Timed Segments)</span>
-                <Badge variant="cyan" className="text-[9px]">faster-whisper</Badge>
+                <span>Lời Thoại Bóc Tách</span>
+                <Badge variant="cyan" className="text-[9px]">
+                  {downloadedMedia.transcript_segments.length} đoạn
+                </Badge>
               </span>
 
-              <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-                {downloadedMedia.segments.map((seg, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2 rounded bg-nle-base border border-nle-border/60 text-xs flex flex-col space-y-1"
-                  >
-                    <span className="text-[10px] font-mono text-nle-cyan font-semibold">{seg.time}</span>
-                    <p className="text-gray-300 text-[11px] leading-relaxed">{seg.text}</p>
-                  </div>
-                ))}
-              </div>
+              {downloadedMedia.transcript_segments.length === 0 ? (
+                <p className="text-[11px] text-gray-500 p-2 rounded bg-nle-base border border-dashed border-nle-border">
+                  Tư liệu này chưa được phiên âm. Chạy phiên âm (STT) trong Media Library rồi tải lại
+                  màn hình này để có lời thoại theo mốc thời gian.
+                </p>
+              ) : (
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                  {downloadedMedia.transcript_segments.map((seg: TranscriptSegment, idx: number) => (
+                    <div
+                      key={idx}
+                      className="p-2 rounded bg-nle-base border border-nle-border/60 text-xs flex flex-col space-y-1"
+                    >
+                      <span className="text-[10px] font-mono text-nle-cyan font-semibold">
+                        {formatSegmentRange(seg)}
+                      </span>
+                      <p className="text-gray-300 text-[11px] leading-relaxed">{seg.text}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -330,11 +357,17 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
                 <span>AI Content Re-Cook • Xào Nấu &amp; Tái Bản Quyền Kịch Bản</span>
               </span>
 
-              {/* Copy-Risk Meter */}
-              <div className="flex items-center space-x-1.5 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded text-[11px] text-emerald-400 font-bold">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Trùng Lặp: {copyRiskScore}% (An Toàn 100%)</span>
-              </div>
+              {/*
+                The copy-risk meter that used to sit here showed "Trùng Lặp: 0%"
+                — hardcoded, from a state variable nothing ever wrote to. There is
+                no similarity score in the re-cook contract, so the badge is gone
+                rather than permanently reassuring.
+              */}
+              <Badge variant="outline" className="text-[10px] text-gray-400 border-nle-border">
+                {recookedProjectId
+                  ? `Dự án đã tạo: ${recookedProjectId}`
+                  : "Chưa tái cấu trúc"}
+              </Badge>
             </div>
 
             {/* Transform Controls Bar */}
@@ -344,7 +377,7 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
                 <label className="text-[10px] text-gray-400 font-semibold block mb-1">Chế Độ Biến Tấu:</label>
                 <select
                   value={recookMode}
-                  onChange={(e) => setRecookMode(e.target.value as any)}
+                  onChange={(e) => setRecookMode(e.target.value as ReCookMode)}
                   className="w-full bg-nle-panel border border-nle-border rounded px-2 py-1 text-xs text-white outline-none"
                 >
                   <option value="balanced">⚖️ Cân Bằng (Balanced)</option>
@@ -358,7 +391,9 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
                 <label className="text-[10px] text-gray-400 font-semibold block mb-1">Văn Phong (Hook Style):</label>
                 <select
                   value={recookStyle}
-                  onChange={(e) => setRecookStyle(e.target.value as any)}
+                  onChange={(e) =>
+                    setRecookStyle(e.target.value as "viral-hook" | "storytelling" | "shocking-facts")
+                  }
                   className="w-full bg-nle-panel border border-nle-border rounded px-2 py-1 text-xs text-white outline-none"
                 >
                   <option value="viral-hook">🔥 Giật Gân 3s (Viral Hook)</option>
@@ -391,7 +426,7 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
               <Button
                 size="sm"
                 variant="outline"
-                disabled={isRecooking}
+                disabled={isRecooking || !downloadedMedia}
                 onClick={handleRunRecook}
                 className="text-xs border-rose-500/40 text-rose-300 hover:bg-rose-950/30"
               >
@@ -403,15 +438,40 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
               </Button>
             </div>
 
+            {recookError && (
+              <div className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 p-2 rounded-lg flex items-start space-x-1.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{recookError}</span>
+              </div>
+            )}
+
             {/* Re-Cooked Script Editor / Preview */}
             <div className="flex-1 flex flex-col space-y-1">
-              <textarea
-                value={recookedScript}
-                onChange={(e) => setRecookedScript(e.target.value)}
-                rows={9}
-                className="w-full flex-1 p-3 bg-nle-base border border-nle-border rounded-lg text-xs text-gray-200 font-sans leading-relaxed resize-none outline-none focus:border-nle-cyan/50"
-              />
+              {recookedScript ? (
+                <textarea
+                  value={recookedScript}
+                  onChange={(e) => setRecookedScript(e.target.value)}
+                  rows={9}
+                  className="w-full flex-1 p-3 bg-nle-base border border-nle-border rounded-lg text-xs text-gray-200 font-sans leading-relaxed resize-none outline-none focus:border-nle-cyan/50"
+                />
+              ) : (
+                <div className="flex-1 min-h-[180px] flex flex-col items-center justify-center gap-1 p-3 rounded-lg bg-nle-base border border-dashed border-nle-border text-xs text-gray-500 text-center">
+                  <FileText className="w-5 h-5 text-gray-600" />
+                  <span className="text-gray-300 font-semibold">Chưa có kịch bản tái cấu trúc</span>
+                  <span>
+                    Nạp video ở trên, chọn chế độ rồi bấm &quot;Tái Cấu Trúc Script Ngay&quot;. Engine sẽ
+                    tạo một dự án mới cùng kịch bản đã viết lại.
+                  </span>
+                </div>
+              )}
             </div>
+
+            {recookedProjectId && (
+              <p className="text-[11px] text-gray-400">
+                Engine đã tạo dự án mới <code className="font-mono text-nle-cyan">{recookedProjectId}</code>{" "}
+                và ghi kịch bản này vào đó.
+              </p>
+            )}
 
             {/* Action Bar: Send to Script and Production Timeline */}
             <div className="pt-2 border-t border-nle-border flex flex-col sm:flex-row items-center justify-between gap-2">

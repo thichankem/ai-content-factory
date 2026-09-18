@@ -73,7 +73,14 @@ export interface CopyrightVerdict {
   checked: number;
 }
 
-/** One immutable audit record (`AuditEntry`). */
+/**
+ * One immutable audit record, as ``/audit`` sends it.
+ *
+ * The log on disk stores one JSON object per line with the six fields below the
+ * aliases. ``services/qa.py`` adds a client-facing alias for each of them and
+ * derives ``sha256_hash`` from the entry's own content, so the trailers the
+ * studio renders are real values the backend computed — not decorations.
+ */
 export interface AuditEntry {
   ts: string;
   actor: string;
@@ -82,6 +89,15 @@ export interface AuditEntry {
   media_id?: string | null;
   prompt?: string | null;
   detail?: string | null;
+  // --- the studio's names for the same record -------------------------------
+  /** Same instant as ``ts``. */
+  timestamp: string;
+  /** Short digest of the record's identity fields. */
+  id: string;
+  /** Digest over the whole record. */
+  sha256_hash: string;
+  /** Alias of ``sha256_hash``. */
+  hash: string;
 }
 
 /** Payload for ``POST /audit/record``. */

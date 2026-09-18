@@ -156,18 +156,20 @@ export function ExternalIngestionModal() {
 
         {/* Tab Navigation */}
         <div className="flex border-b border-nle-border bg-nle-base text-xs font-semibold px-4 pt-1">
-          {[
-            { id: "media", label: "🎬 Footage (Kling/Veo/MJ)", icon: Film },
-            { id: "audio", label: "🎙️ Thoại & Nhạc (ElevenLabs/Suno)", icon: Music },
-            { id: "dossier", label: "🧠 Nghiên Cứu (Perplexity)", icon: FileText },
-            { id: "batch", label: "📦 Batch Dropzone", icon: Package },
-          ].map((tab) => {
+          {(
+            [
+              { id: "media", label: "🎬 Footage (Kling/Veo/MJ)", icon: Film },
+              { id: "audio", label: "🎙️ Thoại & Nhạc (ElevenLabs/Suno)", icon: Music },
+              { id: "dossier", label: "🧠 Nghiên Cứu (Perplexity)", icon: FileText },
+              { id: "batch", label: "📦 Batch Dropzone", icon: Package },
+            ] as const
+          ).map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center space-x-1.5 px-3 py-2.5 border-b-2 transition-all ${
                   isActive
                     ? "border-nle-cyan text-nle-cyan bg-nle-surface/80"
@@ -213,7 +215,9 @@ export function ExternalIngestionModal() {
                   <label className="text-gray-300 font-semibold block mb-1">Phân loại tư liệu:</label>
                   <select
                     value={mediaType}
-                    onChange={(e) => setMediaType(e.target.value as any)}
+                    onChange={(e) =>
+                      setMediaType(e.target.value as "scene_video" | "scene_image")
+                    }
                     className="w-full bg-nle-base border border-nle-border rounded-lg p-2 text-xs text-white"
                   >
                     <option value="scene_video">🎬 AI Reconstruction Video (Kling / Veo / Wan)</option>

@@ -51,10 +51,32 @@ interface AudioLabStore {
   toggleChannelSolo: (ch: "voiceover" | "bgm" | "sfx" | "ambient") => void;
   setEQBandGain: (bandId: string, gain: number) => void;
   resetEQ: () => void;
-  setDuckingParam: (key: string, val: any) => void;
-  setVoiceSettings: (key: string, val: any) => void;
+  /*
+   * These two are keyed setters, and they used to be typed ``(key: string, val:
+   * any)`` — which meant ``setVoiceSettings("ttsPitch", "loud")`` compiled. The
+   * key is now one of the store's own field names and the value must match that
+   * field, so a wrong pairing is a type error instead of a silently broken store.
+   */
+  setDuckingParam: <K extends DuckingParamKey>(key: K, val: AudioLabStore[K]) => void;
+  setVoiceSettings: <K extends VoiceSettingKey>(key: K, val: AudioLabStore[K]) => void;
   setAiAudioProcessing: (loading: boolean, status?: string | null) => void;
 }
+
+/** Sidechain ducking fields the mixer panel writes to. */
+type DuckingParamKey =
+  | "duckingEnabled"
+  | "duckingReductionDb"
+  | "duckingAttackMs"
+  | "duckingReleaseMs"
+  | "duckingThreshold";
+
+/** Neural-voiceover fields the TTS panel writes to. */
+type VoiceSettingKey =
+  | "voiceId"
+  | "ttsSpeed"
+  | "ttsPitch"
+  | "ttsEmotion"
+  | "ttsScriptDraft";
 
 const DEFAULT_EQ_BANDS: EQBand[] = [
   { id: "sub", freqLabel: "60 Hz", freqHz: 60, gainDb: -1.5, q: 1.0 },

@@ -258,13 +258,17 @@ export interface RenderStep {
   entrance: EntranceEffect;
   exit: ExitEffect;
   keyframes: Keyframe[];
-  source_in_seconds: number;
-  speed: number;
-  narration_url?: string | null;
-  volume: number;
 }
 
-/** A timeline compiled into an explicit, renderer-ready plan (`RenderPlan`). */
+/**
+ * A timeline compiled into an explicit, backend-agnostic render plan
+ * (`RenderPlan`).
+ *
+ * This is what a renderer consumes: every scene at an absolute time, the caption
+ * cues, and the audio layers. It is the contract both a server-side ffmpeg render
+ * and an in-browser WebCodecs preview must agree on, so that previewing and
+ * rendering cannot drift apart.
+ */
 export interface RenderPlan {
   project_id: string;
   aspect_ratio: string;

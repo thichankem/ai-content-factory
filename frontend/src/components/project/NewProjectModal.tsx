@@ -46,8 +46,10 @@ export function NewProjectModal() {
       setName("");
       setTopic("");
       setErrorMsg(null);
-    } catch (err: any) {
-      setErrorMsg(err.message || "Không thể khởi tạo dự án mới.");
+    } catch (error) {
+      setErrorMsg(
+        error instanceof Error ? error.message : "Không thể khởi tạo dự án mới."
+      );
     }
   };
 
