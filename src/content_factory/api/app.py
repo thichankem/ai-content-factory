@@ -26,6 +26,7 @@ from .routers import (
     build_media_router,
     build_projects_router,
     build_qa_router,
+    build_resources_router,
     build_seo_router,
     build_studio_media_router,
     build_styles_router,
@@ -50,6 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(build_health_router(service, settings))
     app.include_router(build_qa_router(service))
+    app.include_router(build_resources_router(service))
     app.include_router(build_seo_router(service))
     app.include_router(build_projects_router(service))
     app.include_router(build_styles_router(service))

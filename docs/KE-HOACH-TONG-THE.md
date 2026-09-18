@@ -1116,6 +1116,29 @@ có thể nối LLM sau. Phụ đề rút gọn dùng synonym map + cắt câu, 
 - Quyết định: không phá chuỗi kế thừa mixin — đó là dependency graph phục vụ
   mypy strict; guard kiến trúc cấm property getter+setter cùng tên nên
   `_providers` giữ attribute thường.
+
+### 2026-09-18 — Refactor Store: compare-and-save nguyên tử + dọn worker registry
+
+- Đã làm:
+  - `store.py`: thêm `Store.save_if_unchanged(project, expected)` — so sánh và
+    ghi trong **một lock**, từ chối ghi đè lost-update bằng
+    `StoreConflictError`. Hợp đồng: `expected` là snapshot lấy từ working copy
+    (mutate bản copy, store so với object gốc của nó).
+  - `services/production.py`: `render_video` dùng CAS thay so-sánh tay
+    read-then-write (cửa sổ lost-update bị đóng); import mới
+    `..store.StoreConflictError`.
+  - Worker registry: `_register_worker` (context) dọn thread chết trước khi
+    thêm — trước đây set `_workers` phình vô hạn theo số job. Ba nơi spawn
+    (generation, voiceover, workflow) dùng chung helper.
+  - Thêm `.gitattributes` (eol=lf, .ps1/.bat giữ CRLF) hết cảnh báo CRLF.
+  - Test mới: 3 case CAS trong `tests/test_store.py` (happy, xung đột, id lạ).
+- Kiểm chứng: ruff check + format sạch (170 files); mypy 118 files 0 lỗi;
+  subset store/render/tts/workflow 100% pass; full suite tới [100%] chỉ 2 fail
+  ở `test_resources.py` (module mới của phiên khác, đang bị sửa song song —
+  chạy riêng 2/2 pass); smoke 64/64 PASSED trên cây gồm cả ResourcesMixin.
+- Việc tiếp theo: CAS cho `_apply_timeline_edit` (hiện last-write-wins — cần
+  quyết định UX trước), retention audio generation, hàng đợi render bền vững.
+
 - Việc tiếp theo: giữ danh sách việc trước (store nguyên tử, retention audio,
   hàng đợi bền vững); đo thời gian dựng service trước/sau lazy.
 
@@ -1285,3 +1308,31 @@ mọi agent dùng được.
 khi publish), nối kết quả thật của nền tảng vào `seo_calibrate` để tự hiệu chỉnh
 trọng số, và dùng `seo_optimize` ngay trong `campaign.py` khi sinh gói đa định
 dạng.
+
+---
+
+### 2026-09-18 — Siêu Giao diện NLE Studio & Tài liệu Kiến trúc Toàn diện
+
+**Động lực:**
+Người vận hành yêu cầu tổng hợp toàn bộ 41 ảnh giao diện chuyên nghiệp trong `picture/` (Adobe Premiere Pro 2025, CapCut Pro Desktop, DaVinci Resolve Studio 19, Apple Final Cut Pro 11, Adobe After Effects 2025) để nâng cấp giao diện frontend đạt chuẩn NLE Studio cao cấp nhất, tổ chức thành thanh taskbar 7 bước tuần tự có AI Agent Co-Pilot hỗ trợ trên mọi tab, đồng thời lập tài liệu kiến trúc kỹ thuật (`docs/NLE-STUDIO-FULL-ARCHITECTURE.md`) để dễ dàng mở rộng và triển khai backend.
+
+**Những gì đã làm:**
+1. **Khảo sát & Tổng hợp 41 Ảnh UI:**
+   - Hoàn thiện `picture/README_UI_SURVEY.md` phân tích chi tiết từng khối chức năng của 5 phần mềm NLE hàng đầu.
+2. **Nâng cấp Frontend NLE Studio:**
+   - **Thanh Taskbar 7 bước tuần tự bên trái:** `[01] Kịch bản` → `[02] Tư liệu & Nhạc` → `[03] Chỉnh sửa Ảnh` → `[04] Video & Kỹ xảo` → `[05] Âm thanh` → `[06] Ghép nối Timeline` → `[07] Xuất ra & Kiểm duyệt`.
+   - **Thanh AI Agent Harness Co-Pilot trên mọi tab:** 1-click Quick Actions tự động hóa, prompt lệnh tự nhiên, cùng 100% thanh trượt thủ công.
+   - **Premiere Pro 2025 Contextual Properties & CapCut Video Inspector:** Bảng thuộc tính Text typography (font, tracking, leading, all-caps, stroke outer/inner, drop shadow) và Auto Cutout (birefnet segmentation, chroma key, face retouch).
+   - **CapCut Pro Auto-Captions:** Whisper speech-to-text, nhận diện từ khóa cảm xúc (Keyword Highlight), và các mẫu phụ đề viral (Trending Box, Emphasis Bounce, Glow Neon, Emoji Pop).
+   - **DaVinci Resolve Studio 19 Fusion Node Graph:** Tích hợp bộ ghép nối đồ thị node trực quan, kết nối các luồng `MediaIn` -> `MagicMask AI` / `LumetriColor` -> `Merge` -> `MediaOut`.
+   - **Adobe After Effects Bezier Graph Editor & CapCut Speed Ramping:** Đường cong điều tốc biến thiên 0.1x - 10x với Optical Flow và tiếp tuyến Bezier easing.
+   - **Adobe Audition 5-Band Parametric EQ & Fairlight Ducking:** Bộ cân bằng 5 dải tần (60Hz, 250Hz, 1kHz, 4kHz, 12kHz) và sidechain auto-ducking BGM dưới giọng MC (-16dB).
+   - **Premiere Pro Dual Monitors & Tool Palette:** Màn hình Source/Program, Lumetri Scopes (RGB Parade Rec.709), Live Stereo VU dB meter, và bộ phím tắt `V, A, B, C, Y, P, H, T`.
+3. **Tài liệu Kiến trúc Backend Toàn diện:**
+   - Đã biên soạn `docs/NLE-STUDIO-FULL-ARCHITECTURE.md` với đầy đủ Pydantic models, Service Mixins (`VideoFXServiceMixin`, `AudioLabServiceMixin`, `InspectorServiceMixin`, `FusionServiceMixin`), bảng định tuyến REST API, và state machine 2 cổng duyệt bắt buộc (`state.py`).
+
+**Kiểm chứng:**
+- `npm run type-check`: **0 errors**.
+- `npm run build`: **Next.js 14.2.35 Build PASS** (4/4 static pages generated).
+- `pytest`: **888 test PASS (100%)**, 0 failed.
+

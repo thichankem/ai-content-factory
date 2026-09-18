@@ -188,7 +188,38 @@ class Settings(BaseSettings):
     video_format: str = "mp4"
     render_threads: int = Field(default=1, ge=1, le=8)
     render_max_dimension: int | None = Field(default=None, ge=64, le=1920)
+    # A hung ffmpeg must never pin the machine: the job is killed past this.
+    render_timeout_seconds: float = Field(default=1800.0, ge=30, le=86400)
     uploads_dir: str = "./storage/uploads"
+
+    # --- Compute scheduling (CPU vs GPU) ---------------------------------------
+    # The whole policy lives here so a laptop can be tuned without editing code.
+    # compute_policy: "auto" (use the GPU when it is free and cool) | "cpu" | "gpu"
+    compute_policy: str = "auto"
+    # render_encoder: "auto" (hardware when available) | "nvenc" | "cpu"
+    render_encoder: str = "auto"
+    # Seconds a hardware profile is trusted before it is probed again.
+    profile_ttl_seconds: float = Field(default=15.0, ge=1.0, le=600.0)
+    # Heavy jobs (render, transcribe, OCR, vision) never overlap beyond this.
+    max_heavy_jobs: int = Field(default=1, ge=1, le=4)
+    # Waits longer than this stop waiting for a free machine and proceed anyway.
+    heavy_wait_seconds: float = Field(default=900.0, ge=0.0, le=3600.0)
+    # Concurrent GPU jobs. One on a laptop: the GPU also drives the display.
+    gpu_max_jobs: int = Field(default=1, ge=1, le=4)
+    # Above this temperature the GPU is left alone until it cools down.
+    gpu_max_temperature_c: int = Field(default=82, ge=40, le=100)
+    # Above this utilisation a new GPU job waits rather than piling on.
+    gpu_max_utilization_pct: int = Field(default=90, ge=10, le=100)
+    # VRAM kept free on top of each job's estimate (desktop compositor, browser).
+    gpu_memory_headroom_mb: int = Field(default=600, ge=0, le=8000)
+    # How long a job waits for GPU headroom before it honestly falls back to CPU.
+    gpu_wait_seconds: float = Field(default=90.0, ge=0.0, le=1800.0)
+    gpu_poll_seconds: float = Field(default=2.0, ge=0.1, le=60.0)
+    # Transcribe a video below this free-RAM level on one thread only.
+    ram_min_available_mb: int = Field(default=700, ge=0)
+    # Speech-to-text: "auto" uses the GPU when torch reports CUDA, else CPU.
+    transcribe_model: str = "base"
+    transcribe_device: str = "auto"
 
     # --- Text-to-speech (AI voiceover) -----------------------------------------
     # engine: "edge" (neural, best quality) | "gtts" (fast fallback) | "off"

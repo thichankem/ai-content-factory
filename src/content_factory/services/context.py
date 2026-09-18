@@ -35,6 +35,7 @@ from ..providers import ProviderChain
 from ..rag import KnowledgeRetriever
 from ..recook import RecookPipeline
 from ..research import ResearchEngine
+from ..resources import ResourceGovernor
 from ..scenes import build_video_project
 from ..state import StateMachineError, assert_transition
 from ..store import Store
@@ -69,6 +70,9 @@ class ServiceContext:
         self._kb_documents: dict[str, KBDocument] = {}
         self._chunks: dict[str, Chunk] = {}
         self._retriever = KnowledgeRetriever()
+        # Compute governor: decides GPU vs CPU per job and serializes heavy work.
+        # Cheap to build (the hardware probe only happens on first use).
+        self._governor = ResourceGovernor(settings)
         # Lazy-engine caches, built on first access under ``_init_lock``.
         self._init_lock = threading.Lock()
         # The provider chain only assembles configuration objects (no I/O);
@@ -131,6 +135,9 @@ class ServiceContext:
                         self._settings.media_dir,
                         chunk_bytes=self._settings.stream_chunk_bytes,
                         max_bytes=self._settings.upload_max_bytes,
+                        governor=self._governor,
+                        transcribe_model=self._settings.transcribe_model,
+                        transcribe_device=self._settings.transcribe_device,
                     )
         return self._media_cache
 
@@ -165,6 +172,11 @@ class ServiceContext:
                 if self._presets_cache is None:
                     self._presets_cache = PresetLibrary(self._settings.presets_dir)
         return self._presets_cache
+
+    @property
+    def governor(self) -> ResourceGovernor:
+        """The compute governor shared by every heavy job in this service."""
+        return self._governor
 
     @property
     def providers(self) -> ProviderChain:
@@ -234,12 +246,22 @@ class ServiceContext:
     # --- Generation worker ---------------------------------------------------
 
     def _spawn_worker(self, project_id: str) -> None:
-        thread = threading.Thread(
-            target=self._produce,
-            args=(project_id,),
-            name=f"generation-{project_id}",
-            daemon=True,
+        self._register_worker(
+            threading.Thread(
+                target=self._produce,
+                args=(project_id,),
+                name=f"generation-{project_id}",
+                daemon=True,
+            )
         )
+
+    def _register_worker(self, thread: threading.Thread) -> None:
+        """Track a background worker, pruning finished threads first.
+
+        Without the prune the registry grows by one dead thread per job for
+        the life of the process.
+        """
+        self._workers = {t for t in self._workers if t.is_alive()}
         self._workers.add(thread)
         thread.start()
 

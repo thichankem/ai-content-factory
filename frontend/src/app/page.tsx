@@ -10,6 +10,7 @@ import { VideoMotionFXStudio } from "../components/videofx/VideoMotionFXStudio";
 import { AudioLabStudio } from "../components/audio/AudioLabStudio";
 import { TimelineAssemblyStudio } from "../components/timeline/TimelineAssemblyStudio";
 import { ExportReviewStudio } from "../components/export/ExportReviewStudio";
+import { FusionNodeCompositor } from "../components/fusion/FusionNodeCompositor";
 
 import { CommandBarModal } from "../components/copilot/CommandBarModal";
 import { ComplianceModal } from "../components/qa/ComplianceModal";
@@ -182,46 +183,56 @@ export default function StudioPage() {
 
           {/* System Utility Tab: Visual DAG Workflow Orchestrator */}
           {activeTab === "workflow" && (
-            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-nle-border rounded-xl bg-nle-surface/50 text-center p-6 space-y-3">
-              <div className="w-12 h-12 rounded-xl bg-nle-panel flex items-center justify-center text-nle-cyan shadow-lg shadow-nle-cyan/10">
-                <GitBranch className="w-6 h-6" />
-              </div>
-              <h3 className="font-bold text-base text-white">Visual DAG Pipeline Orchestrator</h3>
-              <p className="text-xs text-gray-400 max-w-md">
-                Định tuyến các khối nghiên cứu, kịch bản, dựng hình, tổng hợp giọng đọc và kiểm định chất lượng theo đồ thị phi chu trình có hướng.
-              </p>
+            <div className="flex-1 flex flex-col space-y-3 min-h-0 overflow-hidden">
+              <div className="flex items-center justify-between bg-nle-panel border border-nle-border rounded-xl px-4 py-2 shrink-0">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-nle-surface flex items-center justify-center text-nle-cyan border border-nle-border">
+                    <GitBranch className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-xs text-white">Visual DAG Pipeline Orchestrator & Node Compositor</h3>
+                    <p className="text-[11px] text-gray-400">Định tuyến các khối AI và Node Compositing theo đồ thị phi chu trình có hướng</p>
+                  </div>
+                </div>
 
-              <div className="flex space-x-2 mt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    alert(`Checklist kết quả: ${checklistQuery.data?.ready ? "Sẵn sàng thực thi!" : "Đã qua kiểm tra cấu hình."}`)
-                  }
-                  className="text-xs border-nle-border"
-                >
-                  <FileCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
-                  Kiểm tra Pre-flight Checklist
-                </Button>
-                <Button
-                  variant="neon"
-                  size="sm"
-                  onClick={handleRunWorkflow}
-                  disabled={runWorkflowMutation.isPending}
-                  className="text-xs"
-                >
-                  {runWorkflowMutation.isPending ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <Play className="w-3.5 h-3.5 mr-1.5 fill-current" />
-                  )}
-                  Chạy Toàn bộ Workflow Nền
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      alert(`Checklist kết quả: ${checklistQuery.data?.ready ? "Sẵn sàng thực thi!" : "Đã qua kiểm tra cấu hình."}`)
+                    }
+                    className="text-xs border-nle-border h-8"
+                  >
+                    <FileCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
+                    Pre-flight Checklist
+                  </Button>
+                  <Button
+                    variant="neon"
+                    size="sm"
+                    onClick={handleRunWorkflow}
+                    disabled={runWorkflowMutation.isPending}
+                    className="text-xs h-8"
+                  >
+                    {runWorkflowMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Play className="w-3.5 h-3.5 mr-1.5 fill-current" />
+                    )}
+                    Chạy Workflow Nền
+                  </Button>
+                </div>
               </div>
 
               {workflowStatus && (
-                <p className="text-xs text-nle-cyan font-semibold mt-2">{workflowStatus}</p>
+                <div className="text-xs text-nle-cyan font-semibold bg-nle-panel px-3 py-1.5 rounded-lg border border-nle-border shrink-0">
+                  {workflowStatus}
+                </div>
               )}
+
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <FusionNodeCompositor />
+              </div>
             </div>
           )}
 

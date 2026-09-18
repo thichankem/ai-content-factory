@@ -5,12 +5,26 @@ import { DualMonitorPlayer } from "./DualMonitorPlayer";
 import { TimelineVisualizer } from "./TimelineVisualizer";
 import { AIAgentBar, AIQuickAction } from "../copilot/AIAgentBar";
 import { useTimelineStore } from "../../stores/useTimelineStore";
-import { Sparkles, Layers, Scissors, Magnet, Wand2 } from "lucide-react";
+import { PropertiesInspector } from "../inspector/PropertiesInspector";
+import { CaptionSimplifier } from "../captions/CaptionSimplifier";
+import {
+  Sparkles,
+  Layers,
+  Scissors,
+  Magnet,
+  Wand2,
+  Sliders,
+  Type,
+  ChevronRight,
+  ChevronLeft,
+  PanelRight,
+} from "lucide-react";
 
 export function TimelineAssemblyStudio() {
   const { setScenes, setSelectedSceneIndex } = useTimelineStore();
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
+  const [activeSidePanel, setActiveSidePanel] = useState<"properties" | "captions" | "none">("properties");
 
   // Quick actions for Timeline Assembly
   const quickActions: AIQuickAction[] = [
@@ -78,9 +92,70 @@ export function TimelineAssemblyStudio() {
         }}
       />
 
-      {/* Top: Dual Monitor Player + Audio VU Meter + Tool Palette */}
-      <div className="flex-1 min-h-[320px] overflow-hidden">
-        <DualMonitorPlayer />
+      {/* Top: Dual Monitor Player + Right Collapsible Inspector Panel */}
+      <div className="flex-1 min-h-[340px] flex overflow-hidden gap-3 relative">
+        {/* Center/Left: Dual Monitor Player */}
+        <div className="flex-1 min-w-0 h-full overflow-hidden flex flex-col">
+          <DualMonitorPlayer />
+        </div>
+
+        {/* Right Collapsible Inspector (Premiere Pro 2025 Properties + CapCut Auto-Captions) */}
+        {activeSidePanel !== "none" ? (
+          <div className="w-80 lg:w-96 shrink-0 h-full overflow-hidden flex flex-col bg-nle-surface border border-nle-border rounded-xl shadow-xl">
+            {/* Inspector Switcher Tabs Header */}
+            <div className="h-10 px-2.5 bg-nle-panel border-b border-nle-border flex items-center justify-between shrink-0 text-xs">
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={() => setActiveSidePanel("properties")}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+                    activeSidePanel === "properties"
+                      ? "bg-nle-surface text-nle-cyan shadow-sm border border-nle-cyan/30"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5 text-nle-cyan" />
+                  <span>Properties</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveSidePanel("captions")}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+                    activeSidePanel === "captions"
+                      ? "bg-nle-surface text-nle-cyan shadow-sm border border-nle-cyan/30"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <Type className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Auto-Captions</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setActiveSidePanel("none")}
+                className="p-1 rounded text-gray-400 hover:text-white hover:bg-nle-surface transition-colors"
+                title="Thu gọn bảng thuộc tính để mở rộng Monitor"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Inspector Scrollable Viewport */}
+            <div className="flex-1 overflow-y-auto p-2">
+              {activeSidePanel === "properties" && <PropertiesInspector />}
+              {activeSidePanel === "captions" && <CaptionSimplifier />}
+            </div>
+          </div>
+        ) : (
+          /* Expand Button when Panel is Collapsed */
+          <button
+            onClick={() => setActiveSidePanel("properties")}
+            className="absolute right-2 top-2 z-30 px-2.5 py-1.5 rounded-lg bg-nle-panel border border-nle-border text-gray-300 hover:text-white hover:border-nle-cyan/50 text-xs font-semibold flex items-center space-x-1.5 shadow-md backdrop-blur-sm"
+            title="Mở bảng Properties Inspector"
+          >
+            <PanelRight className="w-3.5 h-3.5 text-nle-cyan" />
+            <span>Mở Inspector</span>
+          </button>
+        )}
       </div>
 
       {/* Bottom: Professional Multi-track Timeline */}

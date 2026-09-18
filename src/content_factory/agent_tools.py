@@ -742,6 +742,19 @@ def _h_auto_cut_to_beat(service: Any, args: Args) -> Any:
     }
 
 
+# --- Compute: what will this machine actually do with the job -----------------
+
+
+def _h_resource_status(service: Any, args: Args) -> Any:
+    """Hardware, limits, live admission per job kind, and governor counters."""
+    return service.resource_snapshot()
+
+
+def _h_resource_explain(service: Any, args: Args) -> Any:
+    """Whether a job would use the GPU, the CPU, or wait — before starting it."""
+    return service.resource_explain(args.string("kind", "render"))
+
+
 # --- SEO: score it, fix it, and prove the fix ---------------------------------
 
 
@@ -1607,6 +1620,34 @@ _PRODUCTION: list[ToolSpec] = [
     ),
 ]
 
+_COMPUTE: list[ToolSpec] = [
+    ToolSpec(
+        "resource_status",
+        "What this machine has (CPU, RAM, GPU, VRAM, temperature, hardware "
+        "encoders, CUDA) and how the governor is behaving: live admission per job "
+        "kind, jobs serialized, jobs degraded to CPU, encoder fallbacks.",
+        "discovery",
+        "resource_snapshot",
+        _h_resource_status,
+    ),
+    ToolSpec(
+        "resource_explain",
+        "Ask before committing to a long job: would this run on the GPU or the "
+        "CPU, and what is blocking it (busy, hot, VRAM, policy)?",
+        "discovery",
+        "resource_explain",
+        _h_resource_explain,
+        {
+            "kind": _p(
+                "string",
+                "Job kind to test.",
+                enum=["render", "transcribe", "ocr", "vision"],
+                default="render",
+            )
+        },
+    ),
+]
+
 _SEO: list[ToolSpec] = [
     ToolSpec(
         "seo_rules",
@@ -1741,6 +1782,7 @@ _SEO: list[ToolSpec] = [
 #: Every tool, in the order agents should discover them.
 TOOL_SPECS: list[ToolSpec] = [
     *_DISCOVERY,
+    *_COMPUTE,
     *_RESEARCH,
     *_SCRIPT,
     *_TIMELINE,
@@ -1775,6 +1817,9 @@ _USAGE_NOTES = [
     "role='voice' so the music ducks automatically.",
     "Only a human may confirm source rights or pass an approval gate; the tools "
     "record those decisions but never invent them.",
+    "Before a long export or transcription, call resource_explain (or "
+    "resource_status) to see whether the GPU is free; heavy jobs are serialized "
+    "on purpose so one laptop stays responsive.",
     "Before publishing: seo_score_project (or seo_score with a pack) to measure "
     "readiness, seo_optimize to get the rewrite and the measured gain, then "
     "seo_ab_plan before changing anything on a live channel.",

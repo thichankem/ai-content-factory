@@ -29,6 +29,7 @@ from .config import (
     validate_upload_max_bytes,
 )
 from .models import MediaItem, MediaKind, TranscriptSegment, utcnow
+from .resources import JobKind, ResourceGovernor, default_governor
 
 _VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".flv", ".wmv", ".ts"}
 _AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus", ".wma"}
@@ -231,11 +232,19 @@ class MediaLibrary:
         *,
         chunk_bytes: int = DEFAULT_STREAM_CHUNK_BYTES,
         max_bytes: int = DEFAULT_UPLOAD_MAX_BYTES,
+        governor: ResourceGovernor | None = None,
+        transcribe_model: str = "base",
+        transcribe_device: str = "auto",
     ) -> None:
         validate_stream_chunk_bytes(chunk_bytes)
         validate_upload_max_bytes(max_bytes)
         self._chunk_bytes = chunk_bytes
         self._max_bytes = max_bytes
+        # Speech-to-text goes through the governor: one heavy job at a time, and
+        # the GPU only when a CUDA build of torch is actually installed.
+        self._governor = governor
+        self._transcribe_model = transcribe_model
+        self._transcribe_device = transcribe_device
         self._dir = Path(media_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
         self._index_path = self._dir / "index.json"
@@ -458,23 +467,37 @@ class MediaLibrary:
                     "to enable transcription."
                 ) from exc
 
-            model = WhisperModel("base", device="cpu", compute_type="int8")
-            segments, _info = model.transcribe(str(path), language=language)
-            lines: list[str] = []
-            cues: list[TranscriptSegment] = []
-            for seg in segments:
-                text = (seg.text or "").strip()
-                if not text:
-                    continue
-                lines.append(text)
-                cues.append(
-                    TranscriptSegment(
-                        start_seconds=round(float(seg.start), 2),
-                        end_seconds=round(float(seg.end), 2),
-                        text=text,
-                    )
+            governor = self._governor or default_governor()
+            with governor.job(JobKind.TRANSCRIBE) as decision:
+                device, compute_type, _reason = governor.whisper_compute(
+                    self._transcribe_device
                 )
-            return " ".join(lines), cues
+                if decision.admission.value != "gpu":
+                    # The GPU was busy, hot or short of VRAM: spend CPU time instead
+                    # of waiting, and say so rather than silently queueing.
+                    device, compute_type = "cpu", "int8"
+                model = WhisperModel(
+                    self._transcribe_model, device=device, compute_type=compute_type
+                )
+                # faster-whisper decodes lazily, so the generator must be consumed
+                # while the slot is held — otherwise the heavy work would happen
+                # after the governor already let another job onto the GPU.
+                segments, _info = model.transcribe(str(path), language=language)
+                lines: list[str] = []
+                cues: list[TranscriptSegment] = []
+                for seg in segments:
+                    text = (seg.text or "").strip()
+                    if not text:
+                        continue
+                    lines.append(text)
+                    cues.append(
+                        TranscriptSegment(
+                            start_seconds=round(float(seg.start), 2),
+                            end_seconds=round(float(seg.end), 2),
+                            text=text,
+                        )
+                    )
+                return " ".join(lines), cues
 
         if self._cache is not None:
             key = self._cache.key_for_file(

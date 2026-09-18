@@ -106,14 +106,14 @@ class WorkflowMixin(AgentsMixin, ProjectsMixin, GrowthMixin, VoiceMixin):
         )
         with self._workflow_lock:
             self._workflow_runs[run.id] = run
-        thread = threading.Thread(
-            target=self._run_workflow_thread,
-            args=(project_id, run.id, dict(data.inputs)),
-            name=f"workflow-{run.id}",
-            daemon=True,
+        self._register_worker(
+            threading.Thread(
+                target=self._run_workflow_thread,
+                args=(project_id, run.id, dict(data.inputs)),
+                name=f"workflow-{run.id}",
+                daemon=True,
+            )
         )
-        self._workers.add(thread)
-        thread.start()
         return run
 
     def _run_workflow_thread(self, project_id: str, run_id: str, inputs: dict) -> None:

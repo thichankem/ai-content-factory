@@ -12,6 +12,7 @@ from .library import build_router as build_library_router
 from .media import build_router as build_media_router
 from .projects import build_router as build_projects_router
 from .qa import build_router as build_qa_router
+from .resources import build_router as build_resources_router
 from .seo import build_router as build_seo_router
 from .studio_media import build_router as build_studio_media_router
 from .styles import build_router as build_styles_router
@@ -37,5 +38,6 @@ __all__ = [
     "build_graphics_router",
     "build_index_router",
     "build_qa_router",
+    "build_resources_router",
     "build_seo_router",
 ]

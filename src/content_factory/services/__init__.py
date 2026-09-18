@@ -18,6 +18,7 @@ from .production import ProductionMixin
 from .projects import ProjectsMixin
 from .qa import QaMixin
 from .research import ResearchMixin
+from .resources import ResourcesMixin
 from .scripting import ScriptingMixin
 from .seo import SeoMixin
 from .styles import StylesMixin
@@ -27,6 +28,7 @@ from .workflow import WorkflowMixin
 
 
 class ContentFactoryService(
+    ResourcesMixin,
     QaMixin,
     SeoMixin,
     WorkflowMixin,
@@ -58,6 +60,7 @@ __all__ = [
     "ProjectsMixin",
     "QaMixin",
     "ResearchMixin",
+    "ResourcesMixin",
     "ScriptingMixin",
     "SeoMixin",
     "StylesMixin",

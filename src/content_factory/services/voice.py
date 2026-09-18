@@ -25,14 +25,14 @@ class VoiceMixin(TimelineMixin):
         return project
 
     def _spawn_voiceover(self, project_id: str) -> None:
-        thread = threading.Thread(
-            target=self._synthesize_voiceover,
-            args=(project_id,),
-            name=f"voiceover-{project_id}",
-            daemon=True,
+        self._register_worker(
+            threading.Thread(
+                target=self._synthesize_voiceover,
+                args=(project_id,),
+                name=f"voiceover-{project_id}",
+                daemon=True,
+            )
         )
-        self._workers.add(thread)
-        thread.start()
 
     def _synthesize_voiceover(self, project_id: str) -> None:
         """Synthesize narration per scene and sync scene durations to the audio."""

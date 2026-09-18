@@ -10,6 +10,8 @@ from .. import timeline
 from ..image_voice_service import IMAGE_PRESETS, VOICE_PRESETS_DOC
 from ..models import Project, ProjectStatus, VideoAsset
 from ..render import RenderError, render_video_file
+from ..resources import JobKind
+from ..store import StoreConflictError
 from .errors import (
     NotFoundError,
     StateConflictError,
@@ -117,20 +119,20 @@ class ProductionMixin(MediaToolsMixin):
             dir=output_path.parent, prefix=".export-"
         ) as tmp:
             target = Path(tmp) / output_path.name
-            render_video_file(
-                plan,
-                target,
-                resolve_media=self._resolve_render_ref,
-                music_path=music_path,
-                background_video=background,
-                export_format=export_format,
-                threads=self._settings.render_threads,
-                audio_path=audio_path,
-            )
-            current = self.get_project(project_id)
-            if current != snapshot:
-                raise StateConflictError(
-                    "Project changed during rendering; export discarded."
+            # Admission control first: on a laptop this is what stops two heavy
+            # jobs (export + transcribe) from fighting for the same 8 GB GPU and
+            # the same CPU cores. Threads are trimmed under memory pressure.
+            with self._governor.job(JobKind.RENDER):
+                render_video_file(
+                    plan,
+                    target,
+                    resolve_media=self._resolve_render_ref,
+                    music_path=music_path,
+                    background_video=background,
+                    export_format=export_format,
+                    threads=self._governor.recommended_threads(),
+                    audio_path=audio_path,
+                    governor=self._governor,
                 )
             project.video = VideoAsset(
                 asset_url=f"/projects/{project.id}/video",
@@ -143,8 +145,17 @@ class ProductionMixin(MediaToolsMixin):
             project.error = None
             if project.status == ProjectStatus.GENERATING:
                 self._transition(project, ProjectStatus.VIDEO_REVIEW)
+            # Compare-and-save under one lock: an editor that lands between
+            # the render start and now rejects the export instead of being
+            # silently overwritten.
+            try:
+                self._store.save_if_unchanged(project, snapshot)
+            except StoreConflictError as exc:
+                raise StateConflictError(
+                    "Project changed during rendering; export discarded."
+                ) from exc
             target.replace(output_path)
-            return self._store.save(project)
+            return project
 
     def _resolve_render_ref(self, ref: str) -> Path:
         parsed = urlsplit(ref)

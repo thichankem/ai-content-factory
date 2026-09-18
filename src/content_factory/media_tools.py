@@ -26,6 +26,8 @@ from typing import Any
 
 import numpy as np
 
+from .resources import Admission, JobKind, ResourceGovernor, default_governor
+
 __all__ = [
     "MediaToolError",
     "beat_grid",
@@ -381,7 +383,12 @@ def beat_grid(
     }
 
 
-def describe(path: str | Path, *, include: list[str] | None = None) -> dict[str, Any]:
+def describe(
+    path: str | Path,
+    *,
+    include: list[str] | None = None,
+    governor: ResourceGovernor | None = None,
+) -> dict[str, Any]:
     """Everything a text-only agent needs to reason about a media file.
 
     One call answers: how long is it, what is in it, how loud is it, where are
@@ -430,12 +437,19 @@ def describe(path: str | Path, *, include: list[str] | None = None) -> dict[str,
         except Exception as exc:  # noqa: BLE001 - keep the rest of the report
             report["music"] = {"error": str(exc)}
     if "text" in wanted:
-        report["text"] = ocr_text(resolved)
+        report["text"] = ocr_text(resolved, governor=governor)
     return report
 
 
-def ocr_text(path: str | Path) -> dict[str, Any]:
-    """Read words out of an image/video frame using ``tesseract`` or ``easyocr``."""
+def ocr_text(
+    path: str | Path, *, governor: ResourceGovernor | None = None
+) -> dict[str, Any]:
+    """Read words out of an image/video frame using ``tesseract`` or ``easyocr``.
+
+    The local model runs through the resource governor, so a read never starts
+    while another heavy job owns the machine, and the GPU is used only when the
+    installed torch build can actually see it.
+    """
     resolved = _require_file(path)
     binary = shutil.which("tesseract")
     target = resolved
@@ -466,23 +480,27 @@ def ocr_text(path: str | Path) -> dict[str, Any]:
     try:
         import easyocr  # type: ignore[import-untyped]
 
-        reader = easyocr.Reader(["en"], gpu=False, verbose=False)
-        results = reader.readtext(str(target))
-        lines = [str(item[1]) for item in results if len(item) > 1]
-        text = "\n".join(lines).strip()
-        elements = [
-            {
-                "text": str(item[1]),
-                "confidence": round(float(item[2]), 3) if len(item) > 2 else 1.0,
-            }
-            for item in results
-            if len(item) > 1
-        ]
+        resolved_governor = governor or default_governor()
+        with resolved_governor.job(JobKind.OCR) as decision:
+            on_gpu = decision.admission is Admission.GPU
+            reader = easyocr.Reader(["en"], gpu=on_gpu, verbose=False)
+            results = reader.readtext(str(target))
+            lines = [str(item[1]) for item in results if len(item) > 1]
+            text = "\n".join(lines).strip()
+            elements = [
+                {
+                    "text": str(item[1]),
+                    "confidence": round(float(item[2]), 3) if len(item) > 2 else 1.0,
+                }
+                for item in results
+                if len(item) > 1
+            ]
         return {
             "available": True,
             "text": text,
             "words": len(text.split()),
             "engine": "easyocr",
+            "device": "cuda" if on_gpu else "cpu",
             "elements": elements,
         }
     except ImportError:

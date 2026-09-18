@@ -8,8 +8,18 @@ import uuid
 from .models import Project, ProjectCreate, utcnow
 
 
+class StoreConflictError(RuntimeError):
+    """Raised when a compare-and-save detects a concurrent modification."""
+
+
 class Store:
-    """Process-local project repository (vertical-slice storage)."""
+    """Process-local project repository (vertical-slice storage).
+
+    Projects are stored by live reference: whoever fetches a project and
+    mutates it without ``save`` mutates the stored copy in place. Writers
+    that must not lose a concurrent update should use
+    :meth:`save_if_unchanged` instead of a blind :meth:`save`.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
@@ -40,3 +50,26 @@ class Store:
         with self._lock:
             self._projects[project.id] = project
         return project
+
+    def save_if_unchanged(self, project: Project, expected: Project) -> Project:
+        """Compare-and-save: store the project only if the store still holds it.
+
+        The comparison and the write happen under one lock, so an editor that
+        lands between the caller's read and its save is detected and rejected
+        instead of being silently overwritten (a lost update).
+
+        ``expected`` must be a snapshot taken from a working copy (as in the
+        render flow): the caller mutates the copy, and the store compares its
+        own stored object against the untouched snapshot. Mutating the stored
+        object in place defeats the check — the baseline is then already gone.
+        Callers map :class:`StoreConflictError` onto their own conflict type.
+        """
+        with self._lock:
+            stored = self._projects.get(project.id)
+            if stored is None or stored != expected:
+                raise StoreConflictError(
+                    f"Project '{project.id}' changed concurrently; save rejected."
+                )
+            project.updated_at = utcnow()
+            self._projects[project.id] = project
+            return project

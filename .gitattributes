@@ -1,0 +1,4 @@
+# Normalize line endings in the index; Windows-only scripts keep CRLF.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf

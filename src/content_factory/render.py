@@ -25,6 +25,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .models import RenderPlan
+from .resources import ResourceGovernor, default_governor
 
 #: Callable that resolves a media URL (image_url / narration_url) to a local
 #: file path, or None when the URL is not resolvable locally.
@@ -50,6 +51,7 @@ def render_video_file(
     export_format: str = "webm",
     threads: int = 1,
     audio_path: Path | None = None,
+    governor: ResourceGovernor | None = None,
 ) -> Path:
     """Render a plan to a real WebM (VP9) with visuals + voiceover + music.
 
@@ -85,6 +87,7 @@ def render_video_file(
                 export_format=export_format,
                 threads=threads,
                 finished_mix=audio_path is not None,
+                governor=governor,
             )
         else:
             _render_scenes(
@@ -97,6 +100,7 @@ def render_video_file(
                 export_format=export_format,
                 threads=threads,
                 finished_mix=audio_path is not None,
+                governor=governor,
             )
         target.replace(output_path)
     return output_path
@@ -113,6 +117,7 @@ def _render_scenes(
     threads: int,
     finished_mix: bool,
     background_video: Path | None = None,
+    governor: ResourceGovernor | None = None,
 ) -> Path:
     """Render the per-scene path: colour cards or per-scene images + audio."""
     import tempfile
@@ -233,7 +238,7 @@ def _render_scenes(
                 "aac" if export_format == "mp4" else "libopus",
             ]
 
-        command = [
+        prefix = [
             binary,
             "-y",
             "-filter_complex_threads",
@@ -248,18 +253,14 @@ def _render_scenes(
             *audio_args,
             "-r",
             str(plan.fps),
-            *_video_codec(export_format),
-            "-threads",
-            str(threads),
-            "-t",
-            str(plan.total_seconds),
-            str(output_path),
         ]
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
+        completed = _run_encode(
+            prefix,
+            export_format=export_format,
+            threads=threads,
+            total_seconds=plan.total_seconds,
+            output_path=output_path,
+            governor=governor,
         )
     if completed.returncode != 0:
         detail = completed.stderr.strip().splitlines()[-1:] or ["unknown ffmpeg error"]
@@ -280,6 +281,7 @@ def _render_with_background_video(
     export_format: str,
     threads: int,
     finished_mix: bool,
+    governor: ResourceGovernor | None = None,
 ) -> Path:
     """Render using a source video as a moving backdrop + text + voiceover + music.
 
@@ -378,7 +380,7 @@ def _render_with_background_video(
                 "aac" if export_format == "mp4" else "libopus",
             ]
 
-        command = [
+        prefix = [
             binary,
             "-y",
             "-filter_complex_threads",
@@ -393,18 +395,14 @@ def _render_with_background_video(
             *audio_args,
             "-r",
             str(plan.fps),
-            *_video_codec(export_format),
-            "-threads",
-            str(threads),
-            "-t",
-            str(plan.total_seconds),
-            str(output_path),
         ]
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
+        completed = _run_encode(
+            prefix,
+            export_format=export_format,
+            threads=threads,
+            total_seconds=plan.total_seconds,
+            output_path=output_path,
+            governor=governor,
         )
     if completed.returncode != 0:
         detail = completed.stderr.strip().splitlines()[-1:] or ["unknown ffmpeg error"]
@@ -423,28 +421,70 @@ def _bounded_inputs(inputs: list[str], threads: int) -> list[str]:
     return result
 
 
-def _video_codec(export_format: str) -> list[str]:
-    if export_format == "mp4":
-        return [
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "23",
-            "-movflags",
-            "+faststart",
-        ]
-    return [
-        "-c:v",
-        "libvpx-vp9",
-        "-deadline",
-        "realtime",
-        "-cpu-used",
-        "8",
-        "-b:v",
-        "1M",
+def _run_command(
+    command: list[str], timeout: float
+) -> subprocess.CompletedProcess[str]:
+    """Run ffmpeg with a hard deadline; a hung encoder must not pin the machine."""
+    try:
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RenderError(
+            f"ffmpeg exceeded the {timeout:.0f}s render budget and was killed to "
+            "protect the machine; raise CONTENT_FACTORY_RENDER_TIMEOUT_SECONDS "
+            "for very long timelines."
+        ) from exc
+
+
+def _run_encode(
+    prefix: list[str],
+    *,
+    export_format: str,
+    threads: int,
+    total_seconds: float,
+    output_path: Path,
+    governor: ResourceGovernor | None,
+) -> subprocess.CompletedProcess[str]:
+    """Encode with the best available device, and fall back instead of failing.
+
+    The encoder is chosen by the resource governor: a hardware encoder when this
+    machine exposes one and the policy allows it, the software encoder otherwise.
+    If a hardware encoder fails at runtime (driver reset, another process holding
+    the encoder session, VRAM exhausted), the export is retried once in software
+    so a GPU problem never costs the whole job.
+    """
+    resolved = governor or default_governor()
+    choice = resolved.video_codec(export_format)
+    command = [
+        *prefix,
+        *choice.args,
+        "-threads",
+        str(threads),
+        "-t",
+        str(total_seconds),
+        str(output_path),
     ]
+    completed = _run_command(command, resolved.settings.render_timeout_seconds)
+    resolved.note_encoder(choice.encoder)
+    if completed.returncode == 0 or not choice.hardware:
+        return completed
+    resolved.note_encoder_fallback(choice.encoder)
+    software = resolved.software_video_codec(export_format)
+    retry = [
+        *prefix,
+        *software.args,
+        "-threads",
+        str(threads),
+        "-t",
+        str(total_seconds),
+        str(output_path),
+    ]
+    return _run_command(retry, resolved.settings.render_timeout_seconds)
 
 
 def _voice_volume(plan: RenderPlan) -> float:

@@ -19,7 +19,9 @@ import {
   Scissors,
   Eye,
   Sliders,
+  GitBranch,
 } from "lucide-react";
+import { FusionNodeCompositor } from "../fusion/FusionNodeCompositor";
 
 export function VideoMotionFXStudio() {
   const {
@@ -50,7 +52,7 @@ export function VideoMotionFXStudio() {
     setAiVideoProcessing,
   } = useVideoFXStore();
 
-  const [activeSubTab, setActiveSubTab] = useState<"motion" | "speed" | "color">("speed");
+  const [activeSubTab, setActiveSubTab] = useState<"motion" | "speed" | "color" | "fusion">("speed");
 
   // AI Quick Actions for Video FX
   const quickActions: AIQuickAction[] = [
@@ -151,6 +153,18 @@ export function VideoMotionFXStudio() {
           >
             <Palette className="w-3.5 h-3.5 text-emerald-400" />
             <span>Premiere Lumetri Color & LUTs</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab("fusion")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+              activeSubTab === "fusion"
+                ? "bg-nle-surface text-nle-cyan shadow-sm border border-nle-cyan/30"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <GitBranch className="w-3.5 h-3.5 text-cyan-400" />
+            <span>DaVinci Fusion Node Graph</span>
           </button>
         </div>
 
@@ -580,6 +594,13 @@ export function VideoMotionFXStudio() {
               Lưu Preset LUT Người Dùng
             </Button>
           </Card>
+        </div>
+      )}
+
+      {/* Sub-Tab 4: DaVinci Resolve 19 Fusion Node Graph */}
+      {activeSubTab === "fusion" && (
+        <div className="flex-1 min-h-[460px]">
+          <FusionNodeCompositor />
         </div>
       )}
     </div>

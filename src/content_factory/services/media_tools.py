@@ -111,7 +111,9 @@ class MediaToolsMixin(MediaMixin):
         Includes loudness, silence, shot changes, colour palette, tempo and any
         on-screen text when the optional OCR tool is installed.
         """
-        return engine.describe(self.resolve_media_ref(ref), include=include)
+        return engine.describe(
+            self.resolve_media_ref(ref), include=include, governor=self._governor
+        )
 
     def media_loudness(self, ref: str, target_lufs: float = -14.0) -> dict[str, Any]:
         """EBU R128 integrated loudness, true peak and gain to a target."""
