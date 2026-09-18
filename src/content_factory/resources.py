@@ -59,7 +59,6 @@ from .config import Settings, get_settings
 from .hardware import discover_binaries, machine_pressure, probe, probe_encoder
 
 __all__ = [
-    "default_governor",
     # Re-exported so the many modules (and tests) that have always imported the
     # compute vocabulary from here keep working unchanged.
     "Admission",
@@ -70,6 +69,7 @@ __all__ = [
     "HardwareProfile",
     "JobKind",
     "ResourceGovernor",
+    "default_governor",
     "discover_binaries",
     "machine_pressure",
     "probe",

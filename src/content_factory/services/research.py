@@ -26,7 +26,7 @@ class ResearchMixin(ServiceContext):
                 web = await self._searcher.search(
                     project.topic, limit=self._settings.research_max_sources
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - a search outage degrades to no web sources
                 web = []
             for result in web:
                 if len(bundle.sources) >= self._settings.research_max_sources + 2:

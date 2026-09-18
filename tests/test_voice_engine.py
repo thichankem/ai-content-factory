@@ -95,7 +95,7 @@ def test_unknown_preset_raises() -> None:
 
 
 def test_garbage_audio_raises() -> None:
-    with pytest.raises(VoiceError, match="Cannot decode|Empty"):
+    with pytest.raises(VoiceError, match=r"Cannot decode|Empty"):
         process_voice(b"not audio at all")
 
 

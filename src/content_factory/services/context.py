@@ -11,6 +11,7 @@ transparent to them; tests may still assign a fake to the same attribute.
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import time
 
@@ -277,11 +278,9 @@ class ServiceContext:
                 project.progress = int(step / steps * 100)
                 self._store.save(project)
             self.complete_generation(project_id)
-        except Exception as exc:
-            try:
+        except Exception as exc:  # noqa: BLE001 - a failed generation must still be marked failed on the project
+            with contextlib.suppress(Exception):
                 self.fail_generation(project_id, exc)
-            except Exception:
-                pass
 
     def _refresh_analysis(self, project: Project) -> None:
         """Recompute the stored timing plan, lint findings and script document.

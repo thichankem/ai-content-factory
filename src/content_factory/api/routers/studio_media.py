@@ -48,9 +48,9 @@ def build_router(service: ContentFactoryService) -> APIRouter:
     @router.post("/studio/image/edit")
     async def edit_image_studio(
         file: UploadFile = File(...),  # noqa: B008
-        ops: str | None = Form(None),  # noqa: B008
-        preset: str | None = Form(None),  # noqa: B008
-        format: str = Form("png"),  # noqa: B008
+        ops: str | None = Form(None),
+        preset: str | None = Form(None),
+        format: str = Form("png"),
     ) -> dict[str, Any]:
         """Edit an image with an ops pipeline (JSON) or a named preset."""
         import json as _json
@@ -78,9 +78,9 @@ def build_router(service: ContentFactoryService) -> APIRouter:
     @router.post("/studio/voice/enhance")
     async def enhance_voice_studio(
         file: UploadFile = File(...),  # noqa: B008
-        params: str | None = Form(None),  # noqa: B008
-        preset: str | None = Form(None),  # noqa: B008
-        format: str = Form("mp3"),  # noqa: B008
+        params: str | None = Form(None),
+        preset: str | None = Form(None),
+        format: str = Form("mp3"),
     ) -> dict[str, Any]:
         """Enhance voice audio through the Audition-style chain."""
         import json as _json

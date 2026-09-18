@@ -77,10 +77,8 @@ def test_routers_do_not_define_request_models() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and any(
-                isinstance(base, ast.Name)
-                and base.id == "BaseModel"
-                or isinstance(base, ast.Attribute)
-                and base.attr == "BaseModel"
+                (isinstance(base, ast.Name) and base.id == "BaseModel")
+                or (isinstance(base, ast.Attribute) and base.attr == "BaseModel")
                 for base in node.bases
             ):
                 violations.append(f"{path.name}:{node.name}")

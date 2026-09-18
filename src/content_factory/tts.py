@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Protocol
+from typing import Protocol, TypedDict
 
 from .config import Settings
 
@@ -44,7 +44,18 @@ def resolve_voice(language: str) -> str:
     return _VOICES.get(lang, _VOICES["en"])
 
 
-def voice_catalog(active: str | None = None) -> list[dict[str, str | bool]]:
+class VoiceEntry(TypedDict):
+    """One narration voice, shaped for the catalog models to consume."""
+
+    id: str
+    name: str
+    language: str
+    gender: str
+    engine: str
+    active: bool
+
+
+def voice_catalog(active: str | None = None) -> list[VoiceEntry]:
     """Every narration voice this engine can actually synthesise.
 
     Only the mapped defaults are listed: each name here is one the pipeline
@@ -56,7 +67,7 @@ def voice_catalog(active: str | None = None) -> list[dict[str, str | bool]]:
     that is not already in the table, that voice is appended and flagged, so an
     operator who pinned a custom voice can still see which one is in force.
     """
-    catalog: list[dict[str, str | bool]] = [
+    catalog: list[VoiceEntry] = [
         {
             "id": voice,
             "name": voice,
@@ -88,7 +99,7 @@ def mp3_duration(data: bytes) -> float:
 
         info = MP3(io.BytesIO(data)).info
         return float(info.length) if info is not None else 0.0
-    except Exception:
+    except Exception:  # noqa: BLE001 - an unreadable MP3 means an unknown duration, not a crash
         return 0.0
 
 
@@ -174,7 +185,7 @@ class TTSEngine:
                 data = await provider.synthesize(text, language)
                 duration = mp3_duration(data) or self._estimate_duration(text)
                 return data, duration, provider.name
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - try the next engine; all failures raise once none is left
                 last_error = exc
                 logger.warning("TTS provider %s failed: %s", provider.name, exc)
         raise RuntimeError(f"All TTS providers failed: {last_error}")

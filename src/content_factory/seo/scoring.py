@@ -119,7 +119,7 @@ def score_pack(pack: Pack, platform: str) -> SeoReport:
     if blocking:
         projected = min(100.0, max(projected, overall))
     metrics = _metrics(pack, profile)
-    score = int(round(final))
+    score = round(final)
     verdict = _verdict(score, confidence, blocking, pack)
     return SeoReport(
         platform=profile.key,
@@ -132,7 +132,7 @@ def score_pack(pack: Pack, platform: str) -> SeoReport:
         dimensions=tuple(dimensions),
         blocking=blocking,
         quick_wins=quick_wins,
-        projected_score=int(round(projected)),
+        projected_score=round(projected),
         verdict=verdict,
         metrics=metrics,
         notes=_notes(pack, profile, confidence),

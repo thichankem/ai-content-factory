@@ -47,7 +47,42 @@ target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+# The original set (E, F, I, UP, B) is extended with the rules the codebase had
+# already been asserting by hand in `# noqa` comments: BLE for deliberate blind
+# excepts, and the RUF/PERF/PTH/RET/C4 clean-ups that were fixed in one pass
+# rather than left to drift. Every addition here is a rule the tree passes.
+select = ["E", "F", "I", "UP", "B", "BLE", "C4", "PERF", "PTH", "RET", "RUF"]
+
+ignore = [
+  # ``os``/``str.format`` style names are the right names for API parameters and
+  # form fields, so shadowing a builtin there (`format`, `type`, `id`) is intended.
+  "A002",
+  # Unused arguments are how a mixin method or protocol stub declares the
+  # interface it conforms to; renaming them to ``_`` would hide that contract.
+  "ARG",
+  # Lazy imports of heavy or optional dependencies (torch, onnxruntime, PIL) are
+  # deliberate: they keep startup and the base install light.
+  "PLC0415",
+  # Ambiguous-unicode warnings fire on the Vietnamese text this project targets.
+  "RUF001",
+  "RUF002",
+  "RUF003",
+  # `__all__` order is a pinned public surface here (tests/test_seo_engine.py
+  # asserts it verbatim) and RUF022's ordering disagrees with the plain ASCII
+  # order those modules are written in, so sorting them would be a gratuitous
+  # change to a stable interface.
+  "RUF022",
+  # Readability preferences, not defects: the explicit form reads better here.
+  "SIM102",
+  "SIM108",
+  "SIM117",
+  # Every remaining site is an append loop whose body is more than a projection —
+  # conditionals, nested loops, two statements per item. Rewriting those as
+  # `extend(...)` generators loses more clarity than it gains, so the rule stays
+  # off after review rather than being silenced site by site.
+  "PERF401",
+  "PERF403",
+]
 
 [tool.mypy]
 python_version = "3.11"

@@ -115,11 +115,11 @@ class AgentsMixin(ScriptingMixin):
         candidate.pop("builtin", None)
         try:
             style = ScriptStyle.model_validate(candidate)
-        except Exception:
+        except Exception:  # noqa: BLE001 - an agent-authored style block is best-effort
             return None
         try:
             return self._presets.save(style)
-        except Exception:
+        except Exception:  # noqa: BLE001 - saving the preset is best-effort; the style is still usable
             return style
 
     def _apply_agent_scenes(self, project: Project, scenes: list[dict]) -> None:

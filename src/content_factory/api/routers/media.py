@@ -31,7 +31,7 @@ def build_router(service: ContentFactoryService) -> APIRouter:
     @router.post("/media/upload", response_model=MediaItem, status_code=201)
     def media_upload(
         file: UploadFile = File(...),  # noqa: B008
-        language: str = Form("en"),  # noqa: B008
+        language: str = Form("en"),
     ) -> MediaItem:
         """Upload any media file (video/audio/image/document) to the library."""
         try:
@@ -56,7 +56,7 @@ def build_router(service: ContentFactoryService) -> APIRouter:
     async def ai_editor_edit(
         video: UploadFile = File(...),  # noqa: B008
         image: UploadFile = File(...),  # noqa: B008
-        use_vision: bool = Form(False),  # noqa: B008
+        use_vision: bool = Form(False),
     ) -> dict:
         """AI Video Editor: analyse a video, composite an image naturally, cut.
 

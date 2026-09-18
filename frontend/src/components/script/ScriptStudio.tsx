@@ -42,15 +42,15 @@ export function ScriptStudio() {
 
   // Script text state
   const [scriptText, setScriptText] = useState(
-    currentProject?.script?.raw_script ||
+    currentProject?.script_document?.raw_script ||
       `[Hook // 00:00 - 00:03]\n(Visual Cue: Quay cận cảnh thìa cơm trắng dẻo bóng bẩy, khói nghi ngút bốc lên chậm rãi)\nĐừng bao giờ dùng ngón tay đo nước khi nấu cơm nữa, nếu bạn không muốn cả nồi cơm biến thành cháo dính!\n\n[Bằng chứng // 00:03 - 00:20]\n(Visual Cue: Chèn hình minh họa bàn tay ngập trong nồi cơm có dấu gạch chéo đỏ, chuyển cảnh sang chiếc cân điện tử mini)\nNgón tay mỗi người dài ngắn khác nhau, đáy nồi lại có độ cong vát khác nhau. Công thức chuẩn của các đầu bếp Nhật là tỷ lệ nước 1:1.15 theo khối lượng.\n\n[Cú lật Turn // 00:20 - 00:45]\n(Visual Cue: Quay cảnh nhỏ 1 giọt dầu mè nguyên chất vào nồi trước khi bấm nút Cook, hạt cơm tơi xốp tách rời)\nVà đây là bí quyết ít ai chỉ cho bạn: Hãy nhỏ đúng một giọt dầu mè và ngâm 10 phút trước khi bật nồi. Lớp màng lipid tự nhiên sẽ bọc từng hạt tinh bột, giúp cơm nở đều mà không hề bị nát hay dính đáy.\n\n[Payoff & CTA // 00:45 - 00:60]\n(Visual Cue: Người cầm bát cơm nóng hổi ăn thử biểu cảm gật gù hài lòng, icon thả tim và lưu video nhấp nháy)\nThử ngay bữa tối nay xem cơm nhà bạn có ngon hơn hẳn ngoài quán không nhé! Thả tim và lưu lại kẻo lúc nấu lại quên mất công thức!`
   );
 
   useEffect(() => {
-    if (currentProject?.script?.raw_script) {
-      setScriptText(currentProject.script.raw_script);
+    if (currentProject?.script_document?.raw_script) {
+      setScriptText(currentProject.script_document.raw_script);
     }
-  }, [currentProject?.script?.raw_script]);
+  }, [currentProject?.script_document?.raw_script]);
 
   // Speech Pacing State (Default: 160 WPM - natural TTS pacing)
   const [pacingConfig, setPacingConfig] = useState<SpeechPacingConfig>({

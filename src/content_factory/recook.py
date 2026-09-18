@@ -153,8 +153,7 @@ def _reword(sentence: str) -> str:
         " just ",
     ]:
         out = out.replace(filler, " ")
-    out = re.sub(r"\s+", " ", out).strip()
-    return out
+    return re.sub(r"\s+", " ", out).strip()
 
 
 def _pick_sentences(

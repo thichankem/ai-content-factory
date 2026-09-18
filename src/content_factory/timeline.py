@@ -23,6 +23,7 @@ motion track at any point in its runtime, falling back to the single-segment
 
 from __future__ import annotations
 
+import itertools
 import re
 import uuid
 from collections.abc import Callable, Iterable
@@ -830,7 +831,7 @@ def evaluate_motion(scene: VideoScene, progress: float) -> dict[str, float]:
             return _frame_values(track[0])
         if progress >= track[-1].at:
             return _frame_values(track[-1])
-        for start, end in zip(track, track[1:], strict=False):
+        for start, end in itertools.pairwise(track):
             if start.at <= progress <= end.at:
                 span = max(1e-6, end.at - start.at)
                 local = _ease(end.easing, (progress - start.at) / span)
@@ -932,10 +933,12 @@ def _chunk_caption(text: str, enabled: bool) -> list[str]:
         words = _WORD_RE.findall(sentence)
         for start in range(0, len(words), MAX_CUE_WORDS):
             chunk = " ".join(words[start : start + MAX_CUE_WORDS])
-            if len(chunk) > MAX_CUE_CHARS and buffer:
-                pieces.append(buffer)
-                buffer = chunk
-            elif buffer and len(buffer) + len(chunk) + 1 > MAX_CUE_CHARS:
+            # Flush the buffer when either the incoming chunk cannot fit beside
+            # it, or the chunk alone already exceeds what a cue may carry. Both
+            # tests need the buffer to exist: an empty buffer must accumulate.
+            chunk_is_oversized = len(chunk) > MAX_CUE_CHARS
+            pair_is_oversized = len(buffer) + len(chunk) + 1 > MAX_CUE_CHARS
+            if buffer and (chunk_is_oversized or pair_is_oversized):
                 pieces.append(buffer)
                 buffer = chunk
             else:

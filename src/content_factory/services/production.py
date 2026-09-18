@@ -185,6 +185,6 @@ class ProductionMixin(MediaToolsMixin):
                 synthesize_music_bed(
                     bed, max(8.0, float(project.duration_target_seconds))
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - no music bed is a valid outcome for a render
                 return None
         return bed if bed.is_file() else None

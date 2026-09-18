@@ -304,11 +304,7 @@ def apply_command(
         scene_id = project.scenes[index].id
 
     try:
-        if command.intent == TimelineIntent.SPEED_UP:
-            project = timeline.set_speed(
-                project, scene_id, float(command.params["speed"])
-            )
-        elif command.intent == TimelineIntent.SLOW_DOWN:
+        if command.intent in (TimelineIntent.SPEED_UP, TimelineIntent.SLOW_DOWN):
             project = timeline.set_speed(
                 project, scene_id, float(command.params["speed"])
             )
@@ -328,9 +324,7 @@ def apply_command(
             )
         elif command.intent == TimelineIntent.DUPLICATE_SCENE:
             project = timeline.duplicate_scene(project, scene_id)
-        elif command.intent == TimelineIntent.TRIM:
-            project = auto_fit_durations(project)
-        elif command.intent == TimelineIntent.AUTO_FIT:
+        elif command.intent in (TimelineIntent.TRIM, TimelineIntent.AUTO_FIT):
             project = auto_fit_durations(project)
         elif command.intent == TimelineIntent.BEAT_SYNC:
             project = beat_sync(project, int(command.params.get("bpm", 120)))

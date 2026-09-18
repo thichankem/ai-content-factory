@@ -14,7 +14,7 @@ from typing import Any
 
 from . import image_engine, voice_engine
 
-__all__ = ["ImageVoiceStudio", "IMAGE_PRESETS", "VOICE_PRESETS_DOC"]
+__all__ = ["IMAGE_PRESETS", "VOICE_PRESETS_DOC", "ImageVoiceStudio"]
 
 #: One-click photo looks (Photoshop action-style), each an op list.
 IMAGE_PRESETS: dict[str, list[dict[str, Any]]] = {

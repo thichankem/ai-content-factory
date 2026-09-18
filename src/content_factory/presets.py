@@ -316,7 +316,8 @@ class PresetLibrary:
                 style = style_from_markdown(text, name=path.stem)
             style.name = style.name or path.stem
             return style
-        except Exception as exc:  # pragma: no cover - defensive
+        # An invalid preset file is skipped, never fatal.
+        except Exception as exc:  # noqa: BLE001
             logger.warning("Ignoring invalid preset %s: %s", path, exc)
             return None
 

@@ -72,7 +72,7 @@ class VoiceMixin(TimelineMixin):
                 Path(staging).rename(destination)
                 project.error = None
                 self._store.save(project)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - record the failure on the project and keep the caller alive
             project = self.get_project(project_id).model_copy(deep=True)
             project.error = f"Voiceover failed: {exc}"
             self._store.save(project)

@@ -134,7 +134,28 @@ def test_media_dedup_groups_identical_images(client) -> None:
     b = _upload(client, "b.png", _png_bytes())
     resp = client.post("/media/dedup", json={"media_ids": [a, b]})
     assert resp.status_code == 200
-    assert any({a, b}.issubset(set(group)) for group in resp.json())
+    body = resp.json()
+    assert any({a, b}.issubset(set(group)) for group in body["groups"])
+    assert body["count"] == 1
+    assert body["checked"] == 2
+    pair = body["duplicates"][0]
+    assert {pair["original"], pair["duplicate"]} == {a, b}
+    assert pair["similarity"] == 1.0
+
+
+def test_media_dedup_without_a_body_sweeps_the_library(client) -> None:
+    """One-click cleanup posts nothing and still gets an answer.
+
+    The studio has no ids to hand over, so an absent body must mean "check
+    everything" instead of a 422 that leaves the button dead.
+    """
+    a = _upload(client, "a.png", _png_bytes())
+    b = _upload(client, "b.png", _png_bytes())
+    resp = client.post("/media/dedup")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["checked"] >= 2
+    assert any({a, b}.issubset(set(group)) for group in body["groups"])
 
 
 def test_media_search_finds_distinctive_document(client) -> None:

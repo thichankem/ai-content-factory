@@ -40,8 +40,8 @@ def build_router(service: ContentFactoryService) -> APIRouter:
     async def upload_external_asset(
         project_id: str,
         asset_type: ExternalAssetType = Form(...),  # noqa: B008
-        scene_id: str | None = Form(None),  # noqa: B008
-        attribution: str | None = Form(None),  # noqa: B008
+        scene_id: str | None = Form(None),
+        attribution: str | None = Form(None),
         file: UploadFile = File(...),  # noqa: B008
     ) -> ExternalAssetRecord:
         """Upload a local media file (video/image/audio) and bind to scene."""

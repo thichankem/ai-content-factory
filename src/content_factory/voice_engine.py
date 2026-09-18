@@ -20,11 +20,11 @@ from typing import Any
 import numpy as np
 
 __all__ = [
-    "VoiceError",
-    "VoiceChain",
-    "process_voice",
-    "duck_music",
     "KNOWN_CHAIN_STEPS",
+    "VoiceChain",
+    "VoiceError",
+    "duck_music",
+    "process_voice",
 ]
 
 _SR = 44100

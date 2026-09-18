@@ -33,8 +33,8 @@ __all__ = [
     "ImageOp",
     "apply_ops",
     "auto_enhance",
-    "remove_background",
     "export_bytes",
+    "remove_background",
 ]
 
 
@@ -70,7 +70,7 @@ def load_image(data: bytes) -> Image.Image:
     try:
         img: Image.Image = Image.open(io.BytesIO(data))
         img.load()
-    except Exception as exc:  # noqa: BLE001 - PIL raises many types
+    except Exception as exc:
         raise ImageError(f"Cannot decode image: {exc}") from exc
     if img.width > _MAX_DIM or img.height > _MAX_DIM:
         scale = min(_MAX_DIM / img.width, _MAX_DIM / img.height)
@@ -299,7 +299,7 @@ def _op_padding(img: Image.Image, op: ImageOp) -> Image.Image:
     else:
         rgb = (0, 0, 0)
     contained = ImageOps.contain(img, (w, h), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGBA", (min(w, _MAX_DIM), min(h, _MAX_DIM)), rgb + (255,))
+    canvas = Image.new("RGBA", (min(w, _MAX_DIM), min(h, _MAX_DIM)), (*rgb, 255))
     ox = (canvas.width - contained.width) // 2
     oy = (canvas.height - contained.height) // 2
     canvas.alpha_composite(contained, (ox, oy))
@@ -420,7 +420,7 @@ def remove_background(img: Image.Image, op: ImageOp) -> Image.Image:
     limit = tolerance * 441.67  # max distance in RGB space
     for y in range(rgba.height):
         for x in range(rgba.width):
-            r, g, b, a = pix[x, y]
+            r, g, b, _a = pix[x, y]
             dist = math.sqrt((r - kr) ** 2 + (g - kg) ** 2 + (b - kb) ** 2)
             if dist < limit:
                 pix[x, y] = (r, g, b, 0)
@@ -446,7 +446,7 @@ def apply_ops(data: bytes, ops: list[dict[str, Any]]) -> Image.Image:
         elif op.name in _OPS:
             img = _OPS[op.name](img, op)
         else:
-            known = KNOWN_OPS + ["auto_enhance", "remove_background"]
+            known = [*KNOWN_OPS, "auto_enhance", "remove_background"]
             raise ImageError(f"Unknown op '{op.name}'. Known: {known}")
     return img
 
