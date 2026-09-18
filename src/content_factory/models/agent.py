@@ -5,9 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
-from .common import utcnow
+from .common import TwinSpelling, utcnow
 
 
 class AgentInfo(BaseModel):
@@ -70,15 +70,15 @@ class AgentCatalog(BaseModel):
     tts_voices: list[CatalogVoice] = Field(default_factory=list)
 
 
-class AgentResultCreate(BaseModel):
+class AgentResultCreate(TwinSpelling):
     """Payload carrying a result produced by an external AI agent.
 
     ``markdown`` is the canonical field the CLI, the MCP server and the agent
-    tools post. ``markdown_response`` is the spelling the studio UI sends, and a
-    body carrying only that one used to 422 — so both are accepted and exactly
-    one is required, following the same rule as
-    :class:`~content_factory.models.qa.ViralityRequest`.
+    tools post; ``markdown_response`` is the spelling the studio UI sends.
     """
+
+    PRIMARY = "markdown"
+    ALIAS = "markdown_response"
 
     markdown: str | None = None
     markdown_response: str | None = None
@@ -87,15 +87,7 @@ class AgentResultCreate(BaseModel):
     @property
     def body(self) -> str:
         """The agent's reply, whichever field carried it."""
-        return (self.markdown or self.markdown_response or "").strip()
-
-    @model_validator(mode="after")
-    def _require_a_body(self) -> AgentResultCreate:
-        if not self.body:
-            raise ValueError(
-                "provide 'markdown' (or its alias 'markdown_response')"
-            )
-        return self
+        return self.resolved
 
 
 class AgentBrief(BaseModel):

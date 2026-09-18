@@ -226,17 +226,25 @@ class QaMixin(MediaMixin):
         sorts by, which the cluster list threw away.
 
         No ``media_ids`` means sweep the whole library — that is what one-click
-        cleanup sends. Items whose hash cannot be computed (an unreadable or
-        non-image file) are skipped rather than failing the whole sweep, since
-        one bad asset in a library must not block cleaning the rest.
+        cleanup sends. Two failure modes are treated differently on purpose: a
+        file that exists but cannot be hashed (a document, a corrupt image) is
+        skipped, because one bad asset must not block cleaning the rest. An id
+        the caller *named* that does not exist still 404s, because silently
+        dropping it would report a clean library for a typo. Only a sweep we
+        resolved ourselves tolerates a stale entry.
         """
+        sweep = not req.media_ids
         media_ids = req.media_ids or [item.id for item in self.media_list()]
         hashes: dict[str, str] = {}
         for media_id in media_ids:
             try:
                 hashes[media_id] = image_hash(self._qa_media_path(media_id))
-            except (ValueError, NotFoundError):
+            except ValueError:
                 continue
+            except NotFoundError:
+                if sweep:
+                    continue
+                raise
         max_distance = self.settings.dedup_max_distance
         groups = find_near_duplicates(hashes, max_distance=max_distance)
         bits = max((len(value) for value in hashes.values()), default=0)
@@ -374,7 +382,7 @@ class QaMixin(MediaMixin):
 
     def timeline_command(self, req: TimelineCommandRequest) -> dict[str, Any]:
         updated, command = apply_command(req.project, req.instruction)
-        parsed = {
+        parsed: dict[str, Any] = {
             "intent": command.intent.value,
             "target": command.target,
             "target_scene": command.target,

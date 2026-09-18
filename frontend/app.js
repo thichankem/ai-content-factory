@@ -3242,8 +3242,11 @@ function renderMediaGrid(items) {
 
 async function msTranscribe(id) {
   try {
-    const m = await api(`/media/${id}/transcribe`);
-    showToast(`Transcribed ${m.filename} (${m.transcription.split(" ").length} words)`, "success");
+    // POST, not GET: transcription is a mutation that costs a model pass, so it
+    // must not be cached or prefetched like a read.
+    const m = await api(`/media/${id}/transcribe`, { method: "POST" });
+    const words = (m.transcription || "").split(" ").filter(Boolean).length;
+    showToast(`Transcribed ${m.filename} (${words} words)`, "success");
     msDetail(id);
   } catch (err) {
     showError("Transcribe: " + err.message);
@@ -3943,10 +3946,11 @@ function setupProSuiteExtensions() {
           method: "POST",
           body: JSON.stringify({ media_ids: ids }),
         });
-        if (!dupPairs || !dupPairs.length) {
+        const groups = dupPairs?.count ?? dupPairs?.groups?.length ?? 0;
+        if (!groups) {
           showToast("✅ Không có file trùng lặp (100% unique dHash)!", "success");
         } else {
-          showToast(`⚠️ Phát hiện ${dupPairs.length} nhóm file trùng lặp!`, "warn");
+          showToast(`⚠️ Phát hiện ${groups} nhóm file trùng lặp!`, "warn");
         }
       } catch (err) {
         showToast("Dedup: " + err.message, "error");

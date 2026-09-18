@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 import uuid
 from pathlib import Path
@@ -129,7 +130,7 @@ class KnowledgeMixin(ServiceContext):
         try:
             self._chunk_and_store(kb, doc.id, data.text)
             doc.status = KBDocumentStatus.PARSED
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001 - a failed parse is recorded on the document as FAILED
             doc.status = KBDocumentStatus.FAILED
             doc.error = str(err)
         self._refresh_kb_counts(kb)
@@ -245,7 +246,7 @@ class KnowledgeMixin(ServiceContext):
         if not offsets:
             raise StateConflictError("Split offsets must be inside the chunk text.")
         bounds = [0, *offsets, len(text)]
-        parts = [text[a:b].strip() for a, b in zip(bounds, bounds[1:], strict=True)]
+        parts = [text[a:b].strip() for a, b in itertools.pairwise(bounds)]
         parts = [p for p in parts if p]
         if len(parts) < 2:
             raise StateConflictError(

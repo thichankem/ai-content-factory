@@ -55,7 +55,12 @@ POST_CASES = [
         {"actor": "agent"},
     ),
     ("/cost/check", "cost_check", CostCheckRequest(calls={"tts": 2}), {"x": 1}),
-    ("/media/dedup", "media_dedup", DedupRequest(media_ids=["a"]), [["a"]]),
+    (
+        "/media/dedup",
+        "media_dedup",
+        DedupRequest(media_ids=["a"]),
+        {"groups": [["a"]]},
+    ),
     (
         "/script/virality",
         "script_virality",
@@ -166,12 +171,10 @@ def test_deterministic_endpoint_service_parity(
     "path,payload,field",
     [
         ("/qa/platform", {}, "platform"),
-        ("/qa/copyright", {}, "fingerprint"),
-        ("/qa/copyright", {}, "asset_ids"),
         ("/audit/record", {"actor": "", "action": "edit"}, "actor"),
         ("/audit/record", {"actor": "agent", "action": ""}, "action"),
         ("/cost/check", {"calls": {"tts": "bad"}}, "calls"),
-        ("/media/dedup", {"media_ids": []}, "media_ids"),
+        ("/media/dedup", {"media_ids": "not-a-list"}, "media_ids"),
         ("/script/virality", {"script": ""}, "script"),
         ("/script/virality", {"script_text": "  "}, "script"),
         ("/render/duck", {"music_media_id": "a"}, "voice_media_id"),
@@ -215,7 +218,7 @@ def test_request_validation_unchanged(qa_client, path, payload, field) -> None:
 def test_missing_media_domain_and_http_errors(
     service, qa_client, path, method, payload
 ) -> None:
-    with pytest.raises(NotFoundError, match="^Media 'missing' not found$"):
+    with pytest.raises(NotFoundError, match=r"^Media 'missing' not found$"):
         getattr(service, method)(payload)
     response = qa_client.post(path, json=payload.model_dump())
     assert response.status_code == 404
@@ -312,6 +315,10 @@ def test_cost_uses_settings_and_preserves_confirmation_boundary(
         "estimated_total_usd": 15,
         "exceeds_budget": confirm,
         "budget_limit": threshold,
+        # ...and the studio's four names, which read the same numbers.
+        "estimated_cost": 15,
+        "by_service": breakdown,
+        "within_budget": not confirm,
     }
     assert service.cost_check(request) == expected
     assert qa_client.post("/cost/check", json=request.model_dump()).json() == expected
@@ -327,10 +334,22 @@ def test_dedup_skips_unhashable_media_and_uses_config(
     monkeypatch.setattr(qa_service, "find_near_duplicates", grouper)
     service.settings.dedup_max_distance = 3
     request = DedupRequest(media_ids=["a", "document", "b"])
-    assert service.media_dedup(request) == [["a", "b"]]
-    assert qa_client.post("/media/dedup", json=request.model_dump()).json() == [
-        ["a", "b"]
+    result = service.media_dedup(request)
+    assert result["groups"] == [["a", "b"]]
+    assert result["count"] == 1
+    assert result["checked"] == 2
+    assert result["max_distance"] == 3
+    # The pair view names both sides and scores how alike they are, so a UI can
+    # rank what to delete instead of just knowing two files are similar.
+    assert result["duplicates"] == [
+        {
+            "original": "a",
+            "duplicate": "b",
+            "distance": 0,
+            "similarity": 1.0,
+        }
     ]
+    assert qa_client.post("/media/dedup", json=request.model_dump()).json() == result
     assert hasher.call_count == 6
     grouper.assert_called_with({"a": "abcd", "b": "abcd"}, max_distance=3)
 

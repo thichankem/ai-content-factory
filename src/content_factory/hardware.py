@@ -239,8 +239,12 @@ def _extra_binaries(setting: str) -> tuple[str, ...]:
 
 
 def _binary_key(path: str) -> str:
-    """Identity for de-duplicating binaries across spellings of one path."""
-    return os.path.normcase(os.path.abspath(path))
+    """Identity for de-duplicating binaries across spellings of one path.
+
+    ``resolve`` rather than ``abspath`` so a symlink and its target count as the
+    same binary: the point is to recognise one executable reached two ways.
+    """
+    return os.path.normcase(str(Path(path).resolve()))
 
 
 def discover_binaries(
@@ -333,7 +337,7 @@ def probe_encoder(ffmpeg: str, encoder: str) -> tuple[bool, str]:
 def _torch_state() -> tuple[bool, str]:
     """``(cuda_available, version)`` without importing torch unless installed."""
     try:
-        import torch  # noqa: PLC0415 - optional, heavy import on purpose
+        import torch
 
         return bool(torch.cuda.is_available()), str(torch.__version__)
     except Exception:  # noqa: BLE001 - any failure means "no torch"
@@ -342,7 +346,7 @@ def _torch_state() -> tuple[bool, str]:
 
 def _onnx_providers() -> tuple[str, ...]:
     try:
-        import onnxruntime  # type: ignore[import-untyped]  # noqa: PLC0415
+        import onnxruntime  # type: ignore[import-untyped]
 
         return tuple(onnxruntime.get_available_providers())
     except Exception:  # noqa: BLE001 - optional dependency

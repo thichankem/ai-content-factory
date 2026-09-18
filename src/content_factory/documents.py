@@ -191,7 +191,7 @@ class _HttpProvider:
                 response.raise_for_status()
                 data = response.json()
                 return data if isinstance(data, dict) else None
-        except Exception:
+        except Exception:  # noqa: BLE001 - a failing web provider is indistinguishable from no provider
             return None
 
     async def _get_text(self, url: str, params: dict) -> str | None:
@@ -202,7 +202,7 @@ class _HttpProvider:
                 response = await client.get(url, params=params)
                 response.raise_for_status()
                 return response.text
-        except Exception:
+        except Exception:  # noqa: BLE001 - same: a provider outage degrades to no document
             return None
 
 

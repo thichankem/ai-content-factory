@@ -37,11 +37,11 @@ export const useProjectStore = create<ProjectStore>((set) => ({
       currentProject: state.currentProject
         ? {
             ...state.currentProject,
-            script: {
+            script_document: {
               topic: state.currentProject.topic || "Re-Cooked Project",
-              style: state.currentProject.script?.style || "retention_fast",
+              style: state.currentProject.script_document?.style || "retention_fast",
               raw_script: rawScript,
-              sections: state.currentProject.script?.sections || [],
+              sections: state.currentProject.script_document?.sections || [],
             },
           }
         : {
@@ -54,7 +54,8 @@ export const useProjectStore = create<ProjectStore>((set) => ({
             source_rights_confirmed: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            script: {
+            script: rawScript,
+            script_document: {
               topic: "Re-Cooked Project",
               style: "retention_fast",
               raw_script: rawScript,

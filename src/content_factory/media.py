@@ -10,6 +10,7 @@ asset.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import mimetypes
 import shutil
@@ -384,7 +385,7 @@ class MediaLibrary:
                     if files:
                         target_file = files[0]
                         target_filename = target_file.name
-            except Exception:
+            except Exception:  # noqa: BLE001 - extraction failure only means no filename was derived
                 target_file = None
 
             if target_file is None or not target_file.is_file():
@@ -407,7 +408,7 @@ class MediaLibrary:
                 target_file = temp_dir / fallback_name
                 with (
                     urllib.request.urlopen(req, timeout=30) as resp,
-                    open(target_file, "wb") as out_f,
+                    target_file.open("wb") as out_f,
                 ):
                     shutil.copyfileobj(resp, out_f)
                 target_filename = fallback_name
@@ -415,7 +416,7 @@ class MediaLibrary:
             if target_file is None or not target_file.is_file():
                 raise ValueError(f"Could not download media from URL: {url}")
 
-            with open(target_file, "rb") as f:
+            with target_file.open("rb") as f:
                 return self.upload_stream(
                     target_filename,
                     f,
@@ -459,10 +460,8 @@ class MediaLibrary:
             return False
         path = self.path_for(item)
         if path is not None:
-            try:
+            with contextlib.suppress(OSError):
                 path.unlink(missing_ok=True)
-            except OSError:
-                pass
         self._save()
         return True
 
@@ -628,7 +627,7 @@ class MediaLibrary:
 
                 reader = pypdf.PdfReader(str(path))
                 text = "\n".join(page.extract_text() or "" for page in reader.pages)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 raise RuntimeError(f"could not extract PDF text: {exc}") from exc
         else:
             text = path.read_text(encoding="utf-8", errors="replace")

@@ -898,7 +898,7 @@ def generate_campaign_for_project(
         "/ 15% Bản đồ / 15% Văn bản / 10% Sơ đồ / 10% Infographic."
     )
 
-    campaign = MultiFormatCampaign(
+    return MultiFormatCampaign(
         id=f"camp_{uuid.uuid4().hex[:8]}",
         project_id=project.id,
         master_topic=topic,
@@ -918,4 +918,3 @@ def generate_campaign_for_project(
         created_at=utcnow(),
         updated_at=utcnow(),
     )
-    return campaign

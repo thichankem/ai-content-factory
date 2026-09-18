@@ -52,7 +52,7 @@ def test_anthropic_provider_parses_content_blocks(
     )
     captured: dict[str, object] = {}
 
-    async def fake_post(self, url, json=None, headers=None):  # noqa: A002
+    async def fake_post(self, url, json=None, headers=None):
         captured["url"] = url
         captured["headers"] = headers
         captured["payload"] = json
@@ -83,7 +83,7 @@ def test_anthropic_provider_parses_content_blocks(
 def test_anthropic_provider_rejects_non_200(monkeypatch: pytest.MonkeyPatch) -> None:
     provider = AnthropicProvider(base_url="https://api.anthropic.test/v1", model="m")
 
-    async def fake_post(self, url, json=None, headers=None):  # noqa: A002
+    async def fake_post(self, url, json=None, headers=None):
         return SimpleNamespace(status_code=401, text="unauthorized", json=lambda: {})
 
     monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
@@ -96,7 +96,7 @@ def test_anthropic_provider_rejects_empty_content(
 ) -> None:
     provider = AnthropicProvider(base_url="https://api.anthropic.test/v1", model="m")
 
-    async def fake_post(self, url, json=None, headers=None):  # noqa: A002
+    async def fake_post(self, url, json=None, headers=None):
         return SimpleNamespace(status_code=200, text="{}", json=lambda: {"content": []})
 
     monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
@@ -113,7 +113,7 @@ def test_gemini_provider_parses_candidates(monkeypatch: pytest.MonkeyPatch) -> N
     )
     captured: dict[str, object] = {}
 
-    async def fake_post(self, url, json=None, headers=None):  # noqa: A002
+    async def fake_post(self, url, json=None, headers=None):
         captured["url"] = url
         captured["payload"] = json
         return SimpleNamespace(
@@ -139,7 +139,7 @@ def test_gemini_provider_rejects_missing_candidates(
 ) -> None:
     provider = GeminiProvider(base_url="https://generativelanguage.test", model="m")
 
-    async def fake_post(self, url, json=None, headers=None):  # noqa: A002
+    async def fake_post(self, url, json=None, headers=None):
         return SimpleNamespace(status_code=200, text="{}", json=lambda: {"blocked": 1})
 
     monkeypatch.setattr("httpx.AsyncClient.post", fake_post)

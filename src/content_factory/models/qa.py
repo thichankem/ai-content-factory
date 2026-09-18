@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
+from .common import TwinSpelling
 from .timeline import VideoProject
 
 
@@ -82,15 +83,16 @@ class CostCheckRequest(BaseModel):
         return merged
 
 
-class ViralityRequest(BaseModel):
-    """A script to score.
+class ViralityRequest(TwinSpelling):
+    """A script to score, spelled either way by its two kinds of caller.
 
-    Both spellings are accepted on purpose: ``script`` is the canonical field the
-    CLI, the pipeline and the agent tools use, while ``script_text`` is what both
-    web clients send. Accepting one spelling and rejecting the other is the kind
-    of contract drift that silently 422s a working UI, so both are valid and
-    exactly one is required.
+    ``script`` is the canonical field the CLI, the pipeline and the agent tools
+    use; ``script_text`` is what both web clients send. See :class:`TwinSpelling`
+    for the rule and why it is shared rather than repeated.
     """
+
+    PRIMARY = "script"
+    ALIAS = "script_text"
 
     script: str | None = None
     script_text: str | None = None
@@ -101,13 +103,7 @@ class ViralityRequest(BaseModel):
     @property
     def text(self) -> str:
         """The script body, whichever field carried it."""
-        return (self.script or self.script_text or "").strip()
-
-    @model_validator(mode="after")
-    def _require_a_script(self) -> ViralityRequest:
-        if not self.text:
-            raise ValueError("provide 'script' (or its alias 'script_text')")
-        return self
+        return self.resolved
 
 
 class DuckRequest(BaseModel):
@@ -154,13 +150,17 @@ class DedupRequest(BaseModel):
     media_ids: list[str] = Field(default_factory=list)
 
 
-class TimelineCommandRequest(BaseModel):
+class TimelineCommandRequest(TwinSpelling):
     """A natural-language editing instruction and the timeline to apply it to.
 
     ``text`` is the canonical field the CLI, the MCP server and the agent tools
-    use; ``command`` is what the studio's command bar sends. Both are accepted
-    and exactly one is required, so neither client can silently no-op.
+    use; ``command`` is what the studio's command bar sends. An instruction that
+    is silently dropped is a command that appears to work and does nothing, which
+    is why this requires one rather than defaulting to empty.
     """
+
+    PRIMARY = "text"
+    ALIAS = "command"
 
     project: VideoProject
     text: str | None = None
@@ -169,13 +169,7 @@ class TimelineCommandRequest(BaseModel):
     @property
     def instruction(self) -> str:
         """The instruction, whichever field carried it."""
-        return (self.text or self.command or "").strip()
-
-    @model_validator(mode="after")
-    def _require_an_instruction(self) -> TimelineCommandRequest:
-        if not self.instruction:
-            raise ValueError("provide 'text' (or its alias 'command')")
-        return self
+        return self.resolved
 
 
 class SimplifySubtitlesRequest(BaseModel):

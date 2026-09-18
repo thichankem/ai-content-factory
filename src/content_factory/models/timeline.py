@@ -6,7 +6,7 @@ import enum
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from .common import (
     IssueSeverity,
@@ -145,12 +145,24 @@ class Keyframe(BaseModel):
 
 
 class TimelineMarker(BaseModel):
-    """A labelled point on the timeline (beat, cue, chapter, note)."""
+    """A labelled point on the timeline (beat, cue, chapter, note).
+
+    ``time_seconds`` is the canonical offset the editor writes and the renderer
+    reads. ``time`` is the name the dashboard's marker list renders, and it is
+    served alongside rather than instead of, so neither client shows ``undefined``
+    for a marker that exists.
+    """
 
     id: str
     time_seconds: float = Field(ge=0.0)
     label: str = ""
     color: str = "#f59e0b"
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def time(self) -> float:
+        """Alias of :attr:`time_seconds` for dashboard clients."""
+        return self.time_seconds
 
 
 class OverlayPosition(enum.StrEnum):

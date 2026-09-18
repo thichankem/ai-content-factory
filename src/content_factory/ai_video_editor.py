@@ -25,6 +25,7 @@ model:
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import tempfile
 import uuid
@@ -206,8 +207,8 @@ def _track_box(
         else:
             dx, dy = _dense_flow_delta(prev_gray, cur_gray, (x, y, w, h))
             prev_pts = _features_in_box(cur_gray, (x, y, w, h))
-        x = int(round(x + dx))
-        y = int(round(y + dy))
+        x = round(x + dx)
+        y = round(y + dy)
         H, W = cur_gray.shape
         x = max(0, min(W - w, x))
         y = max(0, min(H - h, y))
@@ -294,7 +295,7 @@ def _detect_cuts(frames: list[np.ndarray], fps: int) -> list[CutRange]:
         motion.append(float(diff.mean()) / 255.0)
         prev = cur
     # Pad to align with frame indices.
-    motion = [motion[0]] + motion
+    motion = [motion[0], *motion]
 
     cuts: list[CutRange] = []
     i = 0
@@ -487,10 +488,8 @@ class AiVideoEditor:
             frames, fps, output_path, audio_path=audio_path, ffmpeg_binary=ffmpeg_binary
         )
         if auto_audio is not None:
-            try:
+            with contextlib.suppress(OSError):
                 auto_audio.unlink(missing_ok=True)
-            except OSError:
-                pass
         return EditReport(
             source_frames=len(frames) + sum(c.end - c.start for c in cuts),
             output_frames=len(frames),

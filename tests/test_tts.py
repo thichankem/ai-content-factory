@@ -71,7 +71,7 @@ def test_tts_engine_falls_back_to_gtts_when_edge_fails(monkeypatch) -> None:
 
     monkeypatch.setattr(EdgeTTSProvider, "synthesize", fake_edge)
     monkeypatch.setattr(GTTSProvider, "synthesize", fake_gtts)
-    data, duration, name = asyncio.run(engine.synthesize("Hello", "en"))
+    _data, _duration, name = asyncio.run(engine.synthesize("Hello", "en"))
     assert name == "gtts"
     assert calls["edge"] == 1
     assert calls["gtts"] == 1

@@ -36,7 +36,7 @@ def _now() -> str:
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
-    with open(path, "rb") as handle:
+    with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
@@ -57,7 +57,7 @@ def _pdf_units(path: Path) -> list[tuple[int, str]]:
                 (index + 1, page.get_text("text") or "")
                 for index, page in enumerate(doc)
             ]
-    except Exception:
+    except Exception:  # noqa: BLE001 - optional PDF backend: fall through to pypdf
         pass
     try:
         import pypdf
@@ -67,7 +67,7 @@ def _pdf_units(path: Path) -> list[tuple[int, str]]:
             (index + 1, page.extract_text() or "")
             for index, page in enumerate(reader.pages)
         ]
-    except Exception:
+    except Exception:  # noqa: BLE001 - optional PDF backend: no extractor available at all
         return []
 
 
@@ -178,7 +178,7 @@ class DocumentLibrary:
         async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_seconds)) as client:
             async with client.stream("GET", url, follow_redirects=True) as response:
                 response.raise_for_status()
-                with open(dest, "wb") as handle:
+                with dest.open("wb") as handle:
                     async for chunk in response.aiter_bytes():
                         handle.write(chunk)
         self.index_file(dest)
@@ -196,7 +196,7 @@ class DocumentLibrary:
             ):
                 try:
                     pages = self.index_file(candidate)
-                except Exception as err:
+                except Exception as err:  # noqa: BLE001 - one unreadable file must not abort a whole index run
                     stats.files_failed += 1
                     stats.errors.append(f"{candidate.name}: {err}")
                     continue

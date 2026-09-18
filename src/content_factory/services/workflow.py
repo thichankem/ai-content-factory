@@ -134,7 +134,7 @@ class WorkflowMixin(AgentsMixin, ProjectsMixin, GrowthMixin, VoiceMixin):
                 on_progress=publish,
                 run_id=run_id,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - a failed step is recorded on the run, not raised at the caller
             finished = WorkflowRun(
                 id=run_id,
                 project_id=project_id,

@@ -40,9 +40,9 @@ from .models import (
 )
 
 __all__ = [
-    "Args",
     "TOOL_MANIFEST",
     "TOOL_REGISTRY",
+    "Args",
     "ToolError",
     "ToolSpec",
     "build_tool_manifest",
@@ -166,7 +166,7 @@ class Args:
         raw = str(self.requires(key))
         try:
             return _base64.b64decode(raw, validate=False)
-        except Exception as exc:  # noqa: BLE001 - any decode failure is the same error
+        except Exception as exc:
             raise ToolError(f"Argument '{key}' must be base64 data.") from exc
 
     @staticmethod
@@ -732,7 +732,7 @@ def _h_auto_cut_to_beat(service: Any, args: Args) -> Any:
     """Read a track's tempo and beat-match the project timeline to it."""
     project_id = args.ident("project_id")
     grid = service.music_beat_grid(args.string("music_ref"))
-    tempo = args.integer("bpm", int(round(float(grid.get("bpm") or 120.0))))
+    tempo = args.integer("bpm", round(float(grid.get("bpm") or 120.0)))
     project = service.apply_ai_assist(project_id, fit=True, beat=True, bpm=tempo)
     return {
         "project": project,

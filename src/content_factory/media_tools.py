@@ -16,6 +16,7 @@ over ``ffmpeg``/``ffprobe`` plus Pillow, which keeps it hermetic and testable.
 
 from __future__ import annotations
 
+import itertools
 import json
 import re
 import shutil
@@ -322,7 +323,7 @@ def _energy_envelope(
     samples, rate = _decode_mono_pcm(path)
     if len(samples) == 0:
         return np.zeros(0, dtype=np.float32), 0.0
-    hop = max(1, int(round(frame_seconds * rate)))
+    hop = max(1, round(frame_seconds * rate))
     frames = max(1, len(samples) // hop)
     energy = np.empty(frames, dtype=np.float32)
     for index in range(frames):
@@ -358,10 +359,10 @@ def beat_grid(
     energy, frame_seconds = _energy_envelope(resolved)
     beats: list[float] = []
     if energy.size:
-        search = max(1, int(round(0.35 * interval / frame_seconds)))
+        search = max(1, round(0.35 * interval / frame_seconds))
         index = 0
         while index * frame_seconds < duration and len(beats) < max_beats:
-            centre = int(round(index * interval / frame_seconds))
+            centre = round(index * interval / frame_seconds)
             lo = max(0, centre - search)
             hi = min(energy.size, centre + search + 1)
             if hi <= lo:
@@ -624,7 +625,7 @@ def split_at(
     out_dir.mkdir(parents=True, exist_ok=True)
     bounds = [0.0, *points, duration]
     clips: list[dict[str, Any]] = []
-    for index, (start, end) in enumerate(zip(bounds, bounds[1:], strict=False)):
+    for index, (start, end) in enumerate(itertools.pairwise(bounds)):
         if end - start < 0.05:
             continue
         target = out_dir / f"{prefix}_{index + 1:03d}{src.suffix}"

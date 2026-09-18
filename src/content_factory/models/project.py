@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from .campaign import MultiFormatCampaign
 from .common import (
@@ -12,6 +12,7 @@ from .common import (
     ApprovalStage,
     ApprovalVerdict,
     ProjectStatus,
+    TwinSpelling,
     utcnow,
 )
 from .external import ExternalAssetRecord
@@ -44,13 +45,15 @@ class ProjectCreate(BaseModel):
     duration_target_seconds: int = Field(default=45, ge=5, le=600)
 
 
-class ScriptUpdate(BaseModel):
+class ScriptUpdate(TwinSpelling):
     """Payload for saving a script and confirming source rights.
 
     ``script`` is the canonical field; ``raw_script`` is the name both web clients
     send, because they think of it as the raw text behind the parsed sections.
-    Exactly one of the two is required.
     """
+
+    PRIMARY = "script"
+    ALIAS = "raw_script"
 
     script: str | None = None
     raw_script: str | None = None
@@ -59,13 +62,7 @@ class ScriptUpdate(BaseModel):
     @property
     def text(self) -> str:
         """The script body, whichever field carried it."""
-        return self.script if self.script is not None else (self.raw_script or "")
-
-    @model_validator(mode="after")
-    def _require_a_script(self) -> ScriptUpdate:
-        if not self.text.strip():
-            raise ValueError("provide 'script' (or its alias 'raw_script')")
-        return self
+        return self.resolved
 
 
 class ApprovalCreate(BaseModel):

@@ -508,7 +508,7 @@ class WorkflowRunner:
                 run.message = run.steps[-1].error
                 break
 
-        skipped = [node_id for node_id in cyclic]
+        skipped = list(cyclic)
         for node_id in skipped:
             node = by_id[node_id]
             run.steps.append(
@@ -558,7 +558,8 @@ class WorkflowRunner:
                 else WorkflowStepStatus.FAILED
             )
             step.error = str(exc)
-        except Exception as exc:  # surface the message in the monitor
+        # A failed step is surfaced in the monitor, not raised at the caller.
+        except Exception as exc:  # noqa: BLE001
             step.status = WorkflowStepStatus.FAILED
             step.error = str(exc)
         else:

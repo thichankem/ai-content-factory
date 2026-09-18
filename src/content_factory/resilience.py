@@ -137,7 +137,7 @@ async def retry(
             return await fn(*args, **kwargs)
         except CircuitOpenError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - retry spans arbitrary callables; CircuitOpenError is re-raised
             last_error = exc
             if attempt == attempts - 1:
                 break

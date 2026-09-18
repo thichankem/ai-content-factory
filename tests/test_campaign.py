@@ -139,7 +139,7 @@ def test_service_update_short_not_found(service: ContentFactoryService) -> None:
     )
     service.generate_campaign(project.id)
 
-    with pytest.raises(Exception, match="(?i)not found"):
+    with pytest.raises(Exception, match=r"(?i)not found"):
         service.update_short(
             project.id, "non_existent_short", ShortsUpdateRequest(title="X")
         )

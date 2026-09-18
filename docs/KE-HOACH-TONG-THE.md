@@ -1488,5 +1488,52 @@ Người vận hành yêu cầu tiếp tục phát triển toàn bộ frontend m
 - `npm run type-check`: **0 errors (100% pass)**.
 - `npm run build`: **Next.js 14.2.35 Build PASS** (4/4 static pages generated thành công, First Load JS ~241 kB).
 
+---
 
+### 2026-09-18 — Thiết Kế Lại Toàn Diện Bước 1 (Script Studio & Storyboard): 10 Tiêu Chí, Chatbot Cột Phải Sửa Theo Dòng, Dự Đoán Thời Gian Nói
 
+**Động lực:**
+Người vận hành yêu cầu thiết kế lại Bước 1 trong phần frontend theo 10 nhóm tiêu chí chi tiết, tích hợp AI Chatbot cố định thường trực ở bên tay phải có khả năng sửa trực tiếp kịch bản theo phạm vi đánh dấu (từ dòng X đến dòng Y hoặc đoạn văn bôi đen) kèm tính năng dự đoán thời gian phát âm theo tốc độ (WPM & âm tiết tiếng Việt), và duy trì localhost mở liên tục để test.
+
+**Những gì đã làm:**
+1. **Bộ Cài Đặt Đề Bài 10 Tiêu Chí Toàn Diện (`ScriptBriefSettingsPanel.tsx`, `types/script.ts`):**
+   - Tiêu chí 1: Chủ đề cụ thể & góc nhìn / insight mới lạ, phản trực giác hoặc gây tranh luận.
+   - Tiêu chí 2: Nền tảng đích (TikTok, Shorts, Reels, YouTube 16:9), thời lượng mong muốn (15s, 30s, 60s, 3m, 10m...), tỷ lệ khung hình (9:16, 16:9, 1:1, 4:5).
+   - Tiêu chí 3: Chân dung đối tượng khán giả (tuổi, giới tính, sở thích; đã biết gì; nỗi đau pain points; khao khát desires).
+   - Tiêu chí 4: Mục tiêu video (giáo dục, giải trí, bán hàng, follow, viral) và hành động kêu gọi sau khi xem (CTA).
+   - Tiêu chí 5: Giọng điệu & phong cách (hài hước, nghiêm túc, truyền cảm hứng, kịch tính, thân mật) + Toggle chèn meme/slang/tiếng lóng giới trẻ.
+   - Tiêu chí 6: Cấu trúc mong muốn: Kiểu Hook 3 giây đầu (Phản trực giác, Sai lầm chết người, Khoảng trống tò mò, Số liệu gây sốc), cấu trúc phân đoạn, và toggle Visual Cue đi kèm lời thoại.
+   - Tiêu chí 7: Nhân vật / Hình thức thể hiện (Talking head on-cam, Voiceover + B-roll, Hội thoại 2 người, Storytelling điện ảnh, POV).
+   - Tiêu chí 8: Dữ liệu cụ thể chống AI bịa đặt: Đính kèm file PDF/Word/Text, link bài viết web, YouTube script nguồn, số liệu/tên sản phẩm thực nghiệm.
+   - Tiêu chí 9: Ví dụ tham khảo: Upload video tham khảo bóc tách script, link YouTube/TikTok mẫu, Creator mẫu học tông giọng, script mẫu dán trực tiếp.
+   - Tiêu chí 10: Điều cần tránh: Không nhắc đối thủ, từ cấm nền tảng, tránh câu sáo rỗng, tránh nội dung nhạy cảm.
+   - Hệ thống Presets phong phú: Nấu ăn 60s, Bí ẩn hàng không 10m, Review công nghệ 60s, Quản lý tài chính 3m.
+
+2. **AI Script Copilot Chatbot Cố Định Bên Tay Phải (`ScriptChatbot.tsx`):**
+   - Khung Chatbot luôn thường trực bên cột phải (Persistent Right Panel), kết nối 2 chiều với kịch bản.
+   - Thanh chỉ thị phạm vi sửa thông minh: Nhận diện theo vùng bôi đen của chuột hoặc bộ chọn số dòng (`Từ dòng [X] đến [Y]`) và các nút chọn nhanh (`[Hook 3s]`, `[Nội dung]`, `[Cú lật Turn]`, `[CTA]`, `[Toàn văn]`).
+   - Phím lệnh 1-chạm (Quick Rewrite Chips): Viết lại Hook 3s giật gân, Rút ngắn 15s, Thêm Visual Cue, Chèn slang/meme, Đưa số liệu chống bịa.
+   - Sửa trực tiếp vào kịch bản: Thay thế chính xác chỉ ở các dòng đã chọn, bảo toàn 100% các dòng khác.
+   - Hiển thị bảng so sánh Diff trực quan (đoạn cũ gạch đỏ vs đoạn mới chữ xanh).
+   - Nút **Hoàn tác (Undo)** 1-click giúp khôi phục ngay kịch bản trước đó nếu chưa vừa ý.
+
+3. **Công Cụ Dự Đoán Thời Gian Nói Theo Tốc Độ (`ScriptPacingBar.tsx`):**
+   - 4 mức tốc độ đọc chuẩn: Chậm (130 WPM - ~2.1 từ/s), Chuẩn (160 WPM - ~2.7 từ/s), Nhanh (195 WPM - ~3.2 từ/s), Cực nhanh (230 WPM - ~3.8 từ/s).
+   - Tính toán trực tiếp số từ, số âm tiết tiếng Việt (~words * 1.05), và thời lượng ước tính so với thời lượng mục tiêu (kèm huy hiệu cảnh báo Chuẩn nhịp / Dài hơn / Ngắn hơn).
+   - Dự đoán thời lượng riêng cho đoạn đang được chọn: `🎯 Dòng X-Y: Z từ (~Ts)`.
+
+4. **Trình Soạn Thảo Đánh Số Dòng & Storyboard 2 Cột (`ScriptEditorView.tsx`):**
+   - Cột đánh số dòng lề trái (Line Number Gutter) đồng bộ cuộn với textarea. Click vào số dòng để đặt phạm vi cho Chatbot.
+   - Chế độ xem Storyboard 2 cột chuyên nghiệp: phân cảnh Scene, thời gian, lời thoại Voiceover TTS, và chỉ dẫn hình ảnh Visual Cue.
+   - Cổng kiểm duyệt bắt buộc Gate 1: Checkbox xác nhận bản quyền tư liệu (Source Rights) và nút Phê duyệt kịch bản.
+
+5. **Chế Độ Chia Đôi Màn Hình (`ScriptStudio.tsx`):**
+   - Bổ sung tab `3. Chia Đôi (Song Song)` cho phép hiển thị đồng thời cả Đề bài 10 tiêu chí và Kịch bản cạnh nhau, kết hợp cùng Chatbot bên phải thành bố cục 3 cột làm việc tối ưu.
+
+**Kiểm chứng:**
+- `npm run type-check`: **0 errors (100% pass)**.
+- `ruff check src tests`: **All checks passed!**
+- `ruff format --check src tests`: **All 173 files formatted!**
+- `mypy src`: **Success: no issues found in 120 source files!**
+- Visual Inspection bằng Playwright & Multimodal AI Vision: Đã kiểm tra toàn bộ luồng chọn dòng 1-4, viết lại Hook 3s bằng Chatbot, hiển thị diff, cập nhật editor, và nút hoàn tác khôi phục kịch bản.
+- Localhost: Cả Next.js frontend (`http://localhost:3000`) và FastAPI backend (`http://127.0.0.1:8080`) đang chạy nền và sẵn sàng phục vụ.

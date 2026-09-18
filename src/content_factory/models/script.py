@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from .common import (
     IssueSeverity,
@@ -14,7 +14,14 @@ from .common import (
 
 
 class ScriptSectionInfo(BaseModel):
-    """One labelled section of a narration script, with timing estimates."""
+    """One labelled section of a narration script, with timing estimates.
+
+    ``label``/``unit_count``/``estimated_seconds`` are the pipeline's names for
+    this section. ``name``/``words``/``duration_target_seconds`` are the names the
+    studio's section editor was written against, and both are served so neither
+    client has to rename the other's fields. They are computed rather than stored
+    so the two spellings can never drift apart.
+    """
 
     index: int
     label: str
@@ -22,6 +29,24 @@ class ScriptSectionInfo(BaseModel):
     unit_count: int
     estimated_seconds: float
     share: float
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def name(self) -> str:
+        """Alias of :attr:`label` for editor clients."""
+        return self.label
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def words(self) -> int:
+        """Alias of :attr:`unit_count` for editor clients."""
+        return self.unit_count
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def duration_target_seconds(self) -> float:
+        """Alias of :attr:`estimated_seconds` for editor clients."""
+        return self.estimated_seconds
 
 
 class ScriptDocument(BaseModel):
@@ -56,6 +81,12 @@ class ScriptPlan(BaseModel):
     sections: list[ScriptSectionInfo] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     generated_at: datetime = Field(default_factory=utcnow)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def total_duration(self) -> float:
+        """Alias of :attr:`estimated_seconds` for editor clients."""
+        return self.estimated_seconds
 
 
 # Historical alias: the severity scale is shared with the timeline validator.

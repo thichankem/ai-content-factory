@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import math
 from collections import Counter
 from collections.abc import Sequence
@@ -134,7 +135,7 @@ def keyword_opportunities(
                 median_views=median_views,
                 median_subscribers=median_subs,
                 freshness=freshness,
-                opportunity=int(round(opportunity * 100)),
+                opportunity=round(opportunity * 100),
                 covered=covered,
                 action=action,
                 evidence_titles=tuple(video.title for video in matching[:3]),
@@ -186,7 +187,7 @@ def _winning_patterns(
     weight: dict[str, int] = {}
     for video in strong:
         words = [word for word in _words(video.title) if word not in _STOPWORDS]
-        for first, second in zip(words, words[1:], strict=False):
+        for first, second in itertools.pairwise(words):
             pattern = f"{first} {second}"
             counter[pattern] += 1
             weight[pattern] = weight.get(pattern, 0) + video.views

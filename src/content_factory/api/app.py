@@ -66,7 +66,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_handler(
         request: Request, exc: RequestValidationError
-    ) -> JSONResponse:        detail = _json_safe(exc.errors())
+    ) -> JSONResponse:
+        detail = _json_safe(exc.errors())
         return JSONResponse(status_code=422, content={"detail": detail})
 
     app.include_router(build_health_router(service, settings))

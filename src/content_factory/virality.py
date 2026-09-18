@@ -133,9 +133,8 @@ def score_virality(
     # Call to action (0-20).
     cta_score = 20.0 if _has_cta(text) else 0.0
 
-    total = int(
-        round(max(0.0, min(100.0, hook_score + pace_score + length_score + cta_score)))
-    )
+    raw_total = hook_score + pace_score + length_score + cta_score
+    total = round(max(0.0, min(100.0, raw_total)))
 
     warnings: list[str] = []
     if hook_score < 18.0:

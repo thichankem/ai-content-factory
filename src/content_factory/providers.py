@@ -561,7 +561,7 @@ class ProviderChain:
                 except CircuitOpenError as exc:
                     failures.append(f"{provider.name}: {exc}")
                     continue
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - any vendor failure falls through to the next provider
                     failures.append(f"{provider.name}: {exc}")
                     continue
                 return GenerationResult(

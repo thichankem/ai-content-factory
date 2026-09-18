@@ -204,7 +204,7 @@ def _resample(samples: np.ndarray, source_rate: int, target_rate: int) -> np.nda
     if source_rate == target_rate or len(samples) == 0:
         return samples
     duration = len(samples) / max(1, source_rate)
-    out_len = max(1, int(round(duration * target_rate)))
+    out_len = max(1, round(duration * target_rate))
     src_idx = np.linspace(0.0, len(samples) - 1, num=out_len)
     lo = np.floor(src_idx).astype(np.int64)
     hi = np.minimum(lo + 1, len(samples) - 1)
@@ -250,7 +250,7 @@ def detect_silence_and_pace(
     if len(samples) == 0:
         return [], PaceEstimate(total, 0.0, [], 0.0)
 
-    hop = max(1, int(round(frame_seconds * rate)))
+    hop = max(1, round(frame_seconds * rate))
     n_frames = max(1, len(samples) // hop)
     energies = np.empty(n_frames, dtype=np.float32)
     for i in range(n_frames):
@@ -321,7 +321,7 @@ def classify_music_mood(
     if len(samples) == 0:
         return MusicMood("unknown", 0.0, 0.0, "no audio")
 
-    hop = max(1, int(round(frame_seconds * rate)))
+    hop = max(1, round(frame_seconds * rate))
     n_frames = max(1, len(samples) // hop)
     rms = np.empty(n_frames, dtype=np.float32)
     centroid = np.empty(n_frames, dtype=np.float32)
@@ -373,8 +373,8 @@ def _estimate_tempo(rms: np.ndarray, frame_seconds: float) -> float:
     if onset.sum() <= 0.0:
         return 0.0
     # Lags for 60..200 BPM expressed in frames.
-    min_lag = max(1, int(round(60.0 / 210.0 / frame_seconds)))
-    max_lag = max(min_lag + 1, int(round(60.0 / 57.0 / frame_seconds)))
+    min_lag = max(1, round(60.0 / 210.0 / frame_seconds))
+    max_lag = max(min_lag + 1, round(60.0 / 57.0 / frame_seconds))
     max_lag = min(max_lag, onset.size - 1)
     if max_lag <= min_lag:
         return 0.0
