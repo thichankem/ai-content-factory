@@ -191,10 +191,18 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
       gợi ý tự động theo histogram — dùng được bởi cả người có/nhìn và không nhìn
       được, và AI agent
 - [x] **Undo/redo phiên chỉnh ảnh không phá hủy** (session trong RAM)
+- [x] **Hiệu ứng khung hình video** (`video_effects.py`): glitch, shake,
+      distortion, glow, film grain, motion blur, particles, chromatic
+      aberration, pixelate, scanlines, freeze — thuần numpy, deterministic
+- [x] **Hiệu ứng âm thanh DSP** (`audio_effects.py`): equalizer, compressor,
+      limiter, reverb, voice changer, noise gate — thuần numpy
+- [x] **Tầng trợ năng video** (`video_assist.py`): catalog thao tác video/audio,
+      mô tả timeline bằng lời, gợi ý sửa tự động theo báo cáo validator
 - [ ] Adapter ML pluggable: tách chủ thể (rembg), panorama, HDR merge, RAW decode,
-      upscale (Real-ESRGAN), stabilize
+      upscale (Real-ESRGAN), stabilize, object/face tracking, auto reframe
 - [ ] Version history bền vững trên đĩa (hiện session lưu trong RAM)
-- [ ] Hiệu ứng chuyển cảnh, speed ramp, motion tracking, keyframe đa điểm
+- [ ] Workflow: autosave/recovery, bins, compound clips, adjustment layers,
+      templates, batch export, multiple export versions, safe zones
 - [ ] "Auto-edit giống editor chuyên nghiệp": cắt theo nhịp, chọn B-roll khớp
 
 ### P7 — Tự động hoá & vận hành
@@ -319,6 +327,58 @@ không được là hằng số trong code.
    chạy ComfyUI/Ollama/XTTS local.
 
 ## 9. Nhật ký thay đổi
+
+### 2026-09-18 — Phiên Chỉnh video: hiệu ứng + tầng trợ năng (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung các chức năng edit video còn thiếu trong 10 nhóm
+  chủ dự án liệt kê (Timeline, Hình ảnh, Effects, Text, Audio, Camera/Motion,
+  AI, Social, Export, Workflow) bằng thuật toán thuần numpy/ffmpeg chạy offline,
+  **và** một tầng trợ năng để cả người có/nhìn và không nhìn được (và AI agent)
+  đều hiểu và dùng được từng chức năng. Phần lớn các chức năng trong danh sách
+  đã có sẵn (timeline engine, media_tools read+cut, audio chain, render) — phiên
+  này lấp các khoảng trống rõ rệt.
+- **Đã làm:**
+  - `src/content_factory/video_effects.py` (mới) — **11 hiệu ứng khung hình**
+    thuần numpy, deterministic theo seed: `glitch`, `shake`, `distortion`,
+    `glow`, `film_grain`, `motion_blur`, `particles`, `chromatic_aberration`,
+    `pixelate`, `scanlines`, `freeze`. Kèm `effect_catalog()` mô tả từng hiệu
+    ứng + tham số.
+  - `src/content_factory/audio_effects.py` (mới) — **6 hiệu ứng DSP** thuần
+    numpy: `equalizer` (3-band biquad), `compressor`, `limiter`, `reverb`
+    (Schroeder), `voice_changer` (pitch shift), `noise_gate`. Kèm
+    `audio_effect_catalog()`.
+  - `src/content_factory/video_assist.py` (mới) — **tầng trợ năng video**:
+    - `catalog()` — toàn bộ thao tác video/audio phân nhóm theo category kèm
+      mô tả bằng lời (gộp cả hiệu ứng khung hình + audio).
+    - `describe_operation(name)` — giải thích từng thao tác.
+    - `describe_timeline(project)` — tóm tắt timeline bằng câu chữ (số scene,
+      thời lượng, số từ, tỉ lệ, số scene có ảnh/grade/filter/effect).
+    - `suggest_edits(project)` — biến báo cáo validator thành các bước sửa cụ
+      thể (scene quá ngắn → set_speed, tương phản chữ thấp → outline, flat look
+      → ai_assist, narration underfill → fit…).
+  - `image_voice_service.py` — thêm `persist_audio_bytes`.
+  - `services/production.py` — expose `video_effect_catalog`, `apply_video_effect`,
+    `audio_effect_catalog`, `apply_audio_effect`, `video_operation_catalog`,
+    `describe_video_operation`, `describe_video_timeline`, `suggest_video_edits`.
+  - `api/routers/studio_media.py` — endpoint mới: `GET /studio/video/effects`,
+    `POST /studio/video/effect`, `GET /studio/audio/effects`,
+    `POST /studio/audio/effect`, `GET /studio/video/ops`,
+    `POST /studio/video/describe-op`, `GET /projects/{id}/timeline/describe`,
+    `GET /projects/{id}/timeline/suggest`.
+  - `agent_video.py` (mới) — 8 agent tool mới (registry giờ **97 tool**), gọi
+    được qua `/tools/call` và MCP: `video_effect_catalog`, `apply_video_effect`,
+    `audio_effect_catalog`, `apply_audio_effect`, `video_operation_catalog`,
+    `describe_video_operation`, `describe_video_timeline`, `suggest_video_edits`.
+  - Test mới: `tests/test_video_effects.py`, `tests/test_audio_effects.py`,
+    `tests/test_video_assist.py`.
+- **Kiểm chứng:** ruff + format + mypy sạch trên mọi file đổi; 25 test mới xanh;
+  live HTTP qua TestClient: catalog/effect/describe-op đều 200; timeline
+  describe/suggest qua service trả đúng nội dung.
+- **Việc tiếp theo:** nối hiệu ứng + tầng trợ năng vào UI Video Studio; thêm
+  workflow (version history bền vững, autosave/recovery, bins, compound clips,
+  adjustment layers), social/export (batch export, multiple versions, safe
+  zones), và adapter ML pluggable (object/face tracking, stabilise, auto
+  reframe, upscale, frame interpolation).
 
 ### 2026-09-18 — Phiên Chỉnh ảnh toàn diện + tầng trợ năng (yêu cầu 15)
 
