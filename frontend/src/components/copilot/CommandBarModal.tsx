@@ -6,6 +6,8 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useTimelineStore } from "@/stores/useTimelineStore";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { useTimelineCommands } from "@/hooks/useTimelineCommands";
+import { makeScenes } from "@/lib/scenes";
+import { VideoProject } from "@/types/timeline";
 import { Sparkles, X, ArrowRight, CornerDownLeft, Loader2 } from "lucide-react";
 
 export function CommandBarModal() {
@@ -28,14 +30,30 @@ export function CommandBarModal() {
     if (!cmdText.trim()) return;
     setStatusMessage(null);
 
-    const videoProject = currentProject?.video_project || {
-      scenes: scenes.length > 0 ? scenes : [
-        { index: 0, label: "Hook", duration: 3.5, text: "Hook mở đầu" },
-        { index: 1, label: "Body", duration: 15.0, text: "Thân bài nội dung" },
-        { index: 2, label: "Payoff", duration: 5.0, text: "Lời kết CTA" },
-      ],
+    const videoProject: VideoProject = currentProject?.video_project ?? {
+      scenes:
+        scenes.length > 0
+          ? scenes
+          : makeScenes([
+              { label: "Hook", duration: 3.5, text: "Hook mở đầu" },
+              { label: "Body", duration: 15.0, text: "Thân bài nội dung" },
+              { label: "Payoff", duration: 5.0, text: "Lời kết CTA" },
+            ]),
       aspect_ratio: "9:16",
+      fps: 30,
+      captions: true,
+      background_music: false,
+      background_music_url: null,
+      music_volume: 1,
+      voiceover_volume: 1,
+      export_quality: "high",
+      bpm: 120,
+      markers: [],
+      revision: 0,
+      updated_at: new Date().toISOString(),
       target_duration_seconds: 45,
+      bgm_asset_url: null,
+      bgm_volume: null,
     };
 
     try {

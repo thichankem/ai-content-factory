@@ -158,10 +158,14 @@ Nhưng đây là nghịch lý: chính công cụ đang phân tán sự chú ý c
     setIsAiProcessing(true);
     setAiStatus("AI đang phân tích kịch bản Master và trích xuất 5 góc nhìn Short độc lập...");
     try {
-      await generateCampaignMutation.mutateAsync();
+      await generateCampaignMutation.mutateAsync({});
       setAiStatus("✅ Đã tái lập thành công chiến dịch 5 Shorts và 15 Prompts!");
-    } catch {
-      setAiStatus("Đã làm mới chiến dịch đa kênh với 5 góc nhìn viral!");
+    } catch (error) {
+      // The catch block used to announce a fresh campaign, so a failure looked
+      // like a successful regeneration.
+      setAiStatus(
+        `Tạo lại chiến dịch thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
     } finally {
       setIsAiProcessing(false);
     }

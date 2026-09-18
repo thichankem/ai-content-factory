@@ -18,6 +18,8 @@ import {
   Film,
   Sparkles,
   Layers,
+  Save,
+  Loader2,
 } from "lucide-react";
 
 interface StoryboardScene {
@@ -36,6 +38,9 @@ interface ScriptEditorViewProps {
   pacingConfig: SpeechPacingConfig;
   sourceRightsConfirmed: boolean;
   onConfirmSourceRights: () => void;
+  /** Persist the editor's text; Gate 1 reads the saved copy, not this one. */
+  onSaveScript?: () => void;
+  isSaving?: boolean;
   onApproveGate1: () => void;
   isApproving?: boolean;
   onScoreVirality?: () => void;
@@ -52,6 +57,8 @@ export function ScriptEditorView({
   pacingConfig,
   sourceRightsConfirmed,
   onConfirmSourceRights,
+  onSaveScript,
+  isSaving = false,
   onApproveGate1,
   isApproving = false,
   onScoreVirality,
@@ -339,20 +346,44 @@ export function ScriptEditorView({
               className="rounded border-nle-border text-nle-cyan focus:ring-0 w-4 h-4 bg-nle-panel cursor-pointer"
             />
             <label htmlFor="source-rights-gate" className="text-xs text-gray-200 cursor-pointer">
+              {/* Ticking this saves the script with the confirmation attached; the
+                  backend records it, which is what actually opens Gate 1. */}
               Xác nhận bản quyền nguồn tư liệu hợp pháp (Source Rights Confirmed - Không vi phạm bản quyền)
             </label>
           </div>
 
-          <Button
-            variant="default"
-            size="sm"
-            onClick={onApproveGate1}
-            disabled={!sourceRightsConfirmed || isApproving}
-            className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs h-8 px-4 shadow-lg shadow-emerald-500/20"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-            <span>Gate 1: Duyệt Kịch Bản & Chuyển Bước 2</span>
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSaveScript}
+              disabled={!onSaveScript || isSaving}
+              title="Lưu kịch bản lên server trước khi duyệt Gate 1"
+              className="text-xs h-8 border-nle-border text-gray-200 hover:text-white"
+            >
+              {isSaving ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5 mr-1.5" />
+              )}
+              Lưu Kịch Bản
+            </Button>
+
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onApproveGate1}
+              disabled={!sourceRightsConfirmed || isApproving}
+              className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs h-8 px-4 shadow-lg shadow-emerald-500/20"
+            >
+              {isApproving ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+              )}
+              <span>Gate 1: Duyệt Kịch Bản & Chuyển Bước 2</span>
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

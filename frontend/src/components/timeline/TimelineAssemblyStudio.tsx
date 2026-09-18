@@ -5,6 +5,7 @@ import { DualMonitorPlayer } from "@/components/timeline/DualMonitorPlayer";
 import { TimelineVisualizer } from "@/components/timeline/TimelineVisualizer";
 import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
 import { useTimelineStore } from "@/stores/useTimelineStore";
+import { makeScenes } from "@/lib/scenes";
 import { PropertiesInspector } from "@/components/inspector/PropertiesInspector";
 import { CaptionSimplifier } from "@/components/captions/CaptionSimplifier";
 import {
@@ -36,12 +37,14 @@ export function TimelineAssemblyStudio() {
         setIsAiProcessing(true);
         setAiStatus("AI đang đọc cấu trúc Hook/Turn/CTA và tự động xếp clip vào V1, V2, A1...");
         await new Promise((r) => setTimeout(r, 1400));
-        setScenes([
-          { index: 0, label: "Scene 1 • Hook 3s Viral", duration: 3.8, text: "90% video ngắn thất bại ngay trong 3s đầu", filter: "vibrant" },
-          { index: 1, label: "Scene 2 • Bằng chứng Thống kê", duration: 14.5, text: "Lý do là vì thiếu một chiếc Hook giữ chân", filter: "cinema" },
-          { index: 2, label: "Scene 3 • Cú lật Bất ngờ", duration: 11.2, text: "Áp dụng ngay 3 bước này để giữ chân 100%", filter: "warm" },
-          { index: 3, label: "Scene 4 • Payoff & CTA Cuối", duration: 8.5, text: "Bấm theo dõi để xem trọn bộ bí kíp!", filter: "none" },
-        ]);
+        setScenes(
+          makeScenes([
+            { label: "Scene 1 • Hook 3s Viral", duration: 3.8, text: "90% video ngắn thất bại ngay trong 3s đầu", filter: "contrast" },
+            { label: "Scene 2 • Bằng chứng Thống kê", duration: 14.5, text: "Lý do là vì thiếu một chiếc Hook giữ chân", filter: "cool" },
+            { label: "Scene 3 • Cú lật Bất ngờ", duration: 11.2, text: "Áp dụng ngay 3 bước này để giữ chân 100%", grade: "teal-orange" },
+            { label: "Scene 4 • Payoff & CTA Cuối", duration: 8.5, text: "Bấm theo dõi để xem trọn bộ bí kíp!" },
+          ])
+        );
         setSelectedSceneIndex(0);
         setIsAiProcessing(false);
         setAiStatus("Đã tự động ghép nối hoàn chỉnh 4 phân cảnh vào Timeline!");

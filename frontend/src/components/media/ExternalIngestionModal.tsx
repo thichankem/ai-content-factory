@@ -72,8 +72,8 @@ export function ExternalIngestionModal() {
     try {
       await uploadAssetMutation.mutateAsync({
         file,
-        asset_type: mediaType,
-        scene_id: targetSceneId,
+        assetType: mediaType,
+        sceneId: targetSceneId,
         attribution: mediaAttribution,
       });
       setStatusMessage(`✅ Đã tải và gán ${file.name} vào scene!`);
@@ -90,7 +90,7 @@ export function ExternalIngestionModal() {
     setStatusMessage(`Đang nạp track ${type === "voice" ? "thoại ElevenLabs" : "nhạc Suno"}...`);
     try {
       await importAssetMutation.mutateAsync({
-        asset_type: type === "voice" ? "narration_audio" : "bgm_audio",
+        asset_type: type === "voice" ? "voiceover" : "background_music",
         url,
         attribution: type === "voice" ? "ElevenLabs Neural TTS" : "Suno AI v3.5",
       });
@@ -108,7 +108,7 @@ export function ExternalIngestionModal() {
     try {
       await importAssetMutation.mutateAsync({
         asset_type: "research_dossier",
-        content_text: dossierText,
+        raw_content: dossierText,
         attribution: dossierSource,
       });
       setStatusMessage("✅ Đã nạp thành công tài liệu điều tra vào Knowledge Cache!");

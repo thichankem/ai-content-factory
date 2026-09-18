@@ -100,7 +100,12 @@ export function ExportReviewStudio() {
 
   const handlePublish = async () => {
     if (!currentProject) return;
-    await publishMutation.mutateAsync(currentProject.id);
+    await publishMutation.mutateAsync({
+      projectId: currentProject.id,
+      // The backend falls back to ``youtube`` when the list is empty; send the
+      // project's approved platforms when it has any.
+      platforms: currentProject.platforms.length > 0 ? currentProject.platforms : ["youtube"],
+    });
   };
 
   return (

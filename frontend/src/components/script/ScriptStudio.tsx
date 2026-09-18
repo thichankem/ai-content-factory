@@ -30,9 +30,9 @@ import {
 } from "lucide-react";
 
 export function ScriptStudio() {
-  const { currentProject, confirmSourceRights } = useProjectStore();
+  const { currentProject } = useProjectStore();
   const { viralityMutation } = useScriptEngine(currentProject?.id);
-  const { approveScriptMutation } = useProjects();
+  const { approveScriptMutation, saveScriptMutation } = useProjects();
 
   // Navigation mode for the main work area
   const [activeSubTab, setActiveSubTab] = useState<"brief" | "editor" | "split" | "virality">("brief");
@@ -40,11 +40,19 @@ export function ScriptStudio() {
   // Briefing 10 dimensions state
   const [brief, setBrief] = useState<ScriptBriefSettings>(DEFAULT_BRIEF_SETTINGS);
 
-  // Script text state
+  /*
+   * The editor opens on the project's saved script, and on nothing at all when
+   * there is none. It used to open on a ~1,100-character "cơm trắng" demo script
+   * hardcoded in this file, which read as the project's own narration before
+   * anything had been drafted — and which the operator could then approve.
+   */
   const [scriptText, setScriptText] = useState(
-    currentProject?.script_document?.raw_script ||
-      `[Hook // 00:00 - 00:03]\n(Visual Cue: Quay cận cảnh thìa cơm trắng dẻo bóng bẩy, khói nghi ngút bốc lên chậm rãi)\nĐừng bao giờ dùng ngón tay đo nước khi nấu cơm nữa, nếu bạn không muốn cả nồi cơm biến thành cháo dính!\n\n[Bằng chứng // 00:03 - 00:20]\n(Visual Cue: Chèn hình minh họa bàn tay ngập trong nồi cơm có dấu gạch chéo đỏ, chuyển cảnh sang chiếc cân điện tử mini)\nNgón tay mỗi người dài ngắn khác nhau, đáy nồi lại có độ cong vát khác nhau. Công thức chuẩn của các đầu bếp Nhật là tỷ lệ nước 1:1.15 theo khối lượng.\n\n[Cú lật Turn // 00:20 - 00:45]\n(Visual Cue: Quay cảnh nhỏ 1 giọt dầu mè nguyên chất vào nồi trước khi bấm nút Cook, hạt cơm tơi xốp tách rời)\nVà đây là bí quyết ít ai chỉ cho bạn: Hãy nhỏ đúng một giọt dầu mè và ngâm 10 phút trước khi bật nồi. Lớp màng lipid tự nhiên sẽ bọc từng hạt tinh bột, giúp cơm nở đều mà không hề bị nát hay dính đáy.\n\n[Payoff & CTA // 00:45 - 00:60]\n(Visual Cue: Người cầm bát cơm nóng hổi ăn thử biểu cảm gật gù hài lòng, icon thả tim và lưu video nhấp nháy)\nThử ngay bữa tối nay xem cơm nhà bạn có ngon hơn hẳn ngoài quán không nhé! Thả tim và lưu lại kẻo lúc nấu lại quên mất công thức!`
+    currentProject?.script_document?.raw_script ?? ""
   );
+
+  /** Result of the last save / approval, and the last failure. */
+  const [gateStatus, setGateStatus] = useState<string | null>(null);
+  const [gateError, setGateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentProject?.script_document?.raw_script) {
@@ -116,7 +124,7 @@ ${brief.callToAction}`;
   const handleScoreVirality = async () => {
     try {
       const res = await viralityMutation.mutateAsync({
-        scriptText,
+        script_text: scriptText,
         topic: brief.topic || currentProject?.topic || "Viral script retention",
       });
       setViralityResult(res);
@@ -126,13 +134,67 @@ ${brief.callToAction}`;
     }
   };
 
-  const handleApproveGate1 = async () => {
-    if (!currentProject) return;
-    if (!currentProject.source_rights_confirmed) {
-      alert("Bạn phải xác nhận bản quyền nguồn tư liệu (Source Rights) trước khi duyệt Gate 1!");
+  /**
+   * Persist the editor's text to the server.
+   *
+   * No screen in the Next client used to save the script: the save mutation
+   * existed but nothing called it, so Gate 1 was decided against a script the
+   * backend had never received — and ``source_rights_confirmed`` could never
+   * become true there. Saving is now an explicit, reportable action.
+   */
+  const handleSaveScript = async (sourceRightsConfirmed?: boolean) => {
+    if (!currentProject) {
+      setGateError("Chưa chọn dự án — không có gì để lưu.");
       return;
     }
-    await approveScriptMutation.mutateAsync(currentProject.id);
+    setGateError(null);
+    try {
+      await saveScriptMutation.mutateAsync({
+        projectId: currentProject.id,
+        script: scriptText,
+        ...(sourceRightsConfirmed === undefined ? {} : { sourceRightsConfirmed }),
+      });
+      setGateStatus(
+        sourceRightsConfirmed
+          ? "Đã lưu kịch bản và ghi nhận xác nhận bản quyền nguồn tư liệu lên server."
+          : "Đã lưu kịch bản lên server."
+      );
+    } catch (error) {
+      setGateError(
+        `Lưu kịch bản thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  };
+
+  /** Record the source-rights confirmation on the server, with the script. */
+  const handleConfirmSourceRights = () => {
+    if (currentProject?.source_rights_confirmed) return;
+    void handleSaveScript(true);
+  };
+
+  const handleApproveGate1 = async () => {
+    setGateError(null);
+    if (!currentProject) {
+      setGateError("Chưa chọn dự án để duyệt Gate 1.");
+      return;
+    }
+    if (!currentProject.source_rights_confirmed) {
+      // Stated in the page instead of an `alert()`, which the previous version
+      // used here — and which the studio also used to announce approvals that
+      // the server had rejected.
+      setGateError(
+        "Phải ghi nhận xác nhận bản quyền nguồn tư liệu (Source Rights) lên server trước khi duyệt Gate 1."
+      );
+      return;
+    }
+    try {
+      await approveScriptMutation.mutateAsync(currentProject.id);
+      setGateStatus("Gate 1 đã được duyệt trên server. Dự án chuyển sang bước 2.");
+    } catch (error) {
+      setGateError(
+        `Duyệt Gate 1 thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   };
 
   // Quick actions on top AI Agent Bar
@@ -210,6 +272,21 @@ ${brief.callToAction}`;
         pacingConfig={pacingConfig}
         onPacingChange={setPacingConfig}
       />
+
+      {/* Gate 1 outcome — shown, not alerted. The server's answer is the only one
+          that counts, so a rejection has to be readable here. */}
+      {gateError && (
+        <div className="shrink-0 text-xs text-rose-300 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/30 flex items-start">
+          <AlertTriangle className="w-3.5 h-3.5 mr-1.5 shrink-0 mt-0.5" />
+          <span>{gateError}</span>
+        </div>
+      )}
+      {gateStatus && (
+        <div className="shrink-0 text-xs text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/30 flex items-start">
+          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 shrink-0 mt-0.5" />
+          <span>{gateStatus}</span>
+        </div>
+      )}
 
       {/* Navigation Sub-Tabs & View Controller */}
       <div className="flex items-center justify-between bg-nle-panel border border-nle-border rounded-xl px-3 py-1.5 shrink-0">
@@ -322,7 +399,9 @@ ${brief.callToAction}`;
                 onTargetScopeChange={setTargetScope}
                 pacingConfig={pacingConfig}
                 sourceRightsConfirmed={currentProject?.source_rights_confirmed || false}
-                onConfirmSourceRights={confirmSourceRights}
+                onConfirmSourceRights={handleConfirmSourceRights}
+                onSaveScript={() => void handleSaveScript()}
+                isSaving={saveScriptMutation.isPending}
                 onApproveGate1={handleApproveGate1}
                 isApproving={approveScriptMutation.isPending}
                 onScoreVirality={handleScoreVirality}
@@ -352,7 +431,9 @@ ${brief.callToAction}`;
                   onTargetScopeChange={setTargetScope}
                   pacingConfig={pacingConfig}
                   sourceRightsConfirmed={currentProject?.source_rights_confirmed || false}
-                  onConfirmSourceRights={confirmSourceRights}
+                  onConfirmSourceRights={handleConfirmSourceRights}
+                  onSaveScript={() => void handleSaveScript()}
+                  isSaving={saveScriptMutation.isPending}
                   onApproveGate1={handleApproveGate1}
                   isApproving={approveScriptMutation.isPending}
                   onScoreVirality={handleScoreVirality}

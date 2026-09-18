@@ -177,29 +177,43 @@ export function ScriptBriefSettingsPanel({
     onBriefChange(p.brief);
   };
 
-  const handleSimulateFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Note the picked dossier file in the brief.
+   *
+   * The file is **not** read and **not** uploaded — this panel only drafts text.
+   * The handler used to announce "Đã nạp thành công dữ liệu từ file" and write
+   * "Dữ liệu nghiên cứu thực tế đã được nạp" into the brief while doing neither;
+   * the only thing it ever knew was the filename and the byte count. It now
+   * records exactly that, and points at the route that does ingest for real.
+   */
+  const handleDossierFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      const newFact = `\n[Tài liệu đính kèm: ${file.name} (${(file.size / 1024).toFixed(1)} KB)] - Dữ liệu nghiên cứu thực tế đã được nạp.`;
-      onBriefChange({
-        ...brief,
-        specificFactsAndData: brief.specificFactsAndData + newFact,
-      });
-      alert(`Đã nạp thành công dữ liệu từ file: ${file.name}`);
-    }
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    onBriefChange({
+      ...brief,
+      specificFactsAndData:
+        brief.specificFactsAndData +
+        `\n[Tài liệu tham chiếu: ${file.name} (${(file.size / 1024).toFixed(1)} KB)] — mới chỉ ghi nhận tên file vào brief; nội dung chưa được đọc. Dán nội dung vào đây, hoặc nhập qua External Ingest (POST /projects/{id}/external/import) để AI dùng được.`,
+    });
   };
 
-  const handleSimulateVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Note the picked benchmark video in the brief.
+   *
+   * Nothing is transcribed here. The handler used to announce that Whisper was
+   * analysing the video and then paste a *fabricated* extraction — "nhịp cắt
+   * 1.2s, giọng đọc năng lượng cao" — for a file it had never opened. It now
+   * records the filename and says the transcription has not run.
+   */
+  const handleBenchmarkVideoPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      alert(`Đã tải lên video "${file.name}". AI Speech-to-Text (Whisper) đang phân tích cấu trúc nhịp điệu...`);
-      onBriefChange({
-        ...brief,
-        benchmarkScriptExample: `[Trích xuất từ video: ${file.name}] Mở đầu nhịp cắt 1.2s, giọng đọc năng lượng cao, kết thúc bằng câu hỏi tương tác mở.`,
-      });
-    }
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    onBriefChange({
+      ...brief,
+      benchmarkScriptExample: `[Video tham chiếu: ${file.name}] — chưa bóc tách. Chạy phiên âm (STT) cho tư liệu này trong Media Library rồi dán kịch bản nhận được vào đây.`,
+    });
   };
 
   return (
@@ -719,11 +733,11 @@ export function ScriptBriefSettingsPanel({
                 </label>
                 <label className="flex items-center justify-center space-x-1 p-1 rounded bg-nle-panel border border-dashed border-nle-border hover:border-nle-cyan cursor-pointer text-gray-400 hover:text-white transition-colors">
                   <Upload className="w-3 h-3 text-nle-cyan" />
-                  <span className="text-[11px]">Chọn file PDF/Doc...</span>
+                  <span className="text-[11px]">Ghi tên file PDF/Doc vào brief...</span>
                   <input
                     type="file"
                     accept=".pdf,.doc,.docx,.txt,.md"
-                    onChange={handleSimulateFileUpload}
+                    onChange={handleDossierFilePicked}
                     className="hidden"
                   />
                 </label>
@@ -782,11 +796,11 @@ export function ScriptBriefSettingsPanel({
                 </label>
                 <label className="flex items-center justify-center space-x-1 p-1 rounded bg-nle-panel border border-dashed border-nle-border hover:border-nle-cyan cursor-pointer text-gray-400 hover:text-white transition-colors">
                   <Video className="w-3 h-3 text-fuchsia-400" />
-                  <span className="text-[11px]">Tải file video MP4...</span>
+                  <span className="text-[11px]">Ghi tên video MP4 vào brief...</span>
                   <input
                     type="file"
                     accept="video/mp4,video/quicktime,video/webm"
-                    onChange={handleSimulateVideoUpload}
+                    onChange={handleBenchmarkVideoPicked}
                     className="hidden"
                   />
                 </label>

@@ -120,10 +120,48 @@ export default function StudioPage() {
     }
   };
 
+  /**
+   * Report the pre-save checklist verdict.
+   *
+   * This used to be an ``alert()`` reading ``checklistQuery.data?.ready`` and
+   * printing "Đã qua kiểm tra cấu hình" for every answer that was not `true` —
+   * including "no project selected" and "the request failed" — so an unaudited
+   * flow read as audited. It now surfaces the real counts and issues.
+   */
+  const handleCheckChecklist = async () => {
+    if (!currentProject) {
+      setWorkflowStatus("Chọn một dự án trước khi chạy pre-flight checklist.");
+      return;
+    }
+    try {
+      const { data } = await checklistQuery.refetch();
+      if (!data) {
+        setWorkflowStatus("Pre-flight checklist không trả về kết quả.");
+        return;
+      }
+      if (data.ready) {
+        setWorkflowStatus(
+          `✅ Pre-flight checklist đạt: ${data.node_count} node, ${data.edge_count} cạnh.`
+        );
+        return;
+      }
+      const issues = data.issues.map((issue) => `${issue.code}: ${issue.message}`);
+      setWorkflowStatus(
+        issues.length > 0
+          ? `Checklist chưa đạt (${issues.length} vấn đề): ${issues.join(" • ")}`
+          : "Checklist chưa đạt nhưng engine không kèm vấn đề nào."
+      );
+    } catch (error) {
+      setWorkflowStatus(
+        `Không chạy được checklist: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  };
+
   const handleGenerateCampaign = async () => {
     setCampaignStatus("Đang tổng hợp pillar content thành shorts...");
     try {
-      const campaign = await generateCampaignMutation.mutateAsync();
+      const campaign = await generateCampaignMutation.mutateAsync({});
       setCampaignStatus(
         `✅ Đã tạo chiến dịch gồm ${campaign.shorts.length} micro-shorts đa kênh.`
       );
@@ -235,9 +273,8 @@ export default function StudioPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      alert(`Checklist kết quả: ${checklistQuery.data?.ready ? "Sẵn sàng thực thi!" : "Đã qua kiểm tra cấu hình."}`)
-                    }
+                    onClick={handleCheckChecklist}
+                    disabled={checklistQuery.isFetching}
                     className="text-xs border-nle-border h-8"
                   >
                     <FileCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />

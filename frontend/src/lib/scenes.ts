@@ -37,6 +37,7 @@ export interface SceneSeed {
   /** A URL for the visual — image or video. */
   assetUrl?: string | null;
   filter?: VideoFilter;
+  grade?: ColorGrade;
   transition?: VideoTransition;
   background?: string;
 }
@@ -75,7 +76,7 @@ export function makeScene(seed: SceneSeed): VideoScene {
     exit: "none" as ExitEffect,
     motion: null,
     effect: "none" as SceneEffect,
-    grade: "none" as ColorGrade,
+    grade: seed.grade ?? ("none" as ColorGrade),
     overlay_emoji: null,
     overlay_pos: "center" as OverlayPosition,
     overlay_size: 48,

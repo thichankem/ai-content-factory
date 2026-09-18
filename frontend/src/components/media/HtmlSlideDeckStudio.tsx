@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useTimelineStore } from "@/stores/useTimelineStore";
+import { makeScene } from "@/lib/scenes";
 import {
   Code,
   Eye,
@@ -195,14 +196,12 @@ export function HtmlSlideDeckStudio({ onAddSlideToMedia }: HtmlSlideDeckStudioPr
   };
 
   const handleInsertIntoTimeline = () => {
-    const newSceneIndex = scenes.length;
-    const newScene = {
-      index: newSceneIndex,
+    const newScene = makeScene({
+      index: scenes.length,
       label: `Slide: ${selectedTemplate.name}`,
       duration: slideDuration,
       text: `HTML Slide [${selectedTemplate.category.toUpperCase()}]`,
-      filter: "none",
-    };
+    });
 
     setScenes([...scenes, newScene]);
 
