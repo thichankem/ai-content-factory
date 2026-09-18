@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { useUIStore } from "@/stores/useUIStore";
-import { useWorkflowCampaign } from "@/hooks/useWorkflowCampaign";
+import { useCampaign } from "@/hooks/useCampaign";
 import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ import {
 export function ContentEmpireStudio() {
   const { currentProject } = useProjectStore();
   const { setIngestionModalOpen } = useUIStore();
-  const { generateCampaignMutation } = useWorkflowCampaign(currentProject?.id);
+  const { generateCampaignMutation } = useCampaign(currentProject?.id);
 
   const [activeShortTab, setActiveShortTab] = useState(0);
   const [activePromptTab, setActivePromptTab] = useState<"kling" | "mj" | "suno" | "eleven" | "factcheck">("kling");

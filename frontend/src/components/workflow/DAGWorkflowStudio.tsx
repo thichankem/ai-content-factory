@@ -1,56 +1,52 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@/stores/useProjectStore";
-import { useWorkflowDAG, WorkflowNode, WorkflowEdge, WorkflowBlockDef } from "@/hooks/useWorkflowDAG";
-import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { useWorkflowDAG } from "@/hooks/useWorkflowDAG";
+import {
+  Workflow,
+  WorkflowBlockDef,
+  WorkflowChecklist,
+  WorkflowEdge,
+  WorkflowNode,
+} from "@/types/workflow";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  GitBranch,
-  Play,
-  Save,
   FileCheck,
-  RefreshCw,
-  Plus,
-  Trash2,
-  Terminal,
-  CheckCircle2,
-  AlertTriangle,
+  GitBranch,
   Loader2,
-  Sparkles,
-  Move,
-  Layers,
-  ArrowRight,
+  Play,
+  Plus,
+  Save,
   ShieldCheck,
+  Terminal,
+  Trash2,
 } from "lucide-react";
 
-const DEFAULT_PALETTE_BLOCKS: WorkflowBlockDef[] = [
-  { type: "research", name: "1. Research Engine", category: "input", description: "Thu thập dữ kiện từ arXiv, Wikipedia, Gutenberg", inputs: [], outputs: ["facts"], default_config: { max_sources: 5 } },
-  { type: "script_draft", name: "2. Script Drafting", category: "process", description: "Sinh kịch bản Claude/Gemini theo preset", inputs: ["facts"], outputs: ["script"], default_config: { preset: "storytelling" } },
-  { type: "script_approval", name: "3. Gate 1: Human Approval", category: "gate", description: "Bắt buộc duyệt kịch bản & xác nhận bản quyền", inputs: ["script"], outputs: ["approved_script"], default_config: {} },
-  { type: "voiceover_tts", name: "4. Neural Voiceover", category: "process", description: "Tổng hợp giọng đọc Edge-TTS tiếng Việt", inputs: ["approved_script"], outputs: ["audio_track"], default_config: { voice: "vi-VN-NamMinhNeural" } },
-  { type: "external_ingest", name: "5. Ingest AI Media", category: "ingest", description: "Nạp footage Kling/Veo & ảnh Midjourney", inputs: ["approved_script"], outputs: ["media_assets"], default_config: {} },
-  { type: "timeline_nle", name: "6. Multi-Track Assembly", category: "process", description: "Dựng timeline, sync beat, màu sắc & subtitle", inputs: ["audio_track", "media_assets"], outputs: ["render_plan"], default_config: { aspect_ratio: "9:16" } },
-  { type: "ffmpeg_render", name: "7. ffmpeg Master Render", category: "process", description: "Render video thật MP4 H.264/AAC", inputs: ["render_plan"], outputs: ["video_file"], default_config: { crf: 23 } },
-  { type: "video_approval", name: "8. Gate 2: Video Approval", category: "gate", description: "Bắt buộc duyệt video thành phẩm trước xuất bản", inputs: ["video_file"], outputs: ["approved_video"], default_config: {} },
-  { type: "omni_publish", name: "9. Omni-Publish", category: "output", description: "Đóng gói xuất bản YouTube 16:9 & TikTok 9:16", inputs: ["approved_video"], outputs: [], default_config: { targets: ["youtube", "tiktok"] } },
+/**
+ * The graph a project starts from when the server holds no saved flow.
+ *
+ * The labels are the backend's block vocabulary (`WorkflowNodeType`): a previous
+ * version of this file invented its own (`script_draft`, `ffmpeg_render`,
+ * `omni_publish`, …), so every node it submitted was rejected by the API and the
+ * canvas rendered blank labels. Both gates are one `gate` block whose `stage`
+ * parameter decides which review it represents.
+ */
+const STARTER_NODES: WorkflowNode[] = [
+  { id: "node-research", type: "research", label: "Research Engine", x: 40, y: 80, enabled: true, params: {} },
+  { id: "node-script", type: "script", label: "Script Drafting", x: 230, y: 80, enabled: true, params: {} },
+  { id: "node-gate1", type: "gate", label: "Gate 1: Duyệt kịch bản", x: 420, y: 80, enabled: true, params: { stage: "script" } },
+  { id: "node-tts", type: "voiceover", label: "Neural Voiceover", x: 610, y: 40, enabled: true, params: {} },
+  { id: "node-media", type: "ingest_external", label: "Nạp media AI", x: 610, y: 150, enabled: true, params: {} },
+  { id: "node-timeline", type: "scenes", label: "Ghép timeline", x: 800, y: 90, enabled: true, params: {} },
+  { id: "node-render", type: "render_plan", label: "Render plan", x: 990, y: 90, enabled: true, params: {} },
+  { id: "node-gate2", type: "gate", label: "Gate 2: Duyệt video", x: 1180, y: 90, enabled: true, params: { stage: "video" } },
+  { id: "node-publish", type: "publish", label: "Xuất bản đa kênh", x: 1370, y: 90, enabled: true, params: {} },
 ];
 
-const INITIAL_NODES: WorkflowNode[] = [
-  { id: "node-research", block_type: "research", name: "Research Engine", x: 40, y: 80, config: {} },
-  { id: "node-script", block_type: "script_draft", name: "Script Drafting", x: 230, y: 80, config: {} },
-  { id: "node-gate1", block_type: "script_approval", name: "Gate 1: Review", x: 420, y: 80, config: {} },
-  { id: "node-tts", block_type: "voiceover_tts", name: "Neural TTS", x: 610, y: 40, config: {} },
-  { id: "node-media", block_type: "external_ingest", name: "Ingest AI Footage", x: 610, y: 150, config: {} },
-  { id: "node-timeline", block_type: "timeline_nle", name: "Assembly NLE", x: 800, y: 90, config: {} },
-  { id: "node-render", block_type: "ffmpeg_render", name: "ffmpeg Render", x: 990, y: 90, config: {} },
-  { id: "node-gate2", block_type: "video_approval", name: "Gate 2: Review", x: 1180, y: 90, config: {} },
-  { id: "node-publish", block_type: "omni_publish", name: "Omni-Publish", x: 1370, y: 90, config: {} },
-];
-
-const INITIAL_EDGES: WorkflowEdge[] = [
+const STARTER_EDGES: WorkflowEdge[] = [
   { id: "e1", source: "node-research", target: "node-script" },
   { id: "e2", source: "node-script", target: "node-gate1" },
   { id: "e3", source: "node-gate1", target: "node-tts" },
@@ -67,97 +63,121 @@ export function DAGWorkflowStudio() {
   const {
     blocksQuery,
     workflowQuery,
-    checklistQuery,
     validateChecklistMutation,
     saveWorkflowMutation,
     runWorkflowMutation,
   } = useWorkflowDAG(currentProject?.id);
 
-  const [nodes, setNodes] = useState<WorkflowNode[]>(INITIAL_NODES);
-  const [edges, setEdges] = useState<WorkflowEdge[]>(INITIAL_EDGES);
+  const [nodes, setNodes] = useState<WorkflowNode[]>(STARTER_NODES);
+  const [edges, setEdges] = useState<WorkflowEdge[]>(STARTER_EDGES);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>("node-script");
-  const [runInputs, setRunInputs] = useState('{\n  "topic": "Edward Bernays 1928",\n  "style": "storytelling"\n}');
-  const [executionLogs, setExecutionLogs] = useState<string[]>([
-    "[DAG Initialized]: Ready to execute workflow for project " + (currentProject?.id || "demo"),
-    "[Checklist Pre-flight]: Gate 1 & Gate 2 constraints enforced.",
-  ]);
+  const [runInputs, setRunInputs] = useState('{\n  "topic": "",\n  "style": "storytelling"\n}');
+  const [executionLogs, setExecutionLogs] = useState<string[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [checklistStatus, setChecklistStatus] = useState<any>(null);
+  const [checklist, setChecklist] = useState<WorkflowChecklist | null>(null);
 
-  const palette = blocksQuery.data && blocksQuery.data.length > 0 ? blocksQuery.data : DEFAULT_PALETTE_BLOCKS;
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId);
+  // Seed the canvas from the saved flow once per project. Re-seeding on every
+  // refetch would discard whatever the operator is dragging.
+  const seededFor = useRef<string | null>(null);
+  useEffect(() => {
+    const projectId = currentProject?.id ?? null;
+    if (!projectId || seededFor.current === projectId) return;
+    if (workflowQuery.data) {
+      setNodes(workflowQuery.data.nodes);
+      setEdges(workflowQuery.data.edges);
+      seededFor.current = projectId;
+    }
+  }, [currentProject?.id, workflowQuery.data]);
+
+  const palette: WorkflowBlockDef[] = blocksQuery.data ?? [];
+  const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+
+  /** The document the backend validates and stores. */
+  const buildWorkflow = (): Workflow => ({
+    name: currentProject ? `${currentProject.name} flow` : "Production flow",
+    nodes,
+    edges,
+    version: workflowQuery.data?.version ?? 0,
+    updated_at: workflowQuery.data?.updated_at ?? new Date().toISOString(),
+  });
+
+  const log = (...lines: string[]) => setExecutionLogs((prev) => [...prev, ...lines]);
 
   const handleAddBlock = (blockDef: WorkflowBlockDef) => {
     const newId = `node-${Date.now()}`;
-    const newNode: WorkflowNode = {
-      id: newId,
-      block_type: blockDef.type,
-      name: blockDef.name,
-      x: 100 + (nodes.length % 5) * 60,
-      y: 120 + (nodes.length % 3) * 50,
-      config: { ...blockDef.default_config },
-    };
-    setNodes((prev) => [...prev, newNode]);
+    setNodes((prev) => [
+      ...prev,
+      {
+        id: newId,
+        type: blockDef.type,
+        label: blockDef.label,
+        x: 100 + (prev.length % 5) * 60,
+        y: 120 + (prev.length % 3) * 50,
+        enabled: true,
+        params: { ...blockDef.default_params },
+      },
+    ]);
     setSelectedNodeId(newId);
   };
 
   const handleDeleteSelected = () => {
     if (!selectedNodeId) return;
-    setNodes((prev) => prev.filter((n) => n.id !== selectedNodeId));
-    setEdges((prev) => prev.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId));
+    setNodes((prev) => prev.filter((node) => node.id !== selectedNodeId));
+    setEdges((prev) =>
+      prev.filter((edge) => edge.source !== selectedNodeId && edge.target !== selectedNodeId)
+    );
     setSelectedNodeId(null);
   };
 
   const handleRunChecklist = async () => {
-    setExecutionLogs((prev) => [...prev, "[Audit]: Running pre-save DAG validation checklist..."]);
+    log("[Audit] Đang kiểm tra DAG trước khi lưu...");
     try {
-      const res = await validateChecklistMutation.mutateAsync({ nodes, edges });
-      setChecklistStatus(res);
-      setExecutionLogs((prev) => [
-        ...prev,
-        res.ready ? "✅ [Checklist PASS]: Workflow satisfies all safety & gate constraints." : "⚠️ [Checklist WARNING]: Review flagged nodes.",
-      ]);
-    } catch {
-      setChecklistStatus({ ready: true, has_gate_1: true, has_gate_2: true, issues: [] });
-      setExecutionLogs((prev) => [...prev, "✅ [Checklist PASS]: 2 Mandatory human review gates confirmed."]);
+      const result = await validateChecklistMutation.mutateAsync({ workflow: buildWorkflow() });
+      setChecklist(result);
+      log(
+        result.ready
+          ? `✅ [Audit] Đạt: ${result.node_count} khối, ${result.edge_count} liên kết, không có vấn đề.`
+          : `⚠️ [Audit] Có ${result.issues.length} vấn đề cần xử lý trước khi chạy.`
+      );
+    } catch (error) {
+      // Reporting a pass here would tell the operator the flow is safe when it
+      // was never checked at all.
+      log(`❌ [Audit] Không kiểm tra được: ${describeError(error)}`);
     }
   };
 
   const handleSaveDAG = async () => {
     try {
-      await saveWorkflowMutation.mutateAsync({ nodes, edges });
-      setExecutionLogs((prev) => [...prev, "💾 [Saved]: DAG workflow layout successfully saved to project."]);
-    } catch (e: any) {
-      setExecutionLogs((prev) => [...prev, `💾 [Save status]: Layout saved locally (${nodes.length} nodes, ${edges.length} links)`]);
+      await saveWorkflowMutation.mutateAsync({ workflow: buildWorkflow() });
+      log("💾 [Save] Đã lưu DAG lên máy chủ.");
+    } catch (error) {
+      log(`❌ [Save] Lưu thất bại: ${describeError(error)}`);
     }
   };
 
   const handleExecuteWorkflow = async () => {
     setIsExecuting(true);
-    setExecutionLogs((prev) => [
-      ...prev,
-      "🚀 [Starting Workflow Execution]: Initializing runner thread...",
-    ]);
-
-    for (const node of nodes) {
-      await new Promise((r) => setTimeout(r, 600));
-      setExecutionLogs((prev) => [
-        ...prev,
-        `[Block RUN]: Executing ${node.name} (${node.block_type})... OK ✓`,
-      ]);
-    }
-
+    log("🚀 [Run] Đang khởi chạy workflow trên backend...");
     try {
-      let parsed = {};
-      try { parsed = JSON.parse(runInputs); } catch {}
-      await runWorkflowMutation.mutateAsync({ inputs: parsed, background: false });
-    } catch {}
-
-    setIsExecuting(false);
-    setExecutionLogs((prev) => [
-      ...prev,
-      "🏁 [Workflow Completed]: All pipeline steps executed successfully!",
-    ]);
+      const run = await runWorkflowMutation.mutateAsync({ background: false });
+      log(
+        ...run.steps.map(
+          (step) =>
+            `[${step.status}] ${step.label} (${step.type}) — ${step.duration_ms}ms${
+              step.error ? ` — lỗi: ${step.error}` : ""
+            }`
+        )
+      );
+      log(
+        run.status === "completed"
+          ? `🏁 [Run] Hoàn tất ${run.steps.length} bước.`
+          : `⚠️ [Run] Trạng thái: ${run.status}${run.message ? ` — ${run.message}` : ""}`
+      );
+    } catch (error) {
+      log(`❌ [Run] Thất bại: ${describeError(error)}`);
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
   return (
@@ -171,10 +191,12 @@ export function DAGWorkflowStudio() {
           <div>
             <h2 className="text-xs font-bold text-white tracking-wide flex items-center space-x-2">
               <span>Visual DAG Pipeline Orchestrator</span>
-              <Badge variant="cyan" className="text-[9px] font-mono">Directed Acyclic Graph</Badge>
+              <Badge variant="cyan" className="text-[9px] font-mono">
+                Directed Acyclic Graph
+              </Badge>
             </h2>
             <p className="text-[11px] text-gray-400">
-              Định tuyến luồng sản xuất tự động qua đồ thị phi chu trình, tuân thủ 2 cổng duyệt bắt buộc
+              Định tuyến luồng sản xuất qua đồ thị phi chu trình, tuân thủ 2 cổng duyệt bắt buộc
             </p>
           </div>
         </div>
@@ -184,6 +206,7 @@ export function DAGWorkflowStudio() {
             size="sm"
             variant="outline"
             onClick={handleRunChecklist}
+            disabled={validateChecklistMutation.isPending}
             className="text-xs border-nle-border h-8 text-gray-300 hover:text-white"
           >
             <FileCheck className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
@@ -194,6 +217,7 @@ export function DAGWorkflowStudio() {
             size="sm"
             variant="outline"
             onClick={handleSaveDAG}
+            disabled={saveWorkflowMutation.isPending}
             className="text-xs border-nle-border h-8 text-gray-300 hover:text-white"
           >
             <Save className="w-3.5 h-3.5 mr-1.5 text-sky-400" />
@@ -204,10 +228,14 @@ export function DAGWorkflowStudio() {
             size="sm"
             variant="neon"
             onClick={handleExecuteWorkflow}
-            disabled={isExecuting}
+            disabled={isExecuting || !currentProject}
             className="text-xs h-8"
           >
-            {isExecuting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Play className="w-3.5 h-3.5 mr-1.5 fill-current" />}
+            {isExecuting ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Play className="w-3.5 h-3.5 mr-1.5 fill-current" />
+            )}
             Execute Run
           </Button>
         </div>
@@ -217,12 +245,25 @@ export function DAGWorkflowStudio() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-0 overflow-hidden">
         {/* LEFT COLUMN: Block Palette & Run Inputs (3 cols) */}
         <div className="lg:col-span-3 flex flex-col space-y-3 min-h-0 overflow-y-auto">
-          {/* Palette List */}
+          {/* Palette List — served by GET /workflow/blocks */}
           <Card className="p-3 bg-nle-surface border-nle-border flex flex-col space-y-2">
             <span className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center justify-between">
               <span>Khối Chức Năng (Palette)</span>
               <span className="text-[10px] text-gray-400 font-mono">{palette.length} Blocks</span>
             </span>
+
+            {blocksQuery.isLoading && (
+              <span className="text-[11px] text-gray-400 italic flex items-center">
+                <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                Đang tải palette từ backend...
+              </span>
+            )}
+
+            {blocksQuery.isError && (
+              <span className="text-[11px] text-rose-400">
+                Không tải được palette: {describeError(blocksQuery.error)}
+              </span>
+            )}
 
             <div className="space-y-1.5">
               {palette.map((block) => (
@@ -234,7 +275,7 @@ export function DAGWorkflowStudio() {
                 >
                   <div className="space-y-0.5 min-w-0 pr-2">
                     <span className="text-xs font-bold text-gray-200 group-hover:text-white truncate block">
-                      {block.name}
+                      {block.label}
                     </span>
                     <span className="text-[10px] text-gray-400 truncate block">
                       {block.description}
@@ -288,7 +329,7 @@ export function DAGWorkflowStudio() {
 
               const x1 = (srcNode.x % 500) + 120;
               const y1 = (srcNode.y % 280) + 25;
-              const x2 = (tgtNode.x % 500);
+              const x2 = tgtNode.x % 500;
               const y2 = (tgtNode.y % 280) + 25;
               const cx = (x1 + x2) / 2;
 
@@ -308,7 +349,7 @@ export function DAGWorkflowStudio() {
           <div className="relative w-full h-full overflow-auto p-4 min-h-[360px]">
             {nodes.map((node) => {
               const isSelected = selectedNodeId === node.id;
-              const isGate = node.block_type.includes("approval");
+              const isGate = node.type === "gate";
 
               return (
                 <div
@@ -330,17 +371,22 @@ export function DAGWorkflowStudio() {
                     <span className={isGate ? "text-amber-400 font-bold" : "text-gray-400"}>
                       {isGate ? "GATE" : "BLOCK"}
                     </span>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isGate ? "bg-amber-400" : "bg-emerald-400"} animate-pulse`} />
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isGate ? "bg-amber-400" : "bg-emerald-400"
+                      } animate-pulse`}
+                    />
                   </div>
 
                   <span className="text-[11px] font-bold text-white block mt-1 truncate">
-                    {node.name}
+                    {node.label}
                   </span>
 
                   <div className="flex justify-between items-center text-[8px] text-gray-500 font-mono mt-1 pt-1 border-t border-nle-border/40">
-                    <span>IN</span>
-                    <span className="text-nle-cyan font-bold">＋</span>
-                    <span>OUT</span>
+                    <span>{node.type}</span>
+                    <span className={node.enabled ? "text-emerald-400" : "text-gray-500"}>
+                      {node.enabled ? "ON" : "OFF"}
+                    </span>
                   </div>
                 </div>
               );
@@ -349,7 +395,9 @@ export function DAGWorkflowStudio() {
 
           {/* Canvas Footer Toolbar */}
           <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center bg-nle-panel/80 backdrop-blur border border-nle-border rounded-lg px-3 py-1.5 text-xs text-gray-400">
-            <span>{nodes.length} Khối · {edges.length} Liên kết</span>
+            <span>
+              {nodes.length} Khối · {edges.length} Liên kết
+            </span>
             {selectedNode && (
               <Button
                 size="sm"
@@ -378,10 +426,12 @@ export function DAGWorkflowStudio() {
                   <label className="text-gray-400 text-[10px]">Tên khối:</label>
                   <input
                     type="text"
-                    value={selectedNode.name}
+                    value={selectedNode.label}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, name: val } : n)));
+                      const value = e.target.value;
+                      setNodes((prev) =>
+                        prev.map((n) => (n.id === selectedNode.id ? { ...n, label: value } : n))
+                      );
                     }}
                     className="w-full bg-nle-base border border-nle-border rounded px-2 py-1 text-xs text-white"
                   />
@@ -390,19 +440,37 @@ export function DAGWorkflowStudio() {
                 <div>
                   <label className="text-gray-400 text-[10px]">Loại block:</label>
                   <div className="font-mono text-nle-cyan bg-nle-panel px-2 py-1 rounded border border-nle-border text-[11px]">
-                    {selectedNode.block_type}
+                    {selectedNode.type}
                   </div>
                 </div>
+
+                <label className="flex items-center space-x-2 text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={selectedNode.enabled}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setNodes((prev) =>
+                        prev.map((n) => (n.id === selectedNode.id ? { ...n, enabled } : n))
+                      );
+                    }}
+                  />
+                  <span className="text-[11px]">Bật khối này khi chạy</span>
+                </label>
 
                 <div>
                   <label className="text-gray-400 text-[10px]">Cấu hình tham số (JSON):</label>
                   <textarea
-                    value={JSON.stringify(selectedNode.config, null, 2)}
+                    value={JSON.stringify(selectedNode.params, null, 2)}
                     onChange={(e) => {
                       try {
                         const parsed = JSON.parse(e.target.value);
-                        setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, config: parsed } : n)));
-                      } catch {}
+                        setNodes((prev) =>
+                          prev.map((n) => (n.id === selectedNode.id ? { ...n, params: parsed } : n))
+                        );
+                      } catch {
+                        // Keep the previous params while the operator is mid-edit.
+                      }
                     }}
                     rows={4}
                     className="w-full bg-nle-base border border-nle-border rounded p-2 text-[11px] font-mono text-gray-300"
@@ -416,27 +484,62 @@ export function DAGWorkflowStudio() {
             )}
           </Card>
 
-          {/* Pre-Save Checklist Card */}
+          {/* Pre-Save Checklist Card — the verdict comes from the backend auditor */}
           <Card className="p-3 bg-nle-surface border-nle-border space-y-2">
             <span className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center">
               <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-400" />
               Pre-Save Checklist Audit
             </span>
 
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center justify-between p-1.5 rounded bg-nle-panel text-gray-300">
-                <span>Không có chu trình lặp (DAG)</span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            {!checklist ? (
+              <div className="text-[11px] text-gray-500 italic">
+                Chưa chạy kiểm tra. Bấm “Checklist Audit” để backend thẩm định DAG hiện tại.
               </div>
-              <div className="flex items-center justify-between p-1.5 rounded bg-nle-panel text-gray-300">
-                <span>Cổng duyệt 1: Kịch bản (Bắt buộc)</span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <div className="space-y-1 text-xs">
+                <div className="flex items-center justify-between p-1.5 rounded bg-nle-panel text-gray-300">
+                  <span>Tổng thể</span>
+                  <span
+                    className={checklist.ready ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}
+                  >
+                    {checklist.ready ? "Sẵn sàng chạy" : "Cần xử lý"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-1.5 rounded bg-nle-panel text-gray-300">
+                  <span>Khối / Liên kết</span>
+                  <span className="font-mono text-gray-200">
+                    {checklist.node_count} / {checklist.edge_count}
+                  </span>
+                </div>
+
+                {checklist.issues.length === 0 ? (
+                  <div className="text-[11px] text-emerald-400">Không phát hiện vấn đề.</div>
+                ) : (
+                  <ul className="space-y-1">
+                    {checklist.issues.map((issue, index) => (
+                      <li
+                        key={`${issue.code}-${index}`}
+                        className={`p-1.5 rounded bg-nle-panel border border-nle-border/60 ${
+                          issue.severity === "error"
+                            ? "text-rose-400"
+                            : issue.severity === "warning"
+                            ? "text-amber-400"
+                            : "text-gray-300"
+                        }`}
+                      >
+                        <span className="font-mono text-[10px] mr-1">[{issue.code}]</span>
+                        {issue.message}
+                        {issue.hint && (
+                          <span className="block text-[10px] text-gray-500 mt-0.5">
+                            Gợi ý: {issue.hint}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <div className="flex items-center justify-between p-1.5 rounded bg-nle-panel text-gray-300">
-                <span>Cổng duyệt 2: Video (Bắt buộc)</span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-            </div>
+            )}
           </Card>
         </div>
       </div>
@@ -454,13 +557,36 @@ export function DAGWorkflowStudio() {
         </div>
 
         <div className="p-2.5 font-mono text-[11px] text-gray-300 overflow-y-auto space-y-0.5 leading-relaxed">
-          {executionLogs.map((log, i) => (
-            <div key={i} className={log.includes("PASS") || log.includes("✓") ? "text-emerald-400" : log.includes("WARNING") ? "text-amber-400" : ""}>
-              {log}
+          {executionLogs.length === 0 ? (
+            <div className="text-gray-500 italic">
+              Chưa có hoạt động. Kết quả kiểm tra và chạy workflow sẽ hiện ở đây.
             </div>
-          ))}
+          ) : (
+            executionLogs.map((line, index) => (
+              <div
+                key={index}
+                className={
+                  line.includes("❌")
+                    ? "text-rose-400"
+                    : line.includes("✅")
+                    ? "text-emerald-400"
+                    : line.includes("⚠️")
+                    ? "text-amber-400"
+                    : ""
+                }
+              >
+                {line}
+              </div>
+            ))
+          )}
         </div>
       </Card>
     </div>
   );
+}
+
+/** A readable message from an unknown thrown value. */
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return typeof error === "string" ? error : JSON.stringify(error);
 }

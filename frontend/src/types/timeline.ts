@@ -215,3 +215,70 @@ export interface TimelineReport {
   target_seconds?: number | null;
   generated_at: string;
 }
+
+/** One caption cue with resolved timing (`SubtitleCue`). */
+export interface SubtitleCue {
+  index: number;
+  scene_id: string;
+  start_seconds: number;
+  end_seconds: number;
+  text: string;
+}
+
+/** How one audio layer is laid down by the renderer (`AudioTrackPlan`). */
+export interface AudioTrackPlan {
+  kind: string;
+  enabled: boolean;
+  volume: number;
+  url?: string | null;
+  bpm?: number | null;
+}
+
+/** One scene, resolved to an absolute slot on the render timeline (`RenderStep`). */
+export interface RenderStep {
+  index: number;
+  scene_id: string;
+  label: string;
+  start_seconds: number;
+  end_seconds: number;
+  duration_seconds: number;
+  transition_in: VideoTransition;
+  transition_seconds: number;
+  filter: VideoFilter;
+  effect: SceneEffect;
+  grade: ColorGrade;
+  ken_burns: KenBurns;
+  background: string;
+  image_url?: string | null;
+  text: string;
+  text_position: TextPosition;
+  text_style: TextStyle;
+  text_color: string;
+  font_size: number;
+  entrance: EntranceEffect;
+  exit: ExitEffect;
+  keyframes: Keyframe[];
+}
+
+/**
+ * A timeline compiled into an explicit, backend-agnostic render plan
+ * (`RenderPlan`).
+ *
+ * This is what a renderer consumes: every scene at an absolute time, the caption
+ * cues, and the audio layers. It is the contract both a server-side ffmpeg render
+ * and an in-browser WebCodecs preview must agree on, so that previewing and
+ * rendering cannot drift apart.
+ */
+export interface RenderPlan {
+  project_id: string;
+  aspect_ratio: string;
+  width: number;
+  height: number;
+  fps: number;
+  total_seconds: number;
+  steps: RenderStep[];
+  subtitles: SubtitleCue[];
+  audio: AudioTrackPlan[];
+  warnings: string[];
+  generated_at: string;
+}

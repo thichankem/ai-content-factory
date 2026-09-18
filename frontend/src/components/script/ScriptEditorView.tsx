@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { TargetScope, SpeechPacingConfig } from "@/types/script";
+import { SpeechPacingConfig, TargetScope } from "@/types/studio";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

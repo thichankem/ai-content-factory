@@ -26,7 +26,8 @@ import { Badge } from "@/components/ui/badge";
 import { useUIStore } from "@/stores/useUIStore";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { useProjects } from "@/hooks/useProjects";
-import { useWorkflowCampaign } from "@/hooks/useWorkflowCampaign";
+import { useCampaign } from "@/hooks/useCampaign";
+import { useWorkflowDAG } from "@/hooks/useWorkflowDAG";
 import {
   CheckCircle2,
   Sparkles,
@@ -53,31 +54,24 @@ export default function StudioPage() {
     aiAssistMutation,
   } = useProjects();
 
-  const {
-    runWorkflowMutation,
-    checklistQuery,
-    generateCampaignMutation,
-  } = useWorkflowCampaign(currentProject?.id);
+  // Flow runs and the pre-save checklist belong to the DAG; the campaign is its
+  // own concern. They used to share one hook, which is why neither was typed.
+  const { runWorkflowMutation, checklistQuery } = useWorkflowDAG(currentProject?.id);
+  const { generateCampaignMutation } = useCampaign(currentProject?.id);
 
   const [workflowStatus, setWorkflowStatus] = useState<string | null>(null);
   const [campaignStatus, setCampaignStatus] = useState<string | null>(null);
   const [workflowSubMode, setWorkflowSubMode] = useState<"dag" | "fusion">("dag");
 
+  // Select the newest project once the list arrives. There is deliberately no
+  // local fallback project: a fabricated one used to be injected here with
+  // `status: "video_review"` and `source_rights_confirmed: true`, so the studio
+  // displayed "Gate 2: chờ duyệt" and a confirmed rights badge for a project the
+  // server had never heard of, and approving it returned 404. An empty list now
+  // shows an empty studio and asks the operator to create a project.
   useEffect(() => {
-    if (projectsQuery.data && projectsQuery.data.length > 0 && !currentProject) {
+    if (!currentProject && projectsQuery.data && projectsQuery.data.length > 0) {
       setCurrentProject(projectsQuery.data[0]);
-    } else if (!currentProject) {
-      setCurrentProject({
-        id: "demo-project-01",
-        name: "Bí mật 3 giây đầu giữ chân khán giả",
-        topic: "Short-form video retention hack",
-        target_language: "vi",
-        duration_target_seconds: 45,
-        status: "video_review",
-        source_rights_confirmed: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
     }
   }, [projectsQuery.data, currentProject, setCurrentProject]);
 
@@ -93,7 +87,13 @@ export default function StudioPage() {
 
   const handlePublish = async () => {
     if (!currentProject) return;
-    await publishMutation.mutateAsync(currentProject.id);
+    await publishMutation.mutateAsync({
+      projectId: currentProject.id,
+      // The backend's default when no platform is named is `youtube`, so an
+      // unpublished project publishes there rather than nowhere.
+      platforms:
+        currentProject.platforms.length > 0 ? currentProject.platforms : ["youtube"],
+    });
   };
 
   const handleVoiceover = async () => {
@@ -109,20 +109,30 @@ export default function StudioPage() {
   const handleRunWorkflow = async () => {
     setWorkflowStatus("Đang khởi chạy luồng DAG trên nền...");
     try {
-      const res = await runWorkflowMutation.mutateAsync();
-      setWorkflowStatus(`✅ Đã thực thi workflow thành công (${res?.executed_blocks?.length || 1} blocks)!`);
-    } catch (e: any) {
-      setWorkflowStatus(`Hoàn tất chạy workflow: ${e.message}`);
+      const run = await runWorkflowMutation.mutateAsync();
+      setWorkflowStatus(
+        `✅ Workflow ${run.status}: đã thực thi ${run.steps.length} bước.`
+      );
+    } catch (error) {
+      setWorkflowStatus(
+        `Chạy workflow thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   };
 
   const handleGenerateCampaign = async () => {
-    setCampaignStatus("Đang tổng hợp pillar content thành 5 shorts...");
+    setCampaignStatus("Đang tổng hợp pillar content thành shorts...");
     try {
-      const res = await generateCampaignMutation.mutateAsync();
-      setCampaignStatus(`✅ Đã tạo thành công chiến dịch ${res?.shorts?.length || 5} micro-shorts đa kênh!`);
-    } catch (e: any) {
-      setCampaignStatus(`Đã tạo chiến dịch 5 shorts thành công!`);
+      const campaign = await generateCampaignMutation.mutateAsync();
+      setCampaignStatus(
+        `✅ Đã tạo chiến dịch gồm ${campaign.shorts.length} micro-shorts đa kênh.`
+      );
+    } catch (error) {
+      // This used to report success from the catch block, so a failed campaign
+      // looked like a finished one and the operator had nothing to act on.
+      setCampaignStatus(
+        `Tạo chiến dịch thất bại: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   };
 

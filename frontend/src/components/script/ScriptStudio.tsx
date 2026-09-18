@@ -5,7 +5,7 @@ import { useProjectStore } from "@/stores/useProjectStore";
 import { useScriptEngine } from "@/hooks/useScriptEngine";
 import { useProjects } from "@/hooks/useProjects";
 import { AIAgentBar, AIQuickAction } from "@/components/copilot/AIAgentBar";
-import { ScriptBriefSettings, TargetScope, SpeechPacingConfig } from "@/types/script";
+import { ScriptBriefSettings, SpeechPacingConfig, TargetScope } from "@/types/studio";
 import { ScriptPacingBar } from "@/components/script/ScriptPacingBar";
 import { ScriptChatbot } from "@/components/script/ScriptChatbot";
 import { ScriptBriefSettingsPanel, DEFAULT_BRIEF_SETTINGS } from "@/components/script/ScriptBriefSettingsPanel";
@@ -13,7 +13,7 @@ import { ScriptEditorView } from "@/components/script/ScriptEditorView";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ViralityScoreResult } from "@/types/api";
+import { ViralityResult } from "@/types/qa";
 import {
   Flame,
   CheckCircle2,
@@ -70,7 +70,7 @@ export function ScriptStudio() {
   });
 
   // Virality & AI status states
-  const [viralityResult, setViralityResult] = useState<ViralityScoreResult | null>(null);
+  const [viralityResult, setViralityResult] = useState<ViralityResult | null>(null);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [showRightChatbot, setShowRightChatbot] = useState(true);

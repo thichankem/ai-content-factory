@@ -12,9 +12,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { projectsApi } from "@/lib/api";
+import { projectsApi, timelineApi } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import { syncProject } from "@/lib/projectSync";
+import { invalidateTimeline, syncProject } from "@/lib/projectSync";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { ProjectCreate } from "@/types/project";
 
@@ -128,6 +128,19 @@ export function useProjects() {
     onSuccess: (project) => syncProject(queryClient, project),
   });
 
+  /**
+   * Auto-edit the timeline: fit the script to the target duration, snap cuts to
+   * the beat and re-time the captions. The endpoint lives under the video project
+   * because it edits the timeline, but it returns the whole project.
+   */
+  const aiAssistMutation = useMutation({
+    mutationFn: (projectId: string) => timelineApi.aiAssist(projectId),
+    onSuccess: (project) => {
+      syncProject(queryClient, project);
+      invalidateTimeline(queryClient, project.id);
+    },
+  });
+
   return {
     projectsQuery,
     createProjectMutation,
@@ -141,5 +154,6 @@ export function useProjects() {
     publishMutation,
     voiceoverMutation,
     renderMutation,
+    aiAssistMutation,
   };
 }

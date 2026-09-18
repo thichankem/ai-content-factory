@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\api\__init__.py", line 3, in <module>
+    from .app import app, create_app
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\api\app.py", line 15, in <module>
+    from ..service import ContentFactoryService
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\service.py", line 10, in <module>
+    from .services import (
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\services\__init__.py", line 5, in <module>
+    from .agents import AgentsMixin
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\services\agents.py", line 20, in <module>
+    from .scripting import ScriptingMixin
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\services\scripting.py", line 11, in <module>
+    from .research import ResearchMixin
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\services\research.py", line 14, in <module>
+    from .context import ServiceContext
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\services\context.py", line 21, in <module>
+    from ..image_voice_service import ImageVoiceStudio
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\image_voice_service.py", line 15, in <module>
+    from . import image_engine, voice_engine
+  File "C:\Users\OS\Documents\GitHub\ai-content-factory\src\content_factory\image_engine.py", line 21, in <module>
+    from PIL import (
+ModuleNotFoundError: No module named 'PIL'
