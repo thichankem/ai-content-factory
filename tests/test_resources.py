@@ -494,13 +494,27 @@ def test_ffmpeg_encoder_probe_parses_a_real_build() -> None:
 
 
 def test_render_timeout_kills_a_hung_ffmpeg() -> None:
-    """The watchdog exists so a stuck encoder cannot pin the machine."""
+    """The deadline exists so a stuck encoder cannot pin the machine.
+
+    The pressure guard is disabled for this test on purpose. Both guards can end
+    the same process, and the pressure one wins whenever the *host* happens to be
+    low on memory — which is exactly what running the whole suite causes. Without
+    this the test asserted the deadline but flaked into asserting the memory
+    floor instead. The pressure path has its own test, with an injected reading,
+    so neither guard is tested by accident here.
+    """
     from content_factory.render import RenderError, _run_command
 
+    governor = ResourceGovernor(
+        Settings(render_monitor_seconds=0.25),
+        probe_fn=lambda: _profile(),
+        pressure=lambda: (7000, 45),  # a healthy machine, on every reading
+    )
     with pytest.raises(RenderError, match="render budget"):
         _run_command(
             ["python", "-c", "import time; time.sleep(30)"],
             1.0,
+            governor=governor,
         )
 
 

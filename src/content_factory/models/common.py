@@ -25,10 +25,10 @@ class TwinSpelling(BaseModel):
 
     A subclass declares the two field names it accepts as :attr:`PRIMARY` and
     :attr:`ALIAS` and gets the whole rule for free: either spelling validates,
-    both together validate (the primary wins), neither fails with a message that
-    names both, and :attr:`resolved` returns the value stripped. Subclasses keep
-    their own public accessors, so the vocabulary each caller already uses does
-    not change.
+    both together validate (a non-empty primary wins), neither fails with a
+    message that names both, and :attr:`resolved` returns the value stripped.
+    Subclasses keep their own public accessors, so the vocabulary each caller
+    already uses does not change.
 
     Only string-valued pairs belong here. A pair whose two spellings are
     genuinely different types is not a spelling difference and needs its own

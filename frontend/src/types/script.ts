@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Script planning, linting and style contract.
  *
  * Mirrors ``src/content_factory/models/script.py``.
