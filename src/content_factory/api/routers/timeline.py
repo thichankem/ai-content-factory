@@ -52,6 +52,17 @@ def build_router(service: ContentFactoryService) -> APIRouter:
     async def update_video_project(project_id: str, data: VideoEditUpdate) -> Project:
         return guard(lambda: service.update_video_project(project_id, data.project))
 
+    @router.put("/projects/{project_id}/timeline", response_model=Project)
+    async def update_timeline(project_id: str, data: VideoProject) -> Project:
+        """Save a timeline, taking the bare project this route has always meant.
+
+        The studio posts the wrapped ``{"project": ...}`` body to
+        ``/video-project``; the legacy dashboard posts the project object itself
+        here. Both persist through the same normalising save, so a client cannot
+        land an un-normalised timeline by picking the other URL.
+        """
+        return guard(lambda: service.update_video_project(project_id, data))
+
     @router.get("/projects/{project_id}/timeline/report", response_model=TimelineReport)
     async def timeline_report(project_id: str) -> TimelineReport:
         return guard_value(lambda: service.timeline_report(project_id))

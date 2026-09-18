@@ -5,13 +5,20 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .common import utcnow
 
 
 class AgentInfo(BaseModel):
-    """A configured AI agent/provider visible to the operator."""
+    """A configured AI agent/provider visible to the operator.
+
+    Two audiences read this one record. The pipeline and the CLI describe a
+    vendor with ``kind``/``tier``/``breaker``; the studio UIs render a card per
+    agent and ask for ``id``/``role``/``provider``/``capabilities``. Rather than
+    make each client translate, both sets of names are carried here and always
+    describe the same vendor.
+    """
 
     name: str
     kind: str
@@ -20,6 +27,34 @@ class AgentInfo(BaseModel):
     model: str | None = None
     base_url: str | None = None
     breaker: str = "closed"
+    #: Stable identifier for a UI: the vendor name, slugged.
+    id: str = ""
+    #: What the vendor is *for*, in the studio's vocabulary (``script``, ...).
+    role: str = ""
+    #: The vendor family, i.e. the configured ``kind``.
+    provider: str = ""
+    #: Work this agent can be routed, e.g. ``["script", "research"]``.
+    capabilities: list[str] = Field(default_factory=list)
+
+
+class CatalogStyle(BaseModel):
+    """A scripting preset, in the shape a picker needs."""
+
+    id: str
+    name: str
+    description: str = ""
+    tone: str = ""
+
+
+class CatalogVoice(BaseModel):
+    """A neural narration voice the operator can select."""
+
+    id: str
+    name: str
+    language: str
+    gender: str = "female"
+    engine: str = ""
+    active: bool = False
 
 
 class AgentCatalog(BaseModel):
@@ -29,13 +64,38 @@ class AgentCatalog(BaseModel):
     tts_engine: str
     agents: list[AgentInfo] = Field(default_factory=list)
     preset_styles: list[str] = Field(default_factory=list)
+    #: ``preset_styles`` as records, for clients that render a picker.
+    script_styles: list[CatalogStyle] = Field(default_factory=list)
+    #: Narration voices, with the configured override flagged ``active``.
+    tts_voices: list[CatalogVoice] = Field(default_factory=list)
 
 
 class AgentResultCreate(BaseModel):
-    """Payload carrying a result produced by an external AI agent."""
+    """Payload carrying a result produced by an external AI agent.
 
-    markdown: str = Field(min_length=1)
+    ``markdown`` is the canonical field the CLI, the MCP server and the agent
+    tools post. ``markdown_response`` is the spelling the studio UI sends, and a
+    body carrying only that one used to 422 — so both are accepted and exactly
+    one is required, following the same rule as
+    :class:`~content_factory.models.qa.ViralityRequest`.
+    """
+
+    markdown: str | None = None
+    markdown_response: str | None = None
     agent: str = "external-agent"
+
+    @property
+    def body(self) -> str:
+        """The agent's reply, whichever field carried it."""
+        return (self.markdown or self.markdown_response or "").strip()
+
+    @model_validator(mode="after")
+    def _require_a_body(self) -> AgentResultCreate:
+        if not self.body:
+            raise ValueError(
+                "provide 'markdown' (or its alias 'markdown_response')"
+            )
+        return self
 
 
 class AgentBrief(BaseModel):

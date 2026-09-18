@@ -44,11 +44,12 @@ class CopyrightCheckRequest(BaseModel):
                 seen.append(value)
         return seen
 
-    @model_validator(mode="after")
-    def _require_a_candidate(self) -> CopyrightCheckRequest:
-        if not self.candidates:
-            raise ValueError("provide 'fingerprint' or 'asset_ids'")
-        return self
+    # There is deliberately no "at least one candidate" rule here. Clearing an
+    # empty batch is a legitimate request — the studio ticks a list of assets and
+    # the operator may have ticked none — and the honest answer is that nothing
+    # was checked, so nothing was blocked. Rejecting it made a UI button fail for
+    # a state the UI itself can produce. Callers that passed a malformed body get
+    # an explicit `checked: 0` back instead of a 422.
 
 
 class AuditRecordRequest(BaseModel):
@@ -61,7 +62,24 @@ class AuditRecordRequest(BaseModel):
 
 
 class CostCheckRequest(BaseModel):
+    """A plan of model calls to price.
+
+    ``calls`` is the canonical field the CLI, the pipeline and the agent tools
+    use; ``estimated_usage`` is what the studio sends. Both are accepted and the
+    two are merged, because a client that sends the spelling we do not read gets
+    a silent $0.00 estimate rather than an error — the most expensive kind of
+    contract drift.
+    """
+
     calls: dict[str, int] = Field(default_factory=dict)
+    estimated_usage: dict[str, int] = Field(default_factory=dict)
+
+    @property
+    def usage(self) -> dict[str, int]:
+        """Every priced call, whichever field carried it."""
+        merged = dict(self.estimated_usage)
+        merged.update(self.calls)
+        return merged
 
 
 class ViralityRequest(BaseModel):
@@ -125,12 +143,39 @@ class ThumbnailRequest(BaseModel):
 
 
 class DedupRequest(BaseModel):
-    media_ids: list[str] = Field(min_length=1)
+    """Which media to scan for near-duplicates.
+
+    An omitted or empty ``media_ids`` means "scan the whole library", which is
+    what the studio's one-click cleanup sends: it has no ids to hand over, it
+    just wants the library swept. Requiring a non-empty list made that button
+    422 while the legacy dashboard, which does pass ids, kept working.
+    """
+
+    media_ids: list[str] = Field(default_factory=list)
 
 
 class TimelineCommandRequest(BaseModel):
+    """A natural-language editing instruction and the timeline to apply it to.
+
+    ``text`` is the canonical field the CLI, the MCP server and the agent tools
+    use; ``command`` is what the studio's command bar sends. Both are accepted
+    and exactly one is required, so neither client can silently no-op.
+    """
+
     project: VideoProject
-    text: str = Field(min_length=1)
+    text: str | None = None
+    command: str | None = None
+
+    @property
+    def instruction(self) -> str:
+        """The instruction, whichever field carried it."""
+        return (self.text or self.command or "").strip()
+
+    @model_validator(mode="after")
+    def _require_an_instruction(self) -> TimelineCommandRequest:
+        if not self.instruction:
+            raise ValueError("provide 'text' (or its alias 'command')")
+        return self
 
 
 class SimplifySubtitlesRequest(BaseModel):

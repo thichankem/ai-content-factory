@@ -19,7 +19,7 @@ from ..compliance import (
     check_platform,
 )
 from ..cost_guard import CostGuard, PlanBudget
-from ..dedup import find_near_duplicates, image_hash
+from ..dedup import find_near_duplicates, hamming_distance, image_hash
 from ..models import (
     AuditRecordRequest,
     BrandCheckRequest,
@@ -131,6 +131,7 @@ class QaMixin(MediaMixin):
         """The copyright check as a verdict, with one row per checked asset."""
         issues = self.qa_copyright(req)
         flagged = {item.get("asset_id") for item in issues}
+        candidates = req.candidates
         return {
             "passed": not issues,
             "fingerprints": [
@@ -139,9 +140,12 @@ class QaMixin(MediaMixin):
                     "sha256": candidate,
                     "status": "flagged" if candidate in flagged else "clear",
                 }
-                for candidate in req.candidates
+                for candidate in candidates
             ],
             "findings": issues,
+            # An empty request is a valid "nothing to clear": report the fact
+            # rather than implying a clean scan covered assets that were absent.
+            "checked": len(candidates),
         }
 
     @staticmethod
@@ -194,7 +198,7 @@ class QaMixin(MediaMixin):
                 "embedding": settings.cost_unit_embedding_usd,
             },
         )
-        estimate, needs_confirmation = CostGuard(budget).check(req.calls)
+        estimate, needs_confirmation = CostGuard(budget).check(req.usage)
         return {
             "estimate_usd": estimate.total_usd,
             "breakdown": estimate.breakdown,
@@ -206,18 +210,60 @@ class QaMixin(MediaMixin):
             "estimated_total_usd": estimate.total_usd,
             "exceeds_budget": needs_confirmation,
             "budget_limit": settings.cost_guard_threshold_usd,
+            # And the third spelling: the studio's budget card reads these four
+            # names directly rather than inferring a verdict from the aliases.
+            "estimated_cost": estimate.total_usd,
+            "by_service": estimate.breakdown,
+            "within_budget": not needs_confirmation,
         }
 
-    def media_dedup(self, req: DedupRequest) -> list[list[str]]:
+    def media_dedup(self, req: DedupRequest) -> dict[str, Any]:
+        """Group near-duplicate media, by cluster *and* by pair.
+
+        Two views of one sweep, because two clients ask for different things: the
+        legacy dashboard only counts clusters, while the studio lists the pairs
+        an operator can act on. Each pair also carries the similarity the studio
+        sorts by, which the cluster list threw away.
+
+        No ``media_ids`` means sweep the whole library — that is what one-click
+        cleanup sends. Items whose hash cannot be computed (an unreadable or
+        non-image file) are skipped rather than failing the whole sweep, since
+        one bad asset in a library must not block cleaning the rest.
+        """
+        media_ids = req.media_ids or [item.id for item in self.media_list()]
         hashes: dict[str, str] = {}
-        for media_id in req.media_ids:
+        for media_id in media_ids:
             try:
                 hashes[media_id] = image_hash(self._qa_media_path(media_id))
-            except ValueError:
+            except (ValueError, NotFoundError):
                 continue
-        return find_near_duplicates(
-            hashes, max_distance=self.settings.dedup_max_distance
-        )
+        max_distance = self.settings.dedup_max_distance
+        groups = find_near_duplicates(hashes, max_distance=max_distance)
+        bits = max((len(value) for value in hashes.values()), default=0)
+        duplicates: list[dict[str, Any]] = []
+        for group in groups:
+            for index, original in enumerate(group):
+                for duplicate in group[index + 1 :]:
+                    distance = hamming_distance(hashes[original], hashes[duplicate])
+                    duplicates.append(
+                        {
+                            "original": original,
+                            "duplicate": duplicate,
+                            "distance": distance,
+                            # Fraction of agreeing bits, so a UI can show "98%
+                            # alike" without knowing the hash length.
+                            "similarity": (
+                                round(1.0 - distance / bits, 4) if bits else 0.0
+                            ),
+                        }
+                    )
+        return {
+            "groups": groups,
+            "count": len(groups),
+            "duplicates": duplicates,
+            "checked": len(hashes),
+            "max_distance": max_distance,
+        }
 
     def media_search(self, q: str, top_k: int = 10) -> list[dict[str, Any]]:
         index = MediaSearchIndex()
@@ -327,14 +373,22 @@ class QaMixin(MediaMixin):
         return [candidate.__dict__ for candidate in candidates]
 
     def timeline_command(self, req: TimelineCommandRequest) -> dict[str, Any]:
-        updated, command = apply_command(req.project, req.text)
+        updated, command = apply_command(req.project, req.instruction)
+        parsed = {
+            "intent": command.intent.value,
+            "target": command.target,
+            "target_scene": command.target,
+            "parameters": {},
+            "description": command.description,
+        }
         return {
             "project": updated.model_dump(),
-            "command": {
-                "intent": command.intent.value,
-                "target": command.target,
-                "description": command.description,
-            },
+            "command": parsed,
+            # The studio's command bar binds to `parsed_command` and shows
+            # `message` as the confirmation; the pipeline reads `command`. All
+            # three describe the same parse, so the UI never re-derives it.
+            "parsed_command": parsed,
+            "message": command.description,
         }
 
     def subtitles_simplify(self, req: SimplifySubtitlesRequest) -> dict[str, Any]:

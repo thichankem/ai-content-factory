@@ -44,6 +44,43 @@ def resolve_voice(language: str) -> str:
     return _VOICES.get(lang, _VOICES["en"])
 
 
+def voice_catalog(active: str | None = None) -> list[dict[str, str | bool]]:
+    """Every narration voice this engine can actually synthesise.
+
+    Only the mapped defaults are listed: each name here is one the pipeline
+    already speaks with, so a picker built from this catalog can never offer a
+    voice that fails at synthesis time. ``_VOICES`` documents every entry as
+    female, so ``gender`` is reported as such rather than guessed from the name.
+
+    ``active`` is the configured ``tts_voice`` override; when it names a voice
+    that is not already in the table, that voice is appended and flagged, so an
+    operator who pinned a custom voice can still see which one is in force.
+    """
+    catalog: list[dict[str, str | bool]] = [
+        {
+            "id": voice,
+            "name": voice,
+            "language": language,
+            "gender": "female",
+            "engine": "edge-tts",
+            "active": active == voice,
+        }
+        for language, voice in _VOICES.items()
+    ]
+    if active and all(entry["id"] != active for entry in catalog):
+        catalog.append(
+            {
+                "id": active,
+                "name": active,
+                "language": active.split("-")[0].lower(),
+                "gender": "female",
+                "engine": "edge-tts",
+                "active": True,
+            }
+        )
+    return catalog
+
+
 def mp3_duration(data: bytes) -> float:
     """Return the duration in seconds of an MP3 byte string."""
     try:

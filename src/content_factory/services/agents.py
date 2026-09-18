@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from .. import agent_bridge, script_engine, smart
+from .. import agent_bridge, script_engine, smart, tts
 from ..models import (
     AgentCatalog,
     AgentResultCreate,
+    CatalogStyle,
+    CatalogVoice,
     Project,
     ProjectStatus,
     ScriptStyle,
@@ -24,12 +26,31 @@ class AgentsMixin(ScriptingMixin):
     # --- External AI agent bridge ---------------------------------------------
 
     def agent_catalog(self) -> AgentCatalog:
-        """Describe every AI agent and preset the operator can route work to."""
+        """Describe every AI agent and preset the operator can route work to.
+
+        ``preset_styles`` (names) and ``script_styles`` (records) are two views of
+        the same presets, and ``tts_voices`` lists the voices
+        :mod:`content_factory.tts` can really synthesise — the studio opens a
+        picker against each, while the pipeline keeps using the flat names it
+        already knows.
+        """
+        styles = self._presets.list_styles()
+        voices = tts.voice_catalog(self._settings.tts_voice)
         return AgentCatalog(
             strategy=self._settings.provider_strategy,
             tts_engine=self._settings.tts_engine,
             agents=self._providers.catalog(),
-            preset_styles=self._presets.names(),
+            preset_styles=[style.name for style in styles],
+            script_styles=[
+                CatalogStyle(
+                    id=style.name,
+                    name=style.title or style.name,
+                    description=style.description,
+                    tone=style.tone,
+                )
+                for style in styles
+            ],
+            tts_voices=[CatalogVoice(**voice) for voice in voices],
         )
 
     def export_brief(self, project_id: str, agent: str | None = None) -> str:
@@ -56,7 +77,7 @@ class AgentsMixin(ScriptingMixin):
         a human still has to confirm rights before the script can be approved.
         """
         project = self.get_project(project_id)
-        result = agent_bridge.parse_agent_result(data.markdown)
+        result = agent_bridge.parse_agent_result(data.body)
         if result.is_empty:
             raise StateConflictError(
                 "The agent reply contained no script, scenes, or style block."

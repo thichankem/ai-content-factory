@@ -28,6 +28,27 @@ class ProviderTier(enum.StrEnum):
     STRONG = "strong"
 
 
+#: What each tier is trusted with, in the vocabulary the studio UI shows.
+#: Script writing is the one job every tier can be routed, so it is always
+#: present; the heavier tiers additionally serve the pipeline's other AI stages.
+_TIER_CAPABILITIES: dict[ProviderTier, tuple[str, ...]] = {
+    ProviderTier.LOCAL: ("script", "offline"),
+    ProviderTier.WEAK: ("script", "research"),
+    ProviderTier.STRONG: ("script", "research", "seo", "vision"),
+}
+
+
+def _slug(name: str) -> str:
+    """A stable, URL-safe identifier for a vendor name."""
+    cleaned = [
+        character.lower() if character.isalnum() else "-" for character in name.strip()
+    ]
+    slug = "".join(cleaned).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug or "provider"
+
+
 class GenerationResult(NamedTuple):
     """Successful generation outcome."""
 
@@ -484,19 +505,33 @@ class ProviderChain:
         return {tier.value: self._breakers[tier].state for tier in self._providers}
 
     def catalog(self) -> list[AgentInfo]:
-        """Describe every configured vendor for the operator-facing API."""
+        """Describe every configured vendor for the operator-facing API.
+
+        Each entry is filled for both audiences at once: ``kind``/``tier``/
+        ``breaker`` describe the routing the pipeline performs, while
+        ``id``/``role``/``provider``/``capabilities`` are the same facts in the
+        vocabulary the studio renderer uses, so neither client has to map one
+        onto the other. A vendor's ``role`` is the tier it serves, because that
+        is exactly what the pipeline routes by.
+        """
         agents: list[AgentInfo] = []
         for tier, providers in self._providers.items():
             for provider in providers:
+                name = provider.name
+                kind = getattr(provider, "kind", "openai-compatible")
                 agents.append(
                     AgentInfo(
-                        name=provider.name,
-                        kind=getattr(provider, "kind", "openai-compatible"),
+                        name=name,
+                        kind=kind,
                         tier=tier.value,
                         enabled=True,
                         model=provider.model,
                         base_url=getattr(provider, "base_url", None),
                         breaker=self._breakers[tier].state,
+                        id=_slug(name),
+                        role=tier.value,
+                        provider=kind,
+                        capabilities=list(_TIER_CAPABILITIES.get(tier, ())),
                     )
                 )
         return agents

@@ -107,9 +107,13 @@ def build_router(service: ContentFactoryService) -> APIRouter:
         )
 
     @router.post("/media/dedup")
-    def media_dedup(req: DedupRequest) -> list[list[str]]:
-        """Group media items whose perceptual hashes are near-duplicates."""
-        return guard_value(lambda: service.media_dedup(req))
+    def media_dedup(req: DedupRequest | None = None) -> dict[str, Any]:
+        """Group media items whose perceptual hashes are near-duplicates.
+
+        A body is optional: without one the whole library is swept, which is what
+        the studio's cleanup button asks for.
+        """
+        return guard_value(lambda: service.media_dedup(req or DedupRequest()))
 
     @router.get("/media/search")
     def media_search(q: str, top_k: int = 10) -> list[dict[str, Any]]:
