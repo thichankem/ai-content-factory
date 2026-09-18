@@ -55,6 +55,26 @@ export interface SceneLane {
   scene?: VideoScene;
 }
 
+/** One file the operator attached to the brief (frontend-only, never uploaded). */
+export interface AttachedFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  extractedSnippet?: string;
+  uploadedAt?: string;
+}
+
+/** One web page the operator attached to the brief (frontend-only). */
+export interface AttachedWebPage {
+  id: string;
+  url: string;
+  title?: string;
+  status?: "ready" | "fetching" | "error";
+  snippet?: string;
+  addedAt?: string;
+}
+
 /**
  * The scripting brief.
  *
