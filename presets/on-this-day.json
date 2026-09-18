@@ -1,0 +1,32 @@
+{
+  "name": "on-this-day",
+  "title": "On This Day (Ngày này năm xưa)",
+  "description": "Định dạng kỷ niệm ngày này năm xưa: hook nhanh về ngày tháng, tái hiện sự kiện chấn động, ý nghĩa lịch sử đối với hiện tại.",
+  "tone": "nhanh gọn, súc tích, gợi nhớ, kết nối quá khứ với hiện tại",
+  "structure": [
+    "Date Hook",
+    "Event Unfolding",
+    "Impact",
+    "Then & Now Comparison",
+    "Quick CTA"
+  ],
+  "hook_rules": [
+    "Bắt đầu ngay bằng 'Đúng ngày này X năm trước...' kèm sự kiện nổi bật.",
+    "Không mở đầu bằng lời chào kéo dài."
+  ],
+  "sentence_max_units": 13,
+  "max_sections": 8,
+  "cta": "Lưu lại video và theo dõi để biết mỗi ngày lịch sử có gì đặc biệt.",
+  "banned_phrases": [
+    "hôm nay mình sẽ kể",
+    "chào mừng bạn đến với kênh",
+    "trong video hôm nay"
+  ],
+  "language_notes": {
+    "vi": "Nhấn mạnh mốc năm và khoảng cách thời gian so với hiện tại để tạo cảm giác gần gũi."
+  },
+  "units_per_second": {
+    "vi": 2.7
+  },
+  "builtin": false
+}

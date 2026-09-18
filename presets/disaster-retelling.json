@@ -1,0 +1,35 @@
+{
+  "name": "disaster-retelling",
+  "title": "Disaster Retelling (Thảm họa & Tai nạn)",
+  "description": "Tái hiện diễn biến thảm họa/tai nạn: Cold-open vào giây phút nguy cấp → tua lại chuỗi quyết định sai lầm → cao trào sống còn → bài học an toàn & tưởng niệm nạn nhân.",
+  "tone": "kịch tính vừa phải, cẩn trọng, tôn trọng nạn nhân, tập trung vào nhân chứng và dữ kiện kỹ thuật",
+  "structure": [
+    "Cold Open (Emergency)",
+    "Rewind & Normal Day",
+    "The Fatal Chain",
+    "The Climax",
+    "Rescue & Consequences",
+    "Safety Lessons & Memorial"
+  ],
+  "hook_rules": [
+    "Mở bằng tín hiệu khẩn cấp (còi báo động, radio, âm thanh bất thường) hoặc câu lệnh cuối cùng.",
+    "Tái hiện không khí bình yên trước thảm họa.",
+    "Tuyệt đối không giật gân hóa cái chết của nạn nhân."
+  ],
+  "sentence_max_units": 14,
+  "max_sections": 12,
+  "cta": "Đăng ký kênh để theo dõi những bài học đắt giá từ các sự kiện lịch sử.",
+  "banned_phrases": [
+    "kinh hoàng nhất lịch sử chưa từng thấy",
+    "chết chóc rùng rợn",
+    "xin chào các bạn",
+    "trong video hôm nay"
+  ],
+  "language_notes": {
+    "vi": "Tôn trọng các nạn nhân; gắn nhãn 'theo kết luận điều tra' đối với nguyên nhân kỹ thuật."
+  },
+  "units_per_second": {
+    "vi": 2.6
+  },
+  "builtin": false
+}

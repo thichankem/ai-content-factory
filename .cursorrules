@@ -1,0 +1,16 @@
+# Cursor / Windsurf Rules for AI Content Factory
+
+## Project Overview
+AI Content Factory is an automated video pipeline with two mandatory human review gates (Script Approval, Video Approval).
+- Backend: FastAPI (`src/content_factory`)
+- Frontend: Next.js 14 + Tailwind + TypeScript (`frontend/`)
+- Tools Registry: 61 tools accessible via `GET /tools` and `POST /tools/call`
+- MCP Server: `mcp_server.py`
+- Markdown Bridge: `brief.md` / `agent-result`
+
+## Agent Guidelines
+1. State Machine: Respect the authoritative state machine in `src/content_factory/state.py`.
+2. Human Gates: Never auto-confirm `source_rights_confirmed`. Always wait for human approval on Gate 1 (script) and Gate 2 (video).
+3. Tool Execution: Use `POST /tools/call` with `{"tool": "<name>", "args": { ... }}` for programmatic operations.
+4. Multimodal Vision: If you support multimodal vision, visually inspect keyframes and contact sheets before approving Gate 2.
+5. Quality Gates: Run `ruff check`, `ruff format --check`, `mypy src`, and `pytest` on code changes.

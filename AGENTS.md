@@ -32,6 +32,24 @@ still planned.
 - Source rights are never auto-confirmed, by any code path, for any provider
   or external agent.
 
+## Backend layout
+
+- `src/content_factory/models/` holds the Pydantic contracts, one module per
+  domain; `models/__init__.py` re-exports all of them, so import from
+  `content_factory.models` and add the class to the module that matches its
+  domain.
+- `src/content_factory/services/` holds the service layer as one mixin per
+  domain over a shared `ServiceContext`. Add methods to the matching mixin; if a
+  method calls another layer, add that layer to the mixin's base list rather
+  than reaching across the composition. `service.py` is only a compatibility
+  facade.
+- Shared helpers go in `src/content_factory/text.py` (or the module that owns
+  the concept) — never copy a tokenizer, slug or error mapper into a second
+  place.
+- `tests/test_architecture.py` enforces these rules: disjoint mixins, methods
+  reachable from the composed service, a module line budget, and the
+  `models`/`services` re-export surface. Run it after any structural change.
+
 ## Read this first
 
 `docs/KE-HOACH-TONG-THE.md` is the project's memory: the operator's
@@ -52,9 +70,11 @@ agents (Claude Code, Codex, DeepSeek, Gemini).
   `presets/*.md`) or an environment variable — not as a constant in code.
   `src/content_factory/presets.py` and `script_engine.py` are the reference
   examples.
-- After editing Python code, run the quality gates:
-  `python -m ruff check src tests`, `python -m ruff format --check src tests`,
-  `python -m mypy src`, and `python -m pytest`.
+- After editing Python code, run the quality gates (on Windows use
+  `.venv/Scripts/python.exe`, on Linux/macOS/WSL `./.venv/bin/python` or
+  `scripts/lint.sh`): `python -m ruff check src tests`,
+  `python -m ruff format --check src tests`, `python -m mypy src`, and
+  `python -m pytest`.
 - Before reporting a large task done, run the smoke test: `scripts/smoke.ps1`
   (Windows) or `scripts/smoke.sh` (Linux/macOS/WSL).
 - Do not invent files or commands that do not exist yet. If a step depends on

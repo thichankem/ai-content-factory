@@ -65,6 +65,15 @@ function totalDuration() {
   return ed.scenes.reduce((sum, s) => sum + s.duration_seconds, 0);
 }
 
+function fmtSMPTE(seconds, fps = 30) {
+  if (isNaN(seconds) || seconds < 0) seconds = 0;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const f = Math.floor((seconds % 1) * fps);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}:${String(f).padStart(2, "0")}`;
+}
+
 function fmtClock(seconds) {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
@@ -104,6 +113,9 @@ async function openEditor() {
   ed.redoStack = [];
   ed.dirty = false;
   ed.voiceover = project.voiceover || null;
+  ed.voiceoverVolume = vp.voiceover_volume ?? 1;
+  ed.markers = vp.markers || [];
+  ed.revision = vp.revision || 1;
   ed.audioScene = -1;
 
   $("ed-aspect").value = ed.aspect;
@@ -121,6 +133,7 @@ async function openEditor() {
   $("editor").hidden = false;
   setEdStatus(ed.voiceover ? `Voiceover ready (${ed.voiceover.engine})` : "Editing");
   pausePlayback();
+  await refreshProReport();
 }
 
 function setupAudio() {
@@ -318,6 +331,7 @@ function pushHistory() {
   ed.redoStack = [];
   ed.dirty = true;
   setEdStatus("Unsaved changes");
+  scheduleProReport();
 }
 
 function undo() {
@@ -329,6 +343,7 @@ function undo() {
   selectScene(ed.selected);
   drawFrame(ed.t);
   setEdStatus("Undone");
+  scheduleProReport();
 }
 
 function redo() {
@@ -340,6 +355,7 @@ function redo() {
   selectScene(ed.selected);
   drawFrame(ed.t);
   setEdStatus("Redone");
+  scheduleProReport();
 }
 
 // ---------- timeline ----------
@@ -528,6 +544,34 @@ function play() {
   ed.raf = requestAnimationFrame(loop);
 }
 
+function updateVUMeter(isPlaying) {
+  const fillL = $("vu-fill-l");
+  const fillR = $("vu-fill-r");
+  if (!fillL || !fillR) return;
+  if (!isPlaying) {
+    fillL.style.height = "0%";
+    fillR.style.height = "0%";
+    const clipL = $("vu-clip-l");
+    const clipR = $("vu-clip-r");
+    if (clipL) clipL.classList.remove("clipped");
+    if (clipR) clipR.classList.remove("clipped");
+    return;
+  }
+  const masterVol = $("master-vol") ? Number($("master-vol").value) / 100 : 1.0;
+  const basePeak = masterVol * 0.72;
+  const jitterL = (Math.random() * 0.20) - 0.10;
+  const jitterR = (Math.random() * 0.20) - 0.10;
+  const pctL = Math.max(0, Math.min(100, Math.round((basePeak + jitterL) * 100)));
+  const pctR = Math.max(0, Math.min(100, Math.round((basePeak + jitterR) * 100)));
+  fillL.style.height = `${pctL}%`;
+  fillR.style.height = `${pctR}%`;
+
+  const clipL = $("vu-clip-l");
+  const clipR = $("vu-clip-r");
+  if (clipL) clipL.classList.toggle("clipped", pctL > 94);
+  if (clipR) clipR.classList.toggle("clipped", pctR > 94);
+}
+
 function pausePlayback() {
   ed.playing = false;
   if (ed.raf) cancelAnimationFrame(ed.raf);
@@ -535,6 +579,7 @@ function pausePlayback() {
   $("btn-play").textContent = "▶";
   stopMusic();
   if (ed.audioEl) ed.audioEl.pause();
+  updateVUMeter(false);
 }
 
 function loop(ts) {
@@ -553,13 +598,14 @@ function loop(ts) {
   drawFrame(ed.t);
   updatePlaybackAudio(sceneAt(ed.t).index, false);
   updateSeek();
+  updateVUMeter(true);
   ed.raf = requestAnimationFrame(loop);
 }
 
 function updateSeek() {
   const total = totalDuration();
   $("seek").value = total ? Math.round((ed.t / total) * 1000) : 0;
-  $("play-time").textContent = `${fmtClock(ed.t)} / ${fmtClock(total)}`;
+  $("play-time").textContent = `${fmtSMPTE(ed.t, ed.fps || 30)} / ${fmtSMPTE(total, ed.fps || 30)}`;
 }
 
 // ---------- rendering ----------
@@ -1013,24 +1059,16 @@ function drawText(ctx, sc, p, dur, W, H) {
 // ---------- save ----------
 
 async function saveEditor() {
-  const project = {
-    scenes: ed.scenes,
-    aspect_ratio: ed.aspect,
-    fps: ed.fps,
-    captions: ed.captions,
-    background_music: ed.music,
-    music_volume: ed.musicVolume,
-    export_quality: ed.quality,
-    bpm: ed.bpm,
-  };
   const p = await api(`/projects/${state.selectedId}/video-project`, {
     method: "PUT",
-    body: JSON.stringify({ project }),
+    body: JSON.stringify({ project: proProjectPayload() }),
   });
+  if (p.video_project) proAdopt(p.video_project);
   await loadProjects();
   renderProject(p);
   ed.dirty = false;
-  setEdStatus("Saved ✓");
+  setEdStatus(`Saved ✓ · revision ${ed.revision || 1}`);
+  await refreshProReport();
 }
 
 // ---------- export ----------
@@ -1103,6 +1141,229 @@ function setEdStatus(text) {
   $("ed-status").textContent = text;
 }
 
+// ---------- Sound Effects (SFX) Synthesizer (Web Audio API) ----------
+
+function playSFX(kind) {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = ed.audioCtx || new AudioContextClass();
+    if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (kind === "whoosh") {
+      const bufferSize = Math.floor(ctx.sampleRate * 0.3);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(300, now);
+      filter.frequency.exponentialRampToValueAtTime(2400, now + 0.15);
+      filter.frequency.exponentialRampToValueAtTime(400, now + 0.3);
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.4, now + 0.15);
+      gain.gain.linearRampToValueAtTime(0.001, now + 0.3);
+      noise.connect(filter);
+      filter.connect(gain);
+      noise.start(now);
+      noise.stop(now + 0.3);
+      return;
+    } else if (kind === "pop") {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(750, now);
+      osc.frequency.exponentialRampToValueAtTime(140, now + 0.08);
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      osc.start(now);
+      osc.stop(now + 0.08);
+      return;
+    } else if (kind === "camera") {
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(1200, now);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+      osc.start(now);
+      osc.stop(now + 0.03);
+      setTimeout(() => {
+        try {
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = "triangle";
+          osc2.frequency.setValueAtTime(900, ctx.currentTime);
+          gain2.gain.setValueAtTime(0.35, ctx.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start(ctx.currentTime);
+          osc2.stop(ctx.currentTime + 0.04);
+        } catch { /* ignore */ }
+      }, 50);
+      return;
+    } else if (kind === "impact") {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(130, now);
+      osc.frequency.exponentialRampToValueAtTime(32, now + 0.4);
+      gain.gain.setValueAtTime(0.6, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc.start(now);
+      osc.stop(now + 0.4);
+      return;
+    } else if (kind === "level") {
+      const notes = [523.25, 659.25, 783.99, 1046.5];
+      notes.forEach((freq, idx) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "triangle";
+        o.frequency.value = freq;
+        const t = now + idx * 0.07;
+        g.gain.setValueAtTime(0.3, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(t);
+        o.stop(t + 0.15);
+      });
+      return;
+    } else if (kind === "ding") {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(1760, now);
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+      osc.start(now);
+      osc.stop(now + 0.6);
+      return;
+    } else if (kind === "sos") {
+      // Morse code S-O-S (... --- ...) at 800Hz
+      const beeps = [
+        { dur: 0.08, gap: 0.06 }, { dur: 0.08, gap: 0.06 }, { dur: 0.08, gap: 0.16 }, // S
+        { dur: 0.22, gap: 0.08 }, { dur: 0.22, gap: 0.08 }, { dur: 0.22, gap: 0.16 }, // O
+        { dur: 0.08, gap: 0.06 }, { dur: 0.08, gap: 0.06 }, { dur: 0.08, gap: 0.06 }  // S
+      ];
+      let offset = 0;
+      beeps.forEach((b) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = 850;
+        const t = now + offset;
+        g.gain.setValueAtTime(0.3, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + b.dur);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(t);
+        o.stop(t + b.dur);
+        offset += b.dur + b.gap;
+      });
+      return;
+    } else if (kind === "siren") {
+      // Air raid / emergency wailing siren (450Hz <-> 850Hz)
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(450, now);
+      osc.frequency.linearRampToValueAtTime(850, now + 0.5);
+      osc.frequency.linearRampToValueAtTime(450, now + 1.0);
+      osc.frequency.linearRampToValueAtTime(800, now + 1.5);
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.28, now + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+      osc.start(now);
+      osc.stop(now + 1.8);
+      return;
+    } else if (kind === "sonar") {
+      // Submarine oceanic sonar ping (1500Hz resonant ping with long tail)
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(1550, now);
+      osc.frequency.exponentialRampToValueAtTime(1480, now + 1.2);
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+      osc.start(now);
+      osc.stop(now + 1.6);
+      // Secondary ambient reverberation ping
+      setTimeout(() => {
+        try {
+          const o2 = ctx.createOscillator();
+          const g2 = ctx.createGain();
+          o2.type = "sine";
+          o2.frequency.value = 1480;
+          const t = ctx.currentTime;
+          g2.gain.setValueAtTime(0.15, t);
+          g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+          o2.connect(g2);
+          g2.connect(ctx.destination);
+          o2.start(t);
+          o2.stop(t + 1.0);
+        } catch { /* ignore */ }
+      }, 400);
+      return;
+    } else if (kind === "static") {
+      // Vintage radio static noise burst
+      const bufferSize = Math.floor(ctx.sampleRate * 0.8);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (Math.random() > 0.3 ? 1 : 0.2);
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(1200, now);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      noise.connect(filter);
+      filter.connect(gain);
+      noise.start(now);
+      noise.stop(now + 0.8);
+      return;
+    } else if (kind === "whistle") {
+      // Deep steam engine / ocean liner steam whistle (220Hz + 277Hz)
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(220, now);
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.4, now + 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+      osc.start(now);
+      osc.stop(now + 1.4);
+
+      const o2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      o2.type = "triangle";
+      o2.frequency.setValueAtTime(277, now);
+      g2.gain.setValueAtTime(0.01, now);
+      g2.gain.linearRampToValueAtTime(0.25, now + 0.15);
+      g2.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+      o2.connect(g2);
+      g2.connect(ctx.destination);
+      o2.start(now);
+      o2.stop(now + 1.4);
+      return;
+    }
+  } catch (err) {
+    console.warn("SFX audio failed:", err);
+  }
+}
+
+window.playSFX = playSFX;
+window.openEditor = openEditor;
+
+function captureFrameToPhotoLab() {
+  const canvas = $("preview-canvas");
+  if (!canvas) return;
+  const dataUrl = canvas.toDataURL("image/png");
+  if (window.loadPhotoLabFrame) {
+    window.loadPhotoLabFrame(dataUrl);
+  }
+  closeEditor();
+  if (window.switchWorkspace) {
+    window.switchWorkspace("photolab");
+  }
+  showToast("Frame captured & sent to Photo Lab! 📸", "success");
+}
+
 // ---------- wiring ----------
 
 $("btn-ed-open-editor") && $("btn-ed-open-editor").addEventListener("click", openEditor);
@@ -1119,11 +1380,113 @@ $("btn-ai-suggest").addEventListener("click", () => run(aiSuggestLook));
 $("btn-ai-polish").addEventListener("click", () => run(aiPolishText));
 $("btn-ai-captions").addEventListener("click", aiCaptions);
 
+// Studio Pro Controls: Safe Zone, Device Mockup, Frame Capture
+if ($("btn-ed-safezone")) {
+  $("btn-ed-safezone").addEventListener("click", () => {
+    const tz = $("tiktok-safe-zone");
+    if (!tz) return;
+    tz.hidden = !tz.hidden;
+    $("btn-ed-safezone").classList.toggle("toggle-active", !tz.hidden);
+    showToast(tz.hidden ? "TikTok Safe Zone hidden" : "TikTok Safe Zone overlay active", "info");
+  });
+}
+
+if ($("btn-ed-device")) {
+  $("btn-ed-device").addEventListener("click", () => {
+    const frame = $("canvas-frame");
+    if (!frame) return;
+    frame.classList.toggle("phone-frame");
+    $("btn-ed-device").classList.toggle("toggle-active", frame.classList.contains("phone-frame"));
+  });
+}
+
+if ($("btn-ed-capture")) {
+  $("btn-ed-capture").addEventListener("click", captureFrameToPhotoLab);
+}
+
+// Transport controls
 $("btn-play").addEventListener("click", () => (ed.playing ? pausePlayback() : play()));
+if ($("btn-step-back")) {
+  $("btn-step-back").addEventListener("click", () => {
+    ed.t = Math.max(0, ed.t - 1);
+    drawFrame(ed.t);
+  });
+}
+if ($("btn-step-forward")) {
+  $("btn-step-forward").addEventListener("click", () => {
+    ed.t = Math.min(totalDuration(), ed.t + 1);
+    drawFrame(ed.t);
+  });
+}
+if ($("btn-loop")) {
+  $("btn-loop").addEventListener("click", () => {
+    ed.looping = ed.looping === false ? true : false;
+    $("btn-loop").classList.toggle("active", ed.looping !== false);
+  });
+}
+if ($("master-vol")) {
+  $("master-vol").addEventListener("input", (ev) => {
+    const v = parseInt(ev.target.value, 10) / 100;
+    if (ed.musicGain) ed.musicGain.gain.value = v * (ed.musicVolume || 0.25);
+    if (ed.audioEl) ed.audioEl.volume = v;
+  });
+}
+
 $("seek").addEventListener("input", () => {
   const total = totalDuration();
   ed.t = (parseInt($("seek").value, 10) / 1000) * total;
   drawFrame(ed.t);
+});
+
+// Inspector Tabs Switching
+document.querySelectorAll(".props-tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const tabName = btn.dataset.ptab;
+    document.querySelectorAll(".props-tab-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".props-tab-panel").forEach((p) => p.classList.remove("active"));
+    btn.classList.add("active");
+    const targetPanel = $(`ptab-panel-${tabName}`);
+    if (targetPanel) targetPanel.classList.add("active");
+  });
+});
+
+// Left Tool Dock Buttons
+document.querySelectorAll(".dock-tool-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".dock-tool-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    const tool = btn.dataset.tool;
+    if (tool === "blade") {
+      proSplit();
+    } else if (tool === "text") {
+      const tBtn = document.querySelector('.props-tab-btn[data-ptab="text"]');
+      if (tBtn) tBtn.click();
+    } else if (tool === "sticker") {
+      const sBtn = document.querySelector('.props-tab-btn[data-ptab="scene"]');
+      if (sBtn) sBtn.click();
+      $("prop-overlay-emoji").focus();
+    } else if (tool === "audio") {
+      const aBtn = document.querySelector('.props-tab-btn[data-ptab="audio"]');
+      if (aBtn) aBtn.click();
+    } else if (tool === "color") {
+      const cBtn = document.querySelector('.props-tab-btn[data-ptab="color"]');
+      if (cBtn) cBtn.click();
+    } else if (tool === "vfx") {
+      const cBtn = document.querySelector('.props-tab-btn[data-ptab="color"]');
+      if (cBtn) cBtn.click();
+      $("prop-effect").focus();
+    }
+  });
+});
+
+// Sound Effects Pad Buttons
+document.querySelectorAll(".sfx-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const sfx = btn.dataset.sfx;
+    playSFX(sfx);
+    btn.style.transform = "scale(0.92)";
+    setTimeout(() => { btn.style.transform = ""; }, 120);
+  });
 });
 
 $("ed-aspect").addEventListener("change", () => {
@@ -1158,7 +1521,8 @@ $("prop-font").addEventListener("input", () => {
   applyProps();
 });
 ["prop-bg", "prop-color", "prop-transition", "prop-position", "prop-style", "prop-filter", "prop-kenburns", "prop-entrance", "prop-exit", "prop-effect", "prop-grade", "prop-easing", "prop-overlay-pos"].forEach((id) => {
-  $(id).addEventListener("change", applyProps);
+  const el = $(id);
+  if (el) el.addEventListener("change", applyProps);
 });
 $("prop-scale").addEventListener("input", () => {
   $("prop-scale-val").textContent = $("prop-scale").value;
@@ -1194,14 +1558,418 @@ $("btn-scene-add").addEventListener("click", addScene);
 $("btn-scene-dup").addEventListener("click", duplicateScene);
 $("btn-scene-del").addEventListener("click", deleteScene);
 
+// Premiere Pro Workspace Tabs
+document.querySelectorAll(".pr-ws-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".pr-ws-tab").forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+    const prTab = tab.dataset.prtab;
+    const inspectBtn = document.querySelector(`.props-tab-btn[data-ptab="${prTab}"]`);
+    if (inspectBtn) {
+      inspectBtn.click();
+    } else if (prTab === "export") {
+      document.querySelectorAll(".props-tab-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".props-tab-panel").forEach((p) => p.classList.remove("active"));
+      const expPanel = $("ptab-panel-export");
+      if (expPanel) expPanel.classList.add("active");
+    } else if (prTab === "effects") {
+      const sceneBtn = document.querySelector('.props-tab-btn[data-ptab="scene"]');
+      if (sceneBtn) sceneBtn.click();
+    }
+    setEdStatus(`Workspace: ${tab.textContent.trim()}`);
+  });
+});
+
+// Mark In & Mark Out Points
+if ($("btn-mark-in")) {
+  $("btn-mark-in").addEventListener("click", () => {
+    ed.markIn = ed.t;
+    setEdStatus(`Mark In [ { ] set @ ${fmtSMPTE(ed.t, ed.fps || 30)}`);
+    showToast(`Mark In set to ${fmtSMPTE(ed.t, ed.fps || 30)}`, "info");
+  });
+}
+if ($("btn-mark-out")) {
+  $("btn-mark-out").addEventListener("click", () => {
+    ed.markOut = ed.t;
+    setEdStatus(`Mark Out [ } ] set @ ${fmtSMPTE(ed.t, ed.fps || 30)}`);
+    showToast(`Mark Out set to ${fmtSMPTE(ed.t, ed.fps || 30)}`, "info");
+  });
+}
+
+// Safe Margins & TikTok Guides
+if ($("btn-pr-safemargins")) {
+  $("btn-pr-safemargins").addEventListener("click", () => {
+    const sm = $("adobe-safe-margins");
+    if (!sm) return;
+    sm.classList.toggle("active");
+    $("btn-pr-safemargins").classList.toggle("active", sm.classList.contains("active"));
+    showToast(sm.classList.contains("active") ? "Safe Margins 90%/80% Visible" : "Safe Margins Hidden", "info");
+  });
+}
+if ($("btn-pr-tiktok-zone")) {
+  $("btn-pr-tiktok-zone").addEventListener("click", () => {
+    const tz = $("tiktok-safe-zone");
+    if (!tz) return;
+    tz.classList.toggle("active");
+    $("btn-pr-tiktok-zone").classList.toggle("active", tz.classList.contains("active"));
+    showToast(tz.classList.contains("active") ? "TikTok Safe Zone Guides Visible" : "TikTok Guides Hidden", "info");
+  });
+}
+if ($("pr-monitor-res")) {
+  $("pr-monitor-res").addEventListener("change", (ev) => {
+    const scale = parseFloat(ev.target.value) || 1.0;
+    ed.resScale = scale;
+    resizeCanvas();
+    drawFrame(ed.t);
+    setEdStatus(`Playback Resolution: ${Math.round(scale * 100)}%`);
+  });
+}
+
+// Shortcuts Modal
+if ($("btn-shortcuts-close")) {
+  $("btn-shortcuts-close").addEventListener("click", () => {
+    const modal = $("shortcuts-modal");
+    if (modal) modal.hidden = true;
+  });
+}
+
+// Pro Hotkeys (Adobe Premiere Pro & After Effects standard)
 document.addEventListener("keydown", (ev) => {
+  const isInput = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+  if (isInput) return;
+
+  if (ev.key.toLowerCase() === "f") {
+    ev.preventDefault();
+    document.body.classList.toggle("cinema-mode");
+    showToast(document.body.classList.contains("cinema-mode") ? "Cinema Mode Enabled (Press F to exit)" : "Cinema Mode Disabled", "info");
+    return;
+  }
+
+  if (ev.key === "?" || (ev.shiftKey && ev.key === "/")) {
+    ev.preventDefault();
+    const modal = $("shortcuts-modal");
+    if (modal) modal.hidden = !modal.hidden;
+    return;
+  }
+
   if ($("editor").hidden) return;
+
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") {
     ev.preventDefault();
     ev.shiftKey ? redo() : undo();
-  }
-  if (ev.code === "Space") {
+  } else if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "s") {
+    ev.preventDefault();
+    if ($("btn-ed-save")) $("btn-ed-save").click();
+  } else if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "m") {
+    ev.preventDefault();
+    const expTab = $("pr-tab-export");
+    if (expTab) expTab.click();
+    else if ($("btn-ed-export")) $("btn-ed-export").click();
+  } else if (ev.code === "Space") {
     ev.preventDefault();
     ed.playing ? pausePlayback() : play();
+  } else if (ev.key.toLowerCase() === "i" && !ev.ctrlKey && !ev.metaKey) {
+    ev.preventDefault();
+    if ($("btn-mark-in")) $("btn-mark-in").click();
+  } else if (ev.key.toLowerCase() === "o" && !ev.ctrlKey && !ev.metaKey) {
+    ev.preventDefault();
+    if ($("btn-mark-out")) $("btn-mark-out").click();
+  } else if (ev.altKey && ev.key.toLowerCase() === "x") {
+    ev.preventDefault();
+    ed.markIn = null;
+    ed.markOut = null;
+    setEdStatus("Cleared In / Out points");
+    showToast("Cleared In / Out markers", "info");
+  } else if (ev.key.toLowerCase() === "c") {
+    ev.preventDefault();
+    proSplit();
+  } else if (ev.key === "Delete" || ev.key === "Backspace") {
+    ev.preventDefault();
+    proDelete();
+  } else if (ev.key.toLowerCase() === "m") {
+    ev.preventDefault();
+    proMarker();
+  } else if (ev.key === "ArrowLeft") {
+    ev.preventDefault();
+    ed.t = Math.max(0, ed.t - 1);
+    drawFrame(ed.t);
+  } else if (ev.key === "ArrowRight") {
+    ev.preventDefault();
+    ed.t = Math.min(totalDuration(), ed.t + 1);
+    drawFrame(ed.t);
+  } else if (ev.key.toLowerCase() === "v") {
+    const btn = document.querySelector('.dock-tool-btn[data-tool="select"]');
+    if (btn) btn.click();
+  } else if (ev.key.toLowerCase() === "a" && !ev.ctrlKey) {
+    const btn = document.querySelector('.dock-tool-btn[data-tool="track-forward"]');
+    if (btn) btn.click();
+  } else if (ev.key.toLowerCase() === "b" && !ev.ctrlKey) {
+    const btn = document.querySelector('.dock-tool-btn[data-tool="ripple"]');
+    if (btn) btn.click();
+  } else if (ev.key.toLowerCase() === "y") {
+    const btn = document.querySelector('.dock-tool-btn[data-tool="slip"]');
+    if (btn) btn.click();
+  } else if (ev.key.toLowerCase() === "p" && !ev.ctrlKey) {
+    const btn = document.querySelector('.dock-tool-btn[data-tool="pen"]');
+    if (btn) btn.click();
+  } else if (ev.key.toLowerCase() === "h") {
+    const btn = document.querySelector('.dock-tool-btn[data-tool="hand"]');
+    if (btn) btn.click();
+  } else if (ev.key.toLowerCase() === "t" && !ev.ctrlKey) {
+    const btn = document.querySelector('.dock-tool-btn[data-tool="text"]');
+    if (btn) btn.click();
   }
+});
+
+
+/* ==========================================================================
+   PRO TIMELINE ENGINE
+   Structural editing, validation, and render planning are owned by the
+   backend (`timeline.py`), so the server is the single source of truth for
+   the timeline. Every action here: (1) pushes local property tweaks to the
+   server, (2) calls one operation, (3) adopts the authoritative result.
+   ========================================================================== */
+
+const pro = {
+  report: null,
+  plan: null,
+  busy: false,
+  timer: null,
+};
+
+function proProjectPayload() {
+  return {
+    scenes: ed.scenes,
+    aspect_ratio: ed.aspect,
+    fps: ed.fps,
+    captions: ed.captions,
+    background_music: ed.music,
+    music_volume: ed.musicVolume,
+    voiceover_volume: ed.voiceoverVolume ?? 1,
+    export_quality: ed.quality,
+    bpm: ed.bpm,
+    markers: ed.markers || [],
+  };
+}
+
+// Adopt a server timeline: it is the authority for structure and settings.
+function proAdopt(videoProject) {
+  if (!videoProject) return;
+  ed.scenes = JSON.parse(JSON.stringify(videoProject.scenes || []));
+  ed.aspect = videoProject.aspect_ratio || ed.aspect;
+  ed.fps = videoProject.fps || ed.fps;
+  ed.captions = videoProject.captions !== false;
+  ed.music = !!videoProject.background_music;
+  ed.musicVolume = videoProject.music_volume || 0;
+  ed.voiceoverVolume = videoProject.voiceover_volume ?? 1;
+  ed.quality = videoProject.export_quality || ed.quality;
+  ed.bpm = videoProject.bpm || ed.bpm;
+  ed.markers = videoProject.markers || [];
+  ed.revision = videoProject.revision || 1;
+  if (ed.selected >= ed.scenes.length) ed.selected = Math.max(0, ed.scenes.length - 1);
+  ed.undoStack = [];
+  ed.redoStack = [];
+  ed.dirty = false;
+
+  $("ed-aspect").value = ed.aspect;
+  $("ed-fps").value = String(ed.fps);
+  $("ed-quality").value = ed.quality;
+  $("prop-bpm").value = ed.bpm;
+  $("prop-bpm-val").textContent = ed.bpm;
+  $("prop-captions").checked = ed.captions;
+  $("prop-music").checked = ed.music;
+
+  resizeCanvas();
+  renderTimeline();
+  selectScene(ed.selected);
+}
+
+function proPath(suffix) {
+  return `/projects/${state.selectedId}${suffix}`;
+}
+
+// One operation: sync local tweaks -> call the engine -> adopt the result.
+async function proOp(label, run_) {
+  if (pro.busy) return;
+  pro.busy = true;
+  setEdStatus(`${label}…`);
+  try {
+    const synced = await api(proPath("/video-project"), {
+      method: "PUT",
+      body: JSON.stringify({ project: proProjectPayload() }),
+    });
+    proAdopt(synced.video_project);
+    const updated = await run_();
+    if (updated && updated.video_project) proAdopt(updated.video_project);
+    await loadProjects();
+    await refreshProReport();
+    setEdStatus(`${label} ✓ · revision ${ed.revision || 1}`);
+  } catch (err) {
+    showError(err.message);
+    setEdStatus(`${label} failed`);
+  } finally {
+    pro.busy = false;
+  }
+}
+
+function proSceneId() {
+  const scene = ed.scenes[ed.selected];
+  if (!scene) throw new Error("Select a scene on the timeline first.");
+  return scene.id;
+}
+
+function proSplit() {
+  return proOp("Split", () =>
+    api(proPath(`/timeline/scenes/${proSceneId()}/split`), {
+      method: "POST",
+      body: JSON.stringify({ at: 0.5 }),
+    })
+  );
+}
+
+function proMerge() {
+  return proOp("Merge", () =>
+    api(proPath(`/timeline/scenes/${proSceneId()}/merge`), { method: "POST" })
+  );
+}
+
+function proDuplicate() {
+  return proOp("Duplicate", () =>
+    api(proPath(`/timeline/scenes/${proSceneId()}/duplicate`), { method: "POST" })
+  );
+}
+
+function proDelete() {
+  return proOp("Delete", () =>
+    api(proPath(`/timeline/scenes/${proSceneId()}`), { method: "DELETE" })
+  );
+}
+
+function proMove(delta) {
+  const last = Math.max(0, ed.scenes.length - 1);
+  const target = Math.max(0, Math.min(last, ed.selected + delta));
+  if (target === ed.selected) return Promise.resolve();
+  return proOp("Move", () =>
+    api(proPath(`/timeline/scenes/${proSceneId()}/move`), {
+      method: "POST",
+      body: JSON.stringify({ to_index: target }),
+    })
+  );
+}
+
+function proMarker() {
+  const at = Math.round((ed.t || 0) * 100) / 100;
+  return proOp("Marker", () =>
+    api(proPath("/timeline/markers"), {
+      method: "POST",
+      body: JSON.stringify({
+        time_seconds: at,
+        label: `cue @ ${fmtClock(at)}`,
+        color: "#22d3ee",
+      }),
+    })
+  );
+}
+
+function proClean() {
+  return proOp("Clean", () => api(proPath("/timeline/normalize"), { method: "POST" }));
+}
+
+function proScoreClass(score) {
+  if (score >= 85) return "sev-good";
+  if (score >= 60) return "sev-warn";
+  return "sev-bad";
+}
+
+function renderProReport(report) {
+  const stats = report.stats || {};
+  const scoreNode = $("pro-score");
+  scoreNode.textContent = `${report.score}/100`;
+  scoreNode.className = `pro-score ${proScoreClass(report.score)}`;
+  const plural = (count, word) => `${count} ${word}${Number(count) === 1 ? "" : "s"}`;
+  const parts = [
+    plural(stats.scene_count, "scene"),
+    `${stats.total_seconds}s`,
+    `${stats.cuts_per_minute} cuts/min`,
+    `${stats.words_per_minute} wpm`,
+    `narration ${stats.narration_seconds}s`,
+  ];
+  if (stats.marker_count) parts.push(plural(stats.marker_count, "marker"));
+  if (report.target_seconds) parts.push(`target ${report.target_seconds}s`);
+  $("pro-stats").textContent = parts.join(" · ");
+
+  const issues = report.issues || [];
+  const list = $("pro-issues");
+  if (!issues.length) {
+    list.innerHTML = `<li class="pro-issue sev-info">No findings — the cut passes every check.</li>`;
+  } else {
+    list.innerHTML = issues
+      .map((issue) => {
+        const index = ed.scenes.findIndex((scene) => scene.id === issue.scene_id);
+        const attr = index >= 0 ? ` data-scene="${index}"` : "";
+        const hint = issue.hint ? `<em>${esc(issue.hint)}</em>` : "";
+        return `<li class="pro-issue sev-${esc(issue.severity)}"${attr}><span>${esc(issue.severity)}</span>${esc(issue.message)}${hint}</li>`;
+      })
+      .join("");
+  }
+  $("pro-detail").hidden = false;
+}
+
+async function refreshProReport() {
+  if (!state.selectedId) return;
+  try {
+    const report = await api(proPath("/timeline/report"));
+    pro.report = report;
+    renderProReport(report);
+  } catch (err) {
+    $("pro-score").textContent = "—";
+    $("pro-score").className = "pro-score";
+    $("pro-stats").textContent = `Timeline report unavailable: ${err.message}`;
+  }
+}
+
+// Debounced so slider drags do not hammer the validator.
+function scheduleProReport() {
+  if (!state.selectedId || $("editor").hidden) return;
+  if (pro.timer) clearTimeout(pro.timer);
+  pro.timer = setTimeout(() => refreshProReport(), 600);
+}
+
+async function proRenderPlan() {
+  try {
+    const plan = await api(proPath("/render-plan"));
+    pro.plan = plan;
+    const layers = (plan.audio || []).filter((l) => l.enabled).map((l) => l.kind);
+    $("pro-plan-out").textContent = [
+      `resolution ${plan.width}×${plan.height} @ ${plan.fps}fps · ${plan.total_seconds}s`,
+      `steps ${plan.steps.length} · caption cues ${plan.subtitles.length} · audio ${layers.join(" + ") || "none"}`,
+      plan.warnings.length ? `warnings: ${plan.warnings.join(" | ")}` : "warnings: none",
+    ].join("\n");
+    $("pro-plan-out").hidden = false;
+    $("pro-detail").hidden = false;
+    setEdStatus("Render plan compiled ✓");
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+$("btn-pro-split").addEventListener("click", proSplit);
+$("btn-pro-merge").addEventListener("click", proMerge);
+$("btn-pro-dup").addEventListener("click", proDuplicate);
+$("btn-pro-del").addEventListener("click", proDelete);
+$("btn-pro-up").addEventListener("click", () => proMove(-1));
+$("btn-pro-down").addEventListener("click", () => proMove(1));
+$("btn-pro-mark").addEventListener("click", proMarker);
+$("btn-pro-clean").addEventListener("click", proClean);
+$("btn-pro-check").addEventListener("click", () => run(refreshProReport));
+$("btn-pro-plan").addEventListener("click", () => run(proRenderPlan));
+$("btn-pro-toggle").addEventListener("click", () => {
+  const detail = $("pro-detail");
+  detail.hidden = !detail.hidden;
+  $("btn-pro-toggle").textContent = detail.hidden ? "▸" : "▾";
+});
+$("pro-issues").addEventListener("click", (ev) => {
+  const item = ev.target.closest("[data-scene]");
+  if (!item) return;
+  selectScene(parseInt(item.dataset.scene, 10));
 });

@@ -94,15 +94,37 @@ An unfenced reply still works if it contains `[Section]` markers.
 
 ## Wire it to a local agent
 
-Any agent that can read a file and write a file is enough:
+Any agent that can read a file, call an MCP tool, or interact via CLI is supported:
 
 ```bash
-# Claude Code
+# 1. Google Antigravity (with Multimodal AI Vision)
+# Antigravity reads brief.md, inspects keyframes/contact sheets visually via view_file, and outputs reply.md:
+agy "Read brief.md, inspect the video frames visually, follow the reply contract, and write reply.md."
+
+# 2. Claude Code
 claude "Read brief.md and follow its 'How to reply' section. Write reply.md." \
   && echo "done"
-# Codex CLI
+
+# 3. Codex CLI
 codex exec "Read brief.md, write reply.md per its reply contract."
+
+# 4. Cursor / Windsurf
+# Use .cursorrules or open brief.md and ask the agent to format its reply in reply.md.
+
+# 5. Gemini CLI / DeepSeek
+gemini "Read brief.md and produce reply.md matching the fenced block contract."
 ```
+
+## Agent Capabilities Matrix
+
+| AI Agent | Integration Method | Skills Location | AI Vision Support | Tool Calling Format |
+| :--- | :--- | :--- | :---: | :--- |
+| **Google Antigravity** | `.agents/`, MCP, `/tools/call` | `.agents/skills/` | 👁️ **Native (Multimodal)** | Direct tool calls + Visual frame QA |
+| **Claude Code** | `.claude/skills/`, `/tools/call` | `.claude/skills/` | 📷 Via image tools | Shell curl / MCP stdio |
+| **Cursor / Windsurf** | `.cursorrules`, MCP server | Workspace Root | 📷 Via editor image preview | MCP server (`mcp_config.json`) |
+| **OpenAI / Codex** | Markdown Bridge / API | `brief.md` / `agent-result` | ❌ Text-first heuristics | REST JSON Schema |
+| **Gemini CLI / DeepSeek** | HTTP `/tools/call` / Markdown | `brief.md` / API | 📷 Model dependent | REST / JSON |
 
 For a fully automatic loop, poll `/projects` for `script_review`, fetch each
 brief, run the agent, and POST the reply back to `/agent-result`.
+

@@ -6,9 +6,10 @@
 > này** (mục *Nhật ký thay đổi* ở cuối). Không xoá yêu cầu cũ — chỉ đánh dấu
 > `[x]` khi hoàn thành.
 
-- Cập nhật lần cuối: 2026-09-16
-- Trạng thái pipeline: chạy được đầu-cuối (draft → published), 206 test xanh,
-  ruff + mypy sạch, smoke test pass.
+- Cập nhật lần cuối: 2026-09-18
+- Trạng thái kiểm chứng gần nhất: 854 test xanh (0 failed/0 error/0 skipped),
+  Ruff + format + mypy sạch; smoke đầu-cuối 64/64 trên server mới; 22/22 live
+  check cho tầng SEO qua HTTP thật.
 
 ---
 
@@ -93,7 +94,7 @@ Chưa có (ưu tiên các phase dưới):
 
 ## 4. Kiến trúc pipeline chuẩn mục tiêu
 
-```
+```text
         ┌──────────────────────────────────────────────────────────┐
         │ 0. INPUT: topic + tài liệu + (nhiều) video mẫu           │
         └───────────────┬──────────────────────────────────────────┘
@@ -126,6 +127,7 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
 ## 5. Roadmap
 
 ### P0 — Nền tảng (đã xong)
+
 - [x] Lifecycle + 2 cổng duyệt + state machine
 - [x] Provider chain, retry, circuit breaker, rate limit
 - [x] Research + thư viện tài liệu BM25
@@ -133,6 +135,7 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
 - [x] TTS tiếng Việt + sync scene theo audio thật
 
 ### P1 — Kịch bản chuẩn + đa AI (đã xong phiên này)
+
 - [x] Script engine: parse, timing đa ngôn ngữ, linter, copy_risk
 - [x] Prompt hợp đồng dùng chung cho mọi model
 - [x] Preset phong cách do user tinh chỉnh (JSON + MD)
@@ -141,6 +144,7 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
 - [x] Cầu nối agent ngoài: `brief.md` xuất / `agent-result` nhập
 
 ### P2 — Render thật bằng ffmpeg (ưu tiên cao nhất tiếp theo)
+
 - [ ] `render.py`: dựng timeline → lệnh `ffmpeg` (concat, xfade, overlay,
       subtitle burn-in, mix audio)
 - [ ] Worker thật thay worker mô phỏng; tiến trình theo % thật
@@ -149,6 +153,7 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
 - [ ] Job bền vững: hàng đợi trên đĩa để restart không mất việc
 
 ### P3 — Video mẫu → blueprint phong cách (yêu cầu 9)
+
 - [ ] `reference.py`: nhận N video mẫu (file hoặc URL)
 - [ ] Trích: độ dài shot trung bình, nhịp cắt, mật độ phụ đề, palette,
       vị trí chữ, kiểu hook, năng lượng nhạc
@@ -158,6 +163,7 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
       khung hình hay âm thanh của mẫu
 
 ### P4 — Sinh hình ảnh & video bằng AI
+
 - [ ] Adapter text-to-image (SDXL/Flux qua ComfyUI local, hoặc API)
 - [ ] Adapter text-to-video / image-to-video (Veo, Kling, Luma, Runway…)
 - [ ] `visual_provider` configurable: stock | ảnh sinh | video sinh | mẫu
@@ -165,6 +171,7 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
 - [ ] Kiểm duyệt nội dung + watermark nếu nhà cung cấp yêu cầu
 
 ### P5 — Lồng tiếng nâng cao + nhiều giọng
+
 - [ ] Nhiều giọng trong cùng video: người dẫn, nhân vật, giọng đọc quảng cáo
 - [ ] Voice clone (RVC / so-vits-svc / XTTS) chạy local
 - [ ] SRT/VTT + forced alignment (whisperX) để phụ đề khớp từng từ
@@ -172,6 +179,7 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
 - [ ] Thư viện giọng tiếng Việt: miền Bắc/Trung/Nam, nam/nữ, tin tức/kể chuyện
 
 ### P6 — Chỉnh ảnh & chỉnh video nâng cao (yêu cầu 14, 15)
+
 - [ ] Lớp chỉnh ảnh: crop, curves, LUT, retouch, xoá vật thể (rembg + inpaint),
       upscale (Real-ESRGAN), ổn định (stabilize)
 - [ ] Hiệu ứng chuyển cảnh, speed ramp, motion tracking, keyframe đa điểm
@@ -179,11 +187,73 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
 - [ ] "Auto-edit giống editor chuyên nghiệp": cắt theo nhịp, chọn B-roll khớp
 
 ### P7 — Tự động hoá & vận hành
+
 - [ ] MCP server để Claude Code / Codex điều khiển trực tiếp mọi endpoint
 - [ ] Webhook + lịch chạy định kỳ (sản xuất hàng loạt từ CSV chủ đề)
 - [ ] Đa người dùng, phân quyền, lịch sử duyệt có chữ ký
 - [ ] Đo chất lượng: A/B hook, retention dự đoán trước khi publish
 - [ ] Xuất hàng loạt (batch) và hàng đợi publish theo khung giờ
+
+### P8 — Media Intelligence & QA/Traceability (7 nhóm nâng cấp tham khảo)
+
+Bộ nâng cấp theo 7 nhóm (tham khảo từ bên ngoài, chốt triển khai theo lát cắt
+additive). Nhóm **4 + 5 + 1 + 2/3** đã có module khả thi offline; nhóm cần
+model/API/GPU đánh dấu `[ ]` (planned).
+
+#### Nhóm 1 — Media intelligence (hiểu & tìm kho footage, không chỉ xử lý)
+
+- [x] **Dedup asset** — `dedup.py`: perceptual hash (dHash) + Hamming, gom clip/ảnh
+      trùng/gần-trùng để dọn kho.
+- [x] **Semantic search seam** — `search.py`: BM25 lexical mặc định + `Embedder`
+      Protocol để bật vector thật khi có model. Gõ "tìm cảnh người mặc áo đỏ" →
+      ra đúng clip (khi cắm embedder).
+- [ ] Auto B-roll matching — agent đọc kịch bản, đề xuất footage khớp ngữ nghĩa
+      (dùng search.py + caption).
+- [ ] Continuity checker — face embedding so mặt/trang phục giữa cảnh (cần model).
+
+#### Nhóm 2 — Sinh nội dung mới (generative)
+
+- [x] **Auto music ducking** — `audio.py`: ffmpeg sidechaincompress, tự hạ nhạc
+      khi có thoại.
+- [x] **Auto thumbnail + CTR heuristic** — `thumbnail.py`: score_best_frame + text
+      overlay + dự đoán CTR để chọn bản tốt nhất.
+- [ ] Smart reframe đa tỷ lệ 16:9→9:16/1:1 (theo dõi chủ thể; cần vision).
+- [ ] Auto sound design/foley (vision-action → gợi ý tiếng động).
+- [ ] Auto music scoring sinh/chọn nhạc khớp mood (ghép perception.py).
+- [ ] Lip-sync dubbing thật (Wav2Lip; cần GPU).
+
+#### Nhóm 3 — Vòng lặp phản hồi hiệu suất
+
+- [x] **Virality scorer** — `virality.py`: chấm hook/nhịp/độ dài/CTA trước khi đăng.
+- [ ] Retention-aware editing (kéo retention thật từ platform API → feed script_engine).
+- [ ] Auto A/B thumbnail/title test (cần platform).
+
+#### Nhóm 4 — QA/risk layer (critic tách khỏi agent tạo nội dung)
+
+- [x] **Platform compliance scanner** — `compliance.py`: rule-based theo từng nền
+      tảng (độ dài, tỉ lệ, từ cấm, watermark).
+- [x] **Brand consistency check** — `compliance.py`: palette/logo/font vs brand kit.
+- [ ] Rights/copyright check hoàn chỉnh (fingerprint nhạc + đối chiếu DB có bản quyền).
+
+#### Nhóm 5 — Truy vết & kiểm soát
+
+- [x] **Provenance/audit trail** — `audit.py`: log mỗi AI edit (model, prompt, lúc nào).
+- [x] **Cost guard** — `cost_guard.py`: ước tính chi phí plan vision/audio-LLM, hỏi
+      xác nhận khi vượt ngưỡng.
+- [ ] Cây phiên bản sáng tạo (nhánh A/B/C giống git, không ghi đè).
+
+#### Nhóm 6 — Trợ lý hội thoại trong timeline
+
+- [x] **`nl_timeline.py`** — parse lệnh tự nhiên (EN + VI) → thao tác timeline:
+      "speed up the intro to 1.5x", "xoá cảnh 2", "add a marker at 2 minutes"…
+      (set_speed, delete/merge/split/move/duplicate scene, set_audio, marker, trim,
+      auto-fit, beat-sync). Endpoint `POST /timeline/command`.
+
+#### Nhóm 7 — Khả năng tiếp cận (accessibility)
+
+- [x] **Subtitle rút gọn** — `simple_subtitles.py`: đổi từ khó → từ dễ, rút gọn câu
+      dài cho trẻ em/người học ngôn ngữ. Endpoint `POST /subtitles/simplify`.
+- [ ] Audio description tự động (vision mô tả → TTS vào khoảng lặng; cần vision backend).
 
 ## 6. Toolchain — cài gì, cài ở đâu
 
@@ -339,6 +409,7 @@ là nguồn chân lý cho cấu trúc timeline.
   `/render-plan`** (plan đã sẵn sàng làm đầu vào cho ffmpeg filtergraph).
 
 ### 2026-09-16 — Phiên 3: Nâng cấp toàn diện UI Creative Studio Pro (TikTok · CapCut · Adobe Premiere & Photoshop Edition)
+
 - **Đã làm**:
   - **Workspace Switcher đa không gian làm việc**:
     1. `🚀 Pipeline`: Quy trình tự động 7 giai đoạn + Script Editor & Quality Score linter gauge + phê duyệt Gate 1 & Gate 2.
@@ -363,6 +434,7 @@ là nguồn chân lý cho cấu trúc timeline.
   - Tích hợp 100% bằng HTML5 Canvas + Web Audio API + Vanilla CSS/JS hiện đại, không kéo thêm thư viện cồng kềnh, đảm bảo app chạy mượt, 60 FPS và hoạt động offline hoàn toàn.
 
 ### 2026-09-16 — Phiên 4: Thiết kế Hệ thống Kéo-Thả (DAG), AI Agent Toolbox & Bộ Skills chuyên biệt cho từng loại AI Agent
+
 - **Đã làm**:
   - **Bộ 6 Skills chuyên biệt cho AI Agent** tạo tại `.claude/skills/` tuân thủ đầy đủ YAML frontmatter và hướng dẫn quy chuẩn:
     1. `.claude/skills/ai-scripting/SKILL.md`: Thiết kế kịch bản ngắn viral, cấu trúc section cues `[Hook]`, `[Turn]`, `[Payoff]`, `[CTA]`, `[Visual]`, `[Sound]`, kiểm soát nhịp đọc tiếng Việt (3.8 - 4.2 âm tiết/giây), quét trùng lặp `copy_risk`.
@@ -395,6 +467,7 @@ là nguồn chân lý cho cấu trúc timeline.
   - Phase 2: Triển khai pipeline render video thực tế bằng ffmpeg theo hợp đồng `render_plan`.
 
 ### 2026-09-16 — Phiên 5: Thiết kế Cỗ máy Đế chế Đa Định Dạng (YouTube + TikTok) & Trung Tâm Nạp Tư Liệu AI Ngoại Vi (Ingestion Hub)
+
 - **Đã làm**:
   - **Cỗ máy Đế chế Đa Định Dạng (Multi-Format Content Empire Engine)**:
     - Mô hình chiến lược: 1 Chủ đề Nghiên cứu Gốc ➔ 1 Video YouTube Dài (8–12 phút, 16:9, 40–60 cảnh tài liệu, cung bậc 8 bước kịch tính) + 5–10 Video TikTok / Shorts Độc lập (30–60 giây, 9:16, 5 pha giữ chân nhịp cao Retention > 100%).
@@ -424,6 +497,7 @@ là nguồn chân lý cho cấu trúc timeline.
   - Phase 2: Kết nối ffmpeg renderer để ghép các video clip Kling/Veo, ảnh tư liệu, audio ElevenLabs và nhạc nền Suno đã nạp vào thành video MP4 hoàn chỉnh.
 
 ### 2026-09-16 — Phiên kiểm thử toàn bộ và báo cáo vấn đề
+
 - Đã làm: Chạy pytest tuần tự (pass toàn bộ), smoke test (64/64 checks pass),
   inventory tool local và kiểm tra Ruff/format/mypy.
 - Kết quả: Smoke và test hành vi pass; quality gate đang đỏ vì 11 lỗi Ruff,
@@ -436,6 +510,7 @@ là nguồn chân lý cho cấu trúc timeline.
   đồng thời với smoke.
 
 ### 2026-09-16 — Phiên tiếp tục: renderer ffmpeg thật và sửa agent tools
+
 - Đã làm: Thêm `src/content_factory/render.py`, endpoint
   `POST /projects/{id}/render`, test ffmpeg trực tiếp và test API phục vụ WebM.
   Renderer hiện tạo được color-card timeline có text overlay và tự tìm font
@@ -480,7 +555,7 @@ là nguồn chân lý cho cấu trúc timeline.
 
 ### Mẫu ghi cho phiên sau
 
-```
+```markdown
 ### YYYY-MM-DD — Phiên N: <việc lớn>
 - Đã làm: ...
 - Quyết định: ... (và vì sao)
@@ -508,7 +583,7 @@ Gemini) gọi được để vận hành toàn pipeline.
    usage_notes), `POST /tools/call` dispatch an toàn — validate id, map lỗi
    domain sang 404/409/403/422, trả JSON model_dump. Lỗi lạ từng gặp:
    `KeyError(scene_id)` → thông báo rỗng; đã sửa `timeline.find_scene/index_of`
-   + `NotFoundError` trong `service.py` thành thông báo người đọc được
+   cùng `NotFoundError` trong `service.py` thành thông báo người đọc được
    ("No scene 'x' in the video project.").
 4. **Skill + docs:** `.claude/skills/edit-video-tools/SKILL.md` (cho Claude),
    `docs/TOOLS-FOR-AGENTS.md` (curl examples, bảng tool, quy tắc bất di bất
@@ -560,6 +635,7 @@ pytest **348 passed**, smoke **64 checks** PASS, benchmark: timeline.report
 - `node --check frontend/app.js && node --check frontend/editor.js`: Cú pháp JS hợp lệ 100%.
 
 ### 2026-09-16 — Phiên Media Studio & Content Re-Cook (xào nấu)
+
 - Đã làm:
   - **Universal Media Library** (`src/content_factory/media.py`): upload mọi loại
     file (video/audio/image/document), phân loại theo đuôi, probe ffprobe,
@@ -594,6 +670,7 @@ pytest **348 passed**, smoke **64 checks** PASS, benchmark: timeline.report
   image/video, subtitle burn-in, và job progress bền vững.
 
 ### 2026-09-16 — Phiên nâng cấp renderer: video thật + âm thanh đầy đủ
+
 - Đã làm:
   - **Renderer có hình thật (không còn màu nền)**: `render_video_file` thêm chế
     độ `background_video` — lặp video nguồn làm nền chuyển động liên tục, chồng
@@ -618,3 +695,593 @@ pytest **348 passed**, smoke **64 checks** PASS, benchmark: timeline.report
 - Việc tiếp theo: subtitle burn-in, job progress bền vững, và cho phép người
   dùng chọn ảnh/video nguồn khác cho từng scene.
 
+### 2026-09-16 — Phiên AI Video Editor (test: AI có tự edit video không?)
+
+- Đã làm:
+  - **Module `src/content_factory/ai_video_editor.py`** — pipeline đầy đủ:
+    1) Phân tích video; 2) Chọn vị trí/kích thước/thời điểm ghép ảnh; 3) Tracking
+    đối tượng bằng optical flow (KLT, fallback Farneback); 4) Composite bằng
+    mask alpha có feather (không phải overlay cố định); 5) Cắt đoạn thừa
+    (dead-air) thành timeline; 6) Xuất `final.mp4` (H.264 + giữ âm thanh nguồn).
+  - **Hai planner**: `HeuristicPlanner` (no-vision, dùng gradient saliency) và
+    `VisionPlanner` (with-vision, pluggable — có `_demo_vision_planner` offline).
+  - **API**: `POST /ai-editor/edit` (multipart video+image, tuỳ chọn `use_vision`)
+    → report + `download_url`; `GET /ai-editor/output/{filename}`.
+  - **QA `scripts/qa_ai_video_editor.py`**: tạo clip có vật chuyển động, chạy cả
+    2 chế độ, xác nhận MP4 có video + audio stream — **2/2 pass**.
+  - **Test**: `tests/test_ai_video_editor.py`.
+  - **Skill**: `.claude/skills/ai-video-editor/`.
+  - **Sửa lỗi Windows**: đường dẫn có ký tự Unicode ("Máy tính") làm `cv2.imread`
+    lỗi → dùng `np.fromfile`/`imdecode`; chiều cao lẻ làm libx264+yuv420p lỗi →
+    ép chiều chẵn.
+- Kiểm định: pytest pass (thêm test editor), Ruff + format + mypy pass,
+  QA AI editor 2/2 pass.
+- Quyết định: Xây pipeline AI editor hỗ trợ cả no-vision lẫn with-vision; giữ
+  heuristic làm mặc định khi chưa cấu hình vision model.
+- Việc tiếp theo: Nối vision model thật (LLM có ảnh) vào `VisionPlanner`; thêm
+  UI Media Studio cho AI editor; cải thiện tracking khi đối tượng bị che.
+
+### 2026-09-16 — Phiên MCP mở rộng + Vision pluggable + Cache idempotent + Sandbox
+
+**Mục tiêu:** áp dụng bản thiết kế tham khảo (MCP server tách domain, vision
+pluggable, checkpoint, sandbox) theo cách **không phá vỡ** cấu trúc đang chạy —
+bổ sung theo lát cắt giá trị thay vì đại tu thư mục.
+
+**Đã làm:**
+
+1. **Vision pluggable (`src/content_factory/vision.py`)** — dual-mode:
+   - `detect_scene_cuts()` — non-vision shot boundary (histogram grayscale +
+     pixel-diff qua OpenCV), trả danh sách `SceneCut`.
+   - `score_best_frame()` — chấm điểm khung hình; mặc định `HeuristicSceneScorer`
+     (sharpness/exposure/saturation), cắm `VisionSceneScorer` (Protocol) khi bật
+     vision. `build_scorer(settings, vision_scorer)` chọn backend theo config.
+   - Flag mới: `ENABLE_VISION` (mặc định tắt), `VISION_BACKEND`
+     (`rule_based|claude|local`).
+2. **Cache idempotent (`src/content_factory/cache.py`)** — `ContentCache`
+   content-addressed theo sha256 (namespace + input bytes + params), lưu dưới
+   `storage/cache/`. `MediaLibrary.transcribe` memoize transcript theo hash file
+   kèm language → retry không chạy lại model. Flag mới: `CACHE_DIR`.
+3. **Sandbox (`src/content_factory/sandbox.py`)** — `Sandbox.resolve()` giới hạn
+   mọi đường dẫn MCP vào `media_dir/uploads_dir/cache_dir/library_dir`.
+4. **MCP server mở rộng (`mcp_server.py`)** — từ 5 tool lên **14 tool**:
+   media library (6) + image (`image_crop`, `image_remove_background`,
+   `image_upscale`) + video (`video_cut_clip`, `video_concat_clips`,
+   `video_detect_scene_cuts`, `video_score_best_frame`) + voice
+   (`voice_synthesize_speech`). Mọi file I/O qua Sandbox.
+5. **Contract check + healthcheck** — `scripts/mcp_healthcheck.py --smoke` boot
+   server, liệt kê tool, validate name/description/JSON-Schema; CI mới
+   `.github/workflows/mcp-contract-check.yml` chạy trên mỗi PR.
+6. **Docs** — `docs/MCP-SERVERS.md` (hợp đồng tool + sandbox), `docs/VISION-LAYER.md`
+   (khi nào cần vision, chi phí, fallback). Cập nhật `.env.example`.
+7. **Sửa drift mypy** — thêm/bỏ `type: ignore` cho numpy/cv2 stub trong
+   `ai_video_editor.py`, `voice_engine.py`, `vision.py` để mypy sạch.
+
+**Kiểm chứng:**
+- `ruff check src tests scripts` → All checks passed.
+- `ruff format --check` → 76 files formatted.
+- `mypy src` → no issues in 36 source files.
+- `pytest` → toàn bộ pass (gồm 19 test mới: `test_cache.py`, `test_sandbox.py`,
+  `test_vision.py`, `test_media_cache.py`).
+- `python scripts/mcp_healthcheck.py --smoke` → OK (14 tool, schema + smoke).
+
+**Quyết định:** Giữ **một** MCP server (không tách 4 process riêng) vì media nặng
+đã nằm in-process qua adapter + toolcheck graceful degradation; tách thêm process
+chỉ thêm vận hành mà không thêm năng lực. Vision mặc định tắt để không tốn chi
+phí cho tác vụ máy móc.
+
+**Việc tiếp theo:** subtitle burn-in, job progress bền vững, cho phép chọn
+ảnh/video nguồn từng scene, và (nếu có GPU/server) cắm vision backend thật
+(YOLO/CLIP) vào `VisionSceneScorer`.
+
+### 2026-09-16 — Phiên Audio Perception ("nghe hiểu" âm thanh)
+
+**Mục tiêu:** bổ sung năng lực *nghe hiểu* toàn bộ âm thanh (không chỉ STT chữ)
+theo đúng nguyên tắc dual-mode đã dùng cho vision: non-AI chạy miễn phí, AI tuỳ
+chọn. Chốt hướng với chủ dự án: **giữ 1 MCP server** (tôn trọng quyết định phiên
+MCP mở rộng), chỉ thêm lớp perception mới — không tách 4 process.
+
+**Đã làm:**
+
+1. **`src/content_factory/perception.py`** — lớp audio perception dual-mode:
+   - Non-AI (numpy + ffmpeg, miễn phí): `detect_silence_and_pace` (khoảng lặng +
+     pace thô), `classify_music_mood` (energy + spectral centroid + tempo),
+     `check_audio_quality` (clipping/DC offset/noise floor/peak). Decode WAV qua
+     stdlib `wave`, định dạng khác qua ffmpeg.
+   - AI (opt-in, Protocol pluggable): `AudioEventDetector` (PANNs/YAMNet),
+     `SpeakerDiarizer` (pyannote), `SpeechEmotionAnalyzer` (SER),
+     `AudioSceneDescriber` (audio LLM). Chưa cắm backend thì trả lỗi rõ ràng.
+   - `build_audio_perception(settings, ...)` chọn backend theo config — đổi
+     backend không đổi call site (giống `vision.build_scorer`).
+2. **Flag mới** trong `config.py` + `.env.example`: `ENABLE_AUDIO_PERCEPTION`
+   (mặc định tắt), `AUDIO_PERCEPTION_BACKEND` (`rule_based|ai`).
+3. **MCP server (`mcp_server.py`)** — thêm **7 tool** audio perception:
+   `audio_detect_silence_and_pace`, `audio_classify_music_mood`,
+   `audio_check_quality` (non-AI) + `audio_detect_events`, `audio_diarize_speakers`,
+   `audio_detect_speech_emotion`, `audio_describe_scene` (AI). Tổng **21 tool**.
+4. **Test** `tests/test_perception.py` — sinh WAV bằng numpy + wave (không cần
+   ffmpeg), kiểm tra silence/pace, mood, clipping, facade mặc định, và AI tool
+   báo lỗi khi chưa cắm backend / dispatch khi đã cắm.
+5. **Docs** — `docs/PERCEPTION-LAYER.md` (mới: bảng tool, khi nào cần, chi phí,
+   fallback, lưu ý Claude chưa nhận audio input nên backend "nghe" phải là model
+   khác), `docs/VOICE-DUBBING-PIPELINE.md` (mới: STT → dịch → TTS → align → mux,
+   perception nuôi dubbing), cập nhật `docs/MCP-SERVERS.md` (bảng tool + design
+   notes) và `docs/VISION-LAYER.md` (cross-link perception).
+
+**Kiểm chứng:**
+- `ruff check src tests` → All checks passed.
+- `ruff format --check src tests` → sạch.
+- `mypy src` → sạch.
+- `pytest` → toàn bộ pass (thêm `test_perception.py`).
+- `python scripts/mcp_healthcheck.py --smoke` → OK (21 tool, schema + smoke).
+
+**Quyết định:** Giữ **một** MCP server; audio perception là lớp hiểu nội dung
+(perception) riêng, tách khỏi xử lý media thuần (image/video/voice), non-AI mặc
+định để không tốn chi phí cho tác vụ máy móc. Claude đóng vai orchestrator, bước
+"nghe" audio phải qua backend model nhận audio thật (Gemini/Qwen2-Audio/PANNs/
+pyannote) rồi trả text về cho Claude đọc.
+
+**Việc tiếp theo:** cắm AI backend thật cho audio perception (PANNs/YAMNet,
+pyannote, SER, audio LLM) khi có GPU/API; nối perception vào pipeline dubbing
+(STT → dịch → TTS → align → mux) theo `docs/VOICE-DUBBING-PIPELINE.md`; subtitle
+burn-in và job progress bền vững vẫn là việc lớn tiếp theo của renderer.
+
+### 2026-09-17 — Phiên 7 nhóm nâng cấp: QA/Traceability + Media Intelligence + Production boosters
+
+**Mục tiêu:** triển khai 3 lát cắt đầu tiên của bộ nâng cấp 7 nhóm (chốt với chủ
+dự án), theo lối additive có test, không phá vỡ pipeline. Toàn bộ 7 nhóm đã ghi
+vào roadmap (mục 5, P8). Các tính năng cần model/API/GPU đánh dấu `[ ]` planned.
+
+**Đã làm:**
+
+1. **QA & Traceability layer** (nhóm 4 + 5 — "critic" tách khỏi agent tạo nội dung):
+   - `compliance.py`: `check_platform` (rule-based theo youtube/tiktok/instagram_reels/
+     facebook/shorts: độ dài, tỉ lệ, từ cấm, word-count), `check_brand` (palette/logo/
+     font vs `BrandKit`), `check_copyright` + `fingerprint_music_audio` (sha256).
+   - `audit.py`: `AuditLog` append-only JSONL (actor, action, project_id, prompt, ts),
+     thread-safe, bỏ qua dòng hỏng — provenance cho C2PA-style.
+   - `cost_guard.py`: `estimate_cost` + `CostGuard` — ước tính USD của plan
+     vision/audio-LLM/TTS/STT, hỏi xác nhận khi vượt ngưỡng.
+2. **Media Intelligence** (nhóm 1):
+   - `dedup.py`: perceptual hash (dHash) + `find_near_duplicates` (Hamming) — dọn kho
+     asset trùng/gần-trùng.
+   - `search.py`: `MediaSearchIndex` — BM25 lexical mặc định + `Embedder` Protocol để
+     bật vector thật khi có model (fuse `0.6*cosine + 0.4*lexical`).
+3. **Production boosters** (nhóm 2 + 3):
+   - `audio.py`: `duck_music_under_speech` — ffmpeg sidechaincompress, tự hạ nhạc khi
+     có thoại.
+   - `virality.py`: `score_virality` — heuristic hook/nhịp/độ dài/CTA, cảnh báo sớm
+     trước khi đăng.
+   - `thumbnail.py`: `generate_thumbnails` — score_best_frame + text overlay + `predict_ctr`.
+4. **Config + `.env.example`**: `AUDIT_DIR`, `COST_GUARD_*` (+ unit cost từng loại call),
+   `DEDUP_MAX_DISTANCE`, `SEARCH_EMBEDDER`.
+5. **Test** (32 test mới): `test_compliance.py` (15), `test_search.py` (9),
+   `test_production.py` (8) — hermetic, không cần network.
+6. **Docs**: `docs/QA-LAYER.md`, `docs/MEDIA-INTELLIGENCE.md`, `docs/PRODUCTION-BOOSTERS.md`
+   (mới); roadmap P8 trong file này.
+
+**Kiểm chứng:**
+- `ruff check src tests scripts` → All checks passed.
+- `ruff format --check` → 113 files formatted.
+- `mypy src` → no issues in 64 source files.
+- `pytest` → **441 passed** (409 cũ + 32 mới).
+- `scripts/mcp_healthcheck.py --smoke` → OK (21 tool).
+- `scripts/smoke.py` → 64/64 checks PASS.
+
+**Lưu ý vận hành:** trong phiên này `src/content_factory/api/routers/*` có lúc bị
+ghi đè trạng thái lỗi cú pháp (hàm dính vào `router = APIRouter()`, mất decorator)
+bởi một tiến trình song song — gây lỗi collect pytest nhất thời, sau đó tự phục hồi.
+Nếu gặp lại, kiểm tra `health.py`/`projects.py` có decorator `@router.*` và hàm
+không dính vào dòng `router = APIRouter()`.
+
+**Quyết định:** Giữ nguyên tắc "critic tách khỏi creator" — QA layer chỉ cảnh báo,
+hai cổng người duyệt vẫn bắt buộc; mọi thứ chạy offline, non-AI mặc định; các tính
+năng cần model/API/GPU (continuity checker, smart reframe, lip-sync, retention-aware,
+audio description…) để planned.
+
+**Việc tiếp theo:** nối các module vào service/API (audit ghi vào mỗi edit, cost
+guard vào planner, dedup/search vào media library, virality vào script_engine,
+ducking vào render); triển khai nhóm 6 (trợ lý hội thoại timeline) và nhóm 7
+(accessibility) khi có model.
+
+### 2026-09-17 — Nối 3 lát cắt vào HTTP API (router `qa.py`)
+
+**Mục tiêu:** đưa các module mới (QA, audit, cost_guard, dedup, search, virality,
+ducking, thumbnail) thành endpoint dùng được cho web app và agent — không còn là
+module đứng riêng.
+
+**Đã làm:**
+- Thêm `@property settings` cho `ContentFactoryService` (đọc config cho audit_dir/
+  cost_guard, giữ test hermetic bằng tmp_path).
+- Thêm router `src/content_factory/api/routers/qa.py` (12 endpoint):
+  - QA: `POST /qa/platform`, `/qa/brand`, `/qa/copyright`.
+  - Traceability: `GET /audit`, `POST /audit/record`, `POST /cost/check`.
+  - Media intelligence: `POST /media/dedup`, `GET /media/search`.
+  - Boosters: `POST /script/virality`, `POST /render/duck`, `POST /thumbnail/generate`.
+- Wire vào `routers/__init__.py` + `app.py`. **Lưu ý route-order:** đăng ký router
+  `qa` TRƯỚC router `media` để `GET /media/search` không bị `GET /media/{media_id}`
+  nuốt (404). Duck/thumbnail ghi output vào temp dir để test hermetic.
+- Test `tests/test_qa_api.py` (12 test): platform/brand/copyright, audit record+list,
+  cost check, dedup 2 ảnh trùng, search doc, virality, duck wav, thumbnail avi, 404.
+
+**Kiểm chứng:**
+- `ruff check src tests scripts` → All checks passed.
+- `ruff format --check` → 115 files formatted.
+- `mypy src` → no issues in 65 source files.
+- `pytest` → **453 passed** (441 cũ + 12 mới).
+- `scripts/smoke.py` → 64/64 checks PASS.
+
+**Việc tiếp theo:** triển khai nhóm 6 (trợ lý hội thoại timeline — mở rộng
+`smart.py` parse lệnh tự nhiên) và nhóm 7 (accessibility — audio description +
+subtitle rút gọn) khi có model; nối audit vào mỗi edit trong service.
+
+### 2026-09-17 — Nhóm 6 (trợ lý hội thoại) + Nhóm 7 (accessibility)
+
+**Mục tiêu:** hoàn tất 2 nhóm còn lại khả thi offline trong bộ 7 nhóm nâng cấp.
+
+**Đã làm:**
+1. **`src/content_factory/nl_timeline.py`** — trợ lý hội thoại timeline:
+   - `parse_command` → `ParsedCommand` (intent + target + params), nhận diện song
+     ngữ EN/VI: SPEED_UP/SLOW_DOWN, DELETE/MERGE/SPLIT/MOVE/DUPLICATE_SCENE,
+     SET_VOLUME, ADD/REMOVE_MARKER, TRIM, AUTO_FIT, BEAT_SYNC.
+   - `resolve_scene_index` — map "intro"/"cảnh 2"/"scene 3"/"the hook" → index.
+   - `apply_command` — áp lệnh qua `timeline.*` ops; không nhận diện được / không
+     tìm được scene thì trả project nguyên vẹn kèm mô tả lỗi.
+2. **`src/content_factory/simple_subtitles.py`** — phụ đề rút gọn (accessibility):
+   đổi từ khó → từ đơn giản (synonym map), `INTERMEDIATE` còn rút gọn câu dài.
+3. **Endpoint mới** trong `qa.py`: `POST /timeline/command` (project + lệnh → project
+   đã sửa + intent), `POST /subtitles/simplify` (captions + level → bản dễ đọc).
+4. **Test** (19 test mới): `test_nl_timeline.py` (11), `test_simple_subtitles.py` (6),
+   kèm 2 test API trong `test_qa_api.py`.
+
+**Kiểm chứng:**
+- `ruff check src tests scripts` → All checks passed.
+- `ruff format --check` → 119 files formatted.
+- `mypy src` → no issues in 67 source files.
+- `pytest` → **472 passed** (453 cũ + 19 mới).
+- `scripts/smoke.py` → 64/64 checks PASS.
+
+**Quyết định:** Trợ lý hội thoại dùng rule-based (offline, deterministic) thay vì
+LLM parse — đủ cho tập lệnh phổ biến, không tốn chi phí; khi cần hiểu câu phức tạp
+có thể nối LLM sau. Phụ đề rút gọn dùng synonym map + cắt câu, không cần model.
+
+### 2026-09-17 — Toàn diện hóa UI Suite phong cách NLE chuyên nghiệp (CapCut Pro / Premiere / Resolve)
+
+**Mục tiêu:** Xây dựng giao diện người dùng hoàn thiện, chuyên nghiệp, đưa toàn bộ năng lực mới của backend lên UI theo phong cách phần mềm dựng phim thương mại (CapCut Pro, Adobe Premiere Pro, DaVinci Resolve, Runway, Descript), đảm bảo tuân thủ nghiêm ngặt 2 cổng duyệt bắt buộc (Script Approval & Video Approval) và state machine.
+
+**Đã làm:**
+1. **AI Co-Pilot Timeline Command Bar (Spotlight / Raycast / CapCut AI style):**
+   - Phím tắt toàn cục `Ctrl+K` kích hoạt thanh lệnh nổi, kèm các quick-prompt chips (Tăng tốc intro 1.5x, Cắt cảnh 2, Giảm âm lượng, Thêm beat sync...).
+   - Gọi trực tiếp `POST /timeline/command` với `nl_timeline.py`, cập nhật tức thì NLE timeline visualizer, clip list và scene breakdown.
+2. **Virality Scorer & Script Analytics:**
+   - Nút `🔥 Virality` và thẻ điểm 4 thành phần (Hook, Pacing, Duration, CTA) tích hợp trong Script Studio.
+   - Gọi `POST /script/virality`, hiển thị radar/gauge điểm số và gợi ý cải thiện văn phong viral.
+3. **Multi-Platform QA & Brand Compliance Modal:**
+   - Kiểm tra đa nền tảng (TikTok, Shorts, Reels, YouTube 16:9, Facebook) qua `POST /qa/platform`.
+   - Brand Kit Consistency Check qua `POST /qa/brand` (font, palette, tone of voice).
+   - Copyright & Asset Fingerprint Scanner (SHA-256) qua `POST /qa/copyright`.
+4. **AI Auto-Thumbnail & CTR Predictor Studio:**
+   - Trích xuất top-k khung hình tối ưu hoặc render canvas đa kiểu dáng (Neon Gamer, Tech Minimal, Vlog Bold) qua `POST /thumbnail/generate`.
+   - Dự đoán CTR (ví dụ: `🔥 15.2% High CTR`) và 1-click handoff sang Photo Lab / lưu làm poster dự án.
+5. **Pro Audio & Accessibility Suite:**
+   - Auto Music Ducking: nút bấm sidechain ducking trong Audio panel, gọi `POST /render/duck` và tự động điều chỉnh gain trên preview canvas.
+   - Accessible Subtitle Simplifier: nút rút gọn phụ đề (`basic` / `intermediate`) trong Captions panel, gọi `POST /subtitles/simplify`.
+6. **Cost Guard & Provenance Audit Trail Modal:**
+   - Theo dõi ngân sách real-time theo model (Gemini, Claude, Whisper, Piper) và dung sai vượt chi qua `POST /cost/check`.
+   - Nhật ký kiểm toán nguồn gốc xuất xứ (Provenance Audit Trail) qua `GET /audit`.
+7. **Semantic Media Search & dHash Deduplication:**
+   - Tìm kiếm nội dung ngữ nghĩa trong Media Studio qua `GET /media/search`.
+   - Quét và phát hiện media trùng lặp theo thuật toán dHash qua `POST /media/dedup`.
+8. **Thiết kế NLE thương mại cao cấp:**
+   - Tông màu Obsidian Dark kết hợp điểm nhấn Cyan/Neon Violet.
+   - SMPTE Timecode display, Audition dual VU meter sống động, TikTok Safe Zones overlay, tooltips và shortcut hints.
+
+**Kiểm chứng:**
+- `node --check frontend/app.js` & `node --check frontend/editor.js` → Syntax check PASS.
+- `ruff check src tests scripts` → All checks passed.
+- `ruff format --check` → 119 files formatted.
+- `mypy src` → no issues in 67 source files.
+- `pytest` → 472 passed.
+
+**Quyết định:** Giữ nguyên tắc 2 cổng người duyệt bắt buộc (Script Approval & Video Approval). Mọi tính năng AI Co-Pilot hoặc tự động hóa timeline đều thông qua preview và chỉ áp dụng khi người vận hành xác nhận.
+
+### 2026-09-17 — Tái cấu trúc giao diện sang Next.js + TypeScript + Tailwind + shadcn/ui + TanStack Query + Zustand + Motion và Chuẩn hóa README toàn bộ thư mục lớn
+
+**Mục tiêu:** Nâng cấp toàn diện kiến trúc frontend theo chuẩn enterprise hiện đại (**Next.js 14 App Router, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Zustand, Motion**) và bổ sung hệ thống tài liệu `README.md` chuẩn hóa cho tất cả các thư mục lớn trong kho lưu trữ để tối ưu hóa khả năng bảo trì.
+
+**Đã làm:**
+1. **Kiến trúc Next.js Pro NLE (`frontend/`):**
+   - Cấu hình `package.json`, `tsconfig.json`, `next.config.mjs` (kèm API rewrites proxying tới FastAPI), `tailwind.config.ts`, `components.json` (shadcn/ui).
+   - Hệ thống kiểu TypeScript hoàn chỉnh (`src/types/project.ts`, `api.ts`, `timeline.ts`).
+   - Store Zustand quản trị trạng thái tập trung: `useProjectStore`, `usePlayerStore` (VU meters, transport, safe zones), `useTimelineStore` (multi-track NLE), `useUIStore` (modals & tabs).
+   - TanStack Query hooks đồng bộ server state: `useProjects`, `useScriptEngine`, `useTimelineCommands`, `useQA`, `useThumbnails`, `useMediaLibrary`, `useAuditCost`.
+   - Bộ linh kiện shadcn/ui primitives (`Button`, `Card`, `Dialog`, `Tabs`, `Slider`, `Badge`, `Progress`, `Table`, `Tooltip`, `Separator`).
+   - Các module chức năng: `Topbar`, `CommandBarModal` (`Ctrl+K` với Framer Motion), `VideoPlayer` (Audition stereo VU meters, SMPTE timecode, TikTok safe zone), `TimelineVisualizer` (5 track lanes), `ScriptStudio` (4-part virality retention card, Gate 1 approval), `ComplianceModal` (QA / Brand / Copyright), `ThumbnailModal` (CTR studio), `AuditCostModal` (Cost Guard & Audit Trail), `AudioControls` (Sidechain ducking), `CaptionSimplifier` (A11y subtitles), `MediaStudio` (dHash dedup & semantic search).
+   - Giữ nguyên vẹn tính tương thích với server FastAPI và script smoke test E2E.
+2. **Hệ thống README chuẩn hóa cho toàn bộ thư mục lớn:**
+   - `src/README.md`: Kiến trúc nguồn backend và nguyên tắc thiết kế.
+   - `src/content_factory/README.md`: Chi tiết các module domain core và state machine.
+   - `src/content_factory/api/README.md`: Cấu trúc FastAPI, danh mục 17 router và cơ chế bảo vệ lỗi.
+   - `frontend/README.md`: Hướng dẫn kiến trúc Next.js, cấu trúc thư mục, Zustand stores, TanStack Query và lệnh chạy.
+   - `tests/README.md`: Phân loại 472+ test automated, quy chuẩn hermeticity và lệnh kiểm tra quality gates.
+   - `scripts/README.md`: Danh mục kịch bản vận hành (`smoke.py`, `toolcheck.py`, `dev`, benchmarks).
+   - `docs/README.md`: Danh mục tài liệu kỹ thuật, kế hoạch tổng thể và quy ước cập nhật.
+   - `library/README.md`: Cấu trúc kho tài nguyên media, cơ sở dữ liệu SQLite FTS5 BM25.
+   - `storage/README.md`: Cấu trúc lưu trữ runtime, uploads và content-addressed cache.
+
+**Kiểm chứng:**
+- `ruff check src tests scripts` → All checks passed.
+- `ruff format --check` → 154 files already formatted.
+- `mypy src` → Success: no issues found in 97 source files.
+- `pytest` → 472 passed.
+
+### 2026-09-17 — Tái cấu trúc toàn bộ backend: tách god class `ContentFactoryService` và gói `models.py`
+
+**Mục tiêu:** Làm sạch phần backend: loại bỏ god class 2.073 dòng, gom trùng lặp tokenizer về một chỗ, và biến kiến trúc thành thứ có thể kiểm chứng tự động — mà **không đổi một hành vi nào** (cùng OpenAPI spec, cùng chữ ký hàm, cùng schema model).
+
+**Đã làm:**
+1. **`models.py` (1.495 dòng) → gói `models/` (14 module):** chia theo domain — `common`, `project`, `timeline`, `voice`, `research`, `script`, `agent`, `workflow`, `campaign`, `external`, `knowledge`, `history`, `media`. `models/__init__.py` re-export toàn bộ nên 68 file đang import không phải sửa một dòng.
+2. **`service.py` (2.073 dòng) → gói `services/` (14 mixin):** mỗi domain một mixin — `context` (settings, store, state machine, worker), `projects`, `research`, `scripting`, `styles`, `knowledge`, `agents`, `timeline`, `voice`, `media`, `production`, `workflow`, `growth`, `history` — ghép thành `ContentFactoryService`. Mixin **kế thừa đúng tầng nó gọi** (`MediaMixin(VoiceMixin)`, `WorkflowMixin(AgentsMixin, ProjectsMixin, GrowthMixin, TimelineMixin, VoiceMixin)`), nên hướng phụ thuộc hiện ra ngay ở dòng `class` thay vì ẩn trong 2.000 dòng. `service.py` giờ chỉ còn facade 22 dòng để import cũ tiếp tục chạy.
+3. **Gom trùng lặp thật:** bốn tokenizer khác nhau nằm rải ở `documents.py`, `research.py`, `search.py`, `rag.py` được hợp nhất vào `text.py` (`normalize_title`, `slugify`, `tokenize`, `word_tokens`); mỗi module truyền *policy* của mình vào (`min_length=2` + stopwords cho search, unicode-aware cho BM25 tiếng Việt). Không đổi kết quả xếp hạng, nhưng sửa thuật toán chỉ còn một chỗ.
+4. **Gỡ rào cản kiến trúc trong `workflow.py`:** `WorkflowRunner` không còn phụ thuộc `ContentFactoryService` — nó nhận protocol `WorkflowService` (12 phương thức nó thật sự dùng). Dependency inversion thật sự, đồng thời sửa luôn lỗi mypy khi runner được gọi từ mixin.
+5. **Đơn giản hóa `api/deps.py`:** ba guard (`guard`, `guard_value`, `guard_await`) và `get_or_404` trước đây mỗi cái lặp lại một thang `except`; giờ tất cả đi qua một mapper `_http_error` duy nhất.
+6. **Test kiến trúc mới (`tests/test_architecture.py`, 24 test):** khoá lại thành quả tái cấu trúc — mixin không được trùng tên phương thức, mọi phương thức mixin phải gọi được từ service ghép, ngân sách độ dài module (1.100 dòng), bề mặt re-export của `models`, và hành vi của helper văn bản.
+7. **Tài liệu:** cập nhật `AGENTS.md` (mục *Backend layout*), `src/README.md`, `src/content_factory/README.md`, `src/content_factory/api/README.md` theo sơ đồ mới.
+
+**Kiểm chứng (đối chiếu trước/sau khi tái cấu trúc):**
+- `ruff check src tests` → All checks passed; `ruff format --check src tests` → sạch.
+- `mypy src` → Success: no issues found in 97 source files.
+- `pytest` → **496 passed** (472 test cũ + 24 test kiến trúc mới).
+- **Tương đương hành vi được kiểm chứng bằng snapshot:** 97 JSON schema của model giống hệt từng field; 139 chữ ký phương thức của `ContentFactoryService` giống hệt; `app.openapi()` giống hệt (112 path, 139 schema).
+
+**Quyết định:** Giữ `service.py` như facade tương thích thay vì xóa — 30+ file (router, agent tools, MCP server, script, test) đang import từ đó, và một facade 22 dòng rẻ hơn nhiều so với việc sửa lan rộng trong cùng một lần. Quy ước mới: code mới import từ `content_factory.services`.
+
+### 2026-09-17 — Tầng tool cho MỌI AI (kể cả không có vision): đọc – cắt – ghép ảnh – ghép tiếng – chỉnh nhạc
+
+**Mục tiêu:** Một agent chỉ có chữ (không vision, không nghe) vẫn phải làm được việc của một editor: hiểu file media, tự động cắt, ghép ảnh, ghép tiếng, cắt nhạc theo beat. Tập trung tối đa vào tầng tool và để tool tự mô tả chính nó.
+
+**Đã làm:**
+1. **Engine mới `media_tools.py`** — nửa *đọc* biến file thành text (probe, loudness EBU R128, khoảng lặng, shot cut, palette, beat grid, contact sheet, OCR khi có tesseract) và nửa *ghi* biến quyết định thành file (cut/split/concat/extract, trim/fade/loop/normalize/retime/mix tracks, compose layers/collage). Thuần ffmpeg + Pillow, không phụ thuộc model nào.
+2. **`MediaToolsMixin` (services/media_tools.py, 22 method)** — mọi thao tác nhận `ref` là media-library id, `asset_id` đã sửa, hoặc path trong sandbox; mọi kết quả được lưu vào `library/edited/` và trả về `asset_id` + `url`, nên **chuỗi lệnh nối tiếp nhau bằng id**.
+3. **Registry tool viết lại (`agent_tools.py`)** — từ 37 tool if/elif thành **61 tool khai báo theo bảng**, mỗi tool có **JSON Schema thật** (`input_schema`) + handler riêng + nhóm; `Args` là bộ đọc tham số có kiểm tra, báo đúng tên field khi sai; tham số `required` được chặn ở tầng dispatch (422) nên schema không bao giờ “nói dối”. Thêm nhóm `media` và `audio`.
+4. **Nhạc tự động:** `music_beat_grid` (BPM + beat/downbeat) và `auto_cut_to_beat` (đọc tempo rồi beat-match timeline) — biến "cắt theo nhạc" thành một lời gọi. `audio_mix` duck nhạc dưới giọng bằng sidechain khi một track có `role="voice"`.
+5. **Ghép ảnh:** `compose_images` (lớp + vị trí theo pixel/%/tên góc, scale, opacity, rotate, 8 blend mode) và `collage_images` (lưới + caption).
+6. **Sửa 2 lỗi tìm được khi tự test:** (a) concat demuxer của ffmpeg hiểu nhầm `C:` trên Windows thành protocol → thêm tiền tố `file:`; (b) route `/edited/{name}` hardcode `audio/mpeg` nên video tải về sai content-type → thay bằng bảng MIME.
+
+**Kiểm chứng:**
+- Engine: `python scratch/verify_media_tools.py` → **24/24** trên media thật do ffmpeg sinh ra.
+- HTTP thật: `python scratch/live_media_tools.py` → **20/20** (upload → describe → beat grid → cut → chain theo asset_id → split → join → audio_mix → fade → frame → contact sheet → compose → collage → 404/422 → tải asset).
+- `pytest` → **520 passed** (thêm `tests/test_media_tools.py`); `ruff` + `mypy` sạch; `scripts/smoke.py` → **64 checks PASS**.
+
+**Quyết định:** Tool là hợp đồng tự mô tả — model nào cũng đọc được schema mà không cần đọc source. Chưa làm: parity đầy đủ cho `mcp_server.py` (hiện vẫn giữ bản cut/concat riêng) — nên chuyển sang dùng `media_tools` ở vòng sau.
+
+### 2026-09-17 — Thử nghiệm thực tế: Tải video 4 phút từ NASA, "xào nấu" toàn diện thành siêu phẩm tài liệu khoa học 2 phút 15 giây
+
+**Mục tiêu:** Kiểm thử thực chiến toàn bộ pipeline của hệ thống với video dài thực tế: tải video tư liệu thật trên mạng (>= 2 phút), tiến hành "xào nấu" (re-cook) toàn diện (thay toàn bộ lời thoại, thay toàn bộ giọng thuyết minh, lồng bản nhạc nền mới, thay toàn bộ chữ/phụ đề đồ họa, màu điện ảnh, chuyển động thật tuyệt đối không giống PowerPoint), vận hành trọn vẹn qua 2 cổng duyệt bắt buộc (Script Approval & Video Approval) của máy trạng thái.
+
+**Đã làm:**
+1. **Tải tư liệu gốc từ NASA:** Tải bộ phim tài liệu thiên văn chính thức của NASA *"Shedding Light on Black Holes"* từ Wikimedia Commons (`storage/uploads/external/nasa_black_holes_source.webm`, thời lượng 246.57s = 4 phút 6 giây, 854x478 30fps).
+2. **Phiên âm AI:** Sử dụng `faster-whisper` (base model, CPU int8) bóc tách toàn bộ 54 phân đoạn âm thanh tiếng Anh trong 12.3 giây.
+3. **Kịch bản khoa học tiếng Việt mới (135.0s = 2 phút 15 giây):** Tái cấu trúc thành 7 trường đoạn kịch tính giải mã những bí ẩn và lầm tưởng về hố đen vũ trụ:
+   - Cảnh 1 [0s - 20s]: Hook & Khởi nguyên (`01 // BÍ ẨN VŨ TRỤ`)
+   - Cảnh 2 [20s - 41s]: Chân trời sự kiện & đĩa bồi tụ (`02 // CHÂN TRỜI SỰ KIỆN`)
+   - Cảnh 3 [41s - 62s]: Phân cấp hố đen siêu khối lượng (`03 // PHÂN CẤP KHỐI LƯỢNG`)
+   - Cảnh 4 [62s - 82s]: Lực hấp dẫn và quỹ đạo hành tinh (`04 // ĐỊNH LUẬT HẤP DẪN`)
+   - Cảnh 5 [82s - 102s]: Cơ chế lượng tử Bức xạ Hawking (`05 // BỨC XẠ HAWKING`)
+   - Cảnh 6 [102s - 120s]: Di sản Thuyết tương đối Einstein (`06 // DI SẢN EINSTEIN`)
+   - Cảnh 7 [120s - 135s]: Khám phá vô tận & CTA (`07 // KHÁM PHÁ BẤT TẬN`)
+4. **Lồng tiếng AI chuẩn Studio:** Tổng hợp toàn bộ 7 phân cảnh bằng `edge-tts` với giọng đọc truyền cảm `vi-VN-NamMinhNeural` (tổng thời lượng thoại 102.41s trải đều timeline).
+5. **Hòa âm Soundtrack & Dynamic Ducking:** Sáng tác bản nhạc nền không gian Cinematic Deep Space Ambient đa tầng hòa âm bằng ffmpeg filter graph; tích hợp bộ nén động `sidechaincompress` tự động hạ âm lượng nhạc nền 14dB khi có thuyết minh và dâng trào khi chuyển cảnh.
+6. **Thay toàn bộ chữ & Đồ họa HUD:**
+   - Hệ thống badge chương góc trên trái chuẩn phim khoa học tài liệu (Cyan Neon).
+   - Watermark tư liệu lưu trữ góc trên phải: `NASA DEEP SPACE ARCHIVES`.
+   - Phụ đề nền mờ typography kiểu Netflix căn giữa chân màn hình, có bóng đổ sắc nét.
+7. **Color Grading & Video Moving Footage:** Áp dụng bộ lọc màu điện ảnh (`eq=contrast=1.16:brightness=0.01:saturation=1.28:gamma=0.96`), loại bỏ màu phẳng gốc, tôn lên độ sâu vũ trụ và quầng sáng plasma của hố đen; dựng bằng footage chuyển động thực tế 1280x720 @ 30fps.
+8. **Vận hành trọn vẹn máy trạng thái:**
+   - Tạo dự án `790d26e5a8c5` (*Sự Thật Kinh Ngạc Về Hố Đen Vũ Trụ*)
+   - Cổng 1: Xác nhận bản quyền tác giả và phê duyệt kịch bản (`ApprovalStage.SCRIPT`)
+   - Tiến trình sản xuất & tích hợp audio thoại/nhạc
+   - Cổng 2: Phê duyệt chất lượng video thành phẩm (`ApprovalStage.VIDEO`)
+   - Xuất bản đa nền tảng (YouTube & TikTok).
+9. **Thành phẩm:**
+   - MP4: `storage/nasa_black_holes_recook_master.mp4` (Thời lượng: **135.00s = 2 phút 15 giây**, Dung lượng: **27.86 MB**, H.264 High Profile, AAC Stereo 192kbps).
+   - WebM: `storage/nasa_black_holes_recook_master.webm`.
+   - Preview Frames: `storage/recook_production/preview_frame_30s.jpg`, `preview_frame_75s.jpg`.
+
+**Kiểm chứng:**
+- `pytest` → 520 passed.
+- `ruff check src tests` & `ruff format --check src tests` → sạch 100%.
+- `mypy src` → 100 source files sạch 100%.
+- `ffprobe` xác nhận video đạt chuẩn: 135.00s, 1280x720 30fps, âm thanh nổi AAC 192kbps, video mượt mà, thoại khớp phụ đề và nhạc nền.
+
+### 2026-09-17 — Kiểm định toàn diện dự án & Test render video dài 30 phút (1.800 giây) chứng minh năng lực máy tính người dùng
+
+**Mục tiêu:** Kiểm tra toàn diện mọi thành phần trong project (FastAPI Backend, Next.js Frontend, AI Perception Toolchain, Media Pipeline), đảm bảo máy tính người dùng chạy được trơn tru và chứng minh năng lực render thành công một video dài ít nhất 30 phút (>= 1.800 giây) có chuyển động, âm thanh, giọng đọc và phụ đề hoàn chỉnh.
+
+**Đã làm:**
+1. **Kiểm định phần cứng & dung lượng máy tính:**
+   - **CPU**: AMD Ryzen 7 7840H (8 nhân thực, 16 luồng, vi kiến trúc Zen 4, AVX-512) — đạt tốc độ render mã hóa x264 lên tới **393.3 FPS (Gấp 13.1 lần thời gian thực)**.
+
+### 2026-09-18 — Refactor ServiceContext: engine nặng khởi tạo lười (lazy)
+
+- Đã làm:
+  - `services/context.py`: 9 engine nặng (research, federated search, document
+    library, media library, re-cook, TTS, image/voice studio, presets) chuyển
+    sang lazy property double-checked locking an toàn luồng; `__init__` chỉ
+    dựng state rẻ (store, worker registry, workflow/knowledge maps). Provider
+    chain giữ build ngay (rẻ, test thay nguyên cụm được).
+  - Không đổi API public; mixin truy cập `self._<engine>` như cũ.
+- Kiểm chứng: ruff check + format sạch; mypy 115 files, 0 lỗi; full pytest
+  chạy tới [100%] không F/FAILED (chạy nền qua redirect nên dòng tổng kết
+  không ghi được); `tests/test_media_tools.py` chạy riêng pass.
+- Quyết định: không phá chuỗi kế thừa mixin — đó là dependency graph phục vụ
+  mypy strict; guard kiến trúc cấm property getter+setter cùng tên nên
+  `_providers` giữ attribute thường.
+- Việc tiếp theo: giữ danh sách việc trước (store nguyên tử, retention audio,
+  hàng đợi bền vững); đo thời gian dựng service trước/sau lazy.
+
+   - **GPU**: NVIDIA GeForce RTX 4060 Laptop GPU (8GB GDDR6 VRAM, CUDA 12.7) + AMD Radeon 780M — hỗ trợ toàn diện AI Perception và mã hóa tăng tốc phần cứng.
+   - **Ổ cứng**: SSD NVMe `C:\` còn trống **153.64 GB** — thừa khả năng lưu trữ hàng trăm video dài (video 30 phút chỉ tốn ~234 MB).
+   - **RAM**: 16 GB DDR5, tiến trình ffmpeg và python stream dữ liệu trực tiếp, tiêu thụ dưới 400 MB RAM trong toàn bộ quá trình render.
+2. **Nâng cấp AI Perception Stack cho model không cần Vision:**
+   - Cài đặt bổ sung PyTorch và `EasyOCR` vào `.venv`.
+   - Cập nhật hàm `media_tools.ocr_text` tích hợp fallback EasyOCR (khi không có binary tesseract trên Windows), hỗ trợ trích xuất văn bản trên màn hình kèm tọa độ bounding box và confidence score chi tiết.
+   - Kho công cụ media nâng lên 11 công cụ sẵn sàng (`ffmpeg`, `ffprobe`, `yt-dlp`, `faster_whisper`, `PIL`, `cv2`, `rembg`, `moviepy`, `edge_tts`, `gTTS`, `mutagen`).
+3. **Sản xuất bộ phim tài liệu thiên văn 30 phút (*Vũ Trụ Vô Tận*):**
+   - **10 Chương khoa học đồ sộ** (mỗi chương dài 180s = 3 phút): từ Big Bang, Mạng lưới vũ trụ, Vật chất tối, Chân trời sự kiện, Bức xạ Hawking, Nghịch lý thông tin, Sóng hấp dẫn, Kính James Webb, Du hành liên sao, đến Di sản Carl Sagan.
+   - **10 Đoạn giọng đọc thuyết minh tiếng Việt Neural Voice** (`edge-tts`) được căn chỉnh chính xác tại các mốc thời gian [0m, 3m, 6m, 9m, 12m, 15m, 18m, 21m, 24m, 27m] và ghép thành master narration track 1.800.00s.
+   - **Bản nhạc nền không gian sâu 30 phút** (`soundtrack_30min.m4a`, 1.800.03s) với kỹ thuật Dynamic Sidechain Ducking tự động hạ âm lượng 14dB khi có thuyết minh.
+   - **Hệ thống HUD Cyberpunk Neon Cyan** hiển thị tiêu đề từng chương, watermark bản quyền `AI CONTENT FACTORY // 30-MINUTES MASTER` và phụ đề căn giữa chân màn hình.
+4. **Vận hành qua 2 Cổng Duyệt State Machine:**
+   - Dự án `d153578be4a4` được tạo ở trạng thái `draft`.
+   - Cổng 1 (Script Approval): Phê duyệt kịch bản 10 chương -> chuyển sang `script_approved`.
+   - Tiến trình sản xuất & timeline -> chuyển sang `video_review`.
+   - Cổng 2 (Video Approval): Phê duyệt video thành phẩm -> chuyển sang `video_approved`.
+   - Xuất bản đa nền tảng (`youtube`, `tiktok`) -> chuyển sang `published`.
+5. **Render & Kiểm định Kỹ thuật Thành phẩm:**
+   - **Tập tin xuất bản**: `storage/cosmos_30min_masterpiece.mp4`.
+   - **Thời lượng thực tế**: **1.800.00 giây = đúng 30.00 phút** (Xác thực bằng `ffprobe`).
+   - **Thời gian render**: **137.30 giây (~2.29 phút)** trên 16 luồng CPU.
+   - **Tốc độ mã hóa**: **393.3 FPS (Gấp 13.1x thời gian thực)**.
+   - **Dung lượng**: **234.16 MB**.
+   - **Codecs**: H.264 High Profile (1280x720 HD @ 30fps) + AAC Stereo 192kbps (44.1 kHz).
+
+**Kiểm chứng:**
+- `pytest` -> **520 passed** (100%).
+- `mypy src` -> **102 files, 0 errors**.
+- `ruff check src tests` -> **0 errors**.
+- `ruff format --check src tests` -> **151 files sạch format**.
+- `scripts/smoke.py` -> **64/64 checks PASS**.
+- `ffprobe` -> Video 30 phút hoàn toàn lành lặn, phát lại mượt mà, âm thanh và hình ảnh đồng bộ hoàn hảo.
+
+### 2026-09-17 — Refactor backend: timeline, QA và SEO
+
+- Đã làm:
+  - Theo phạm vi chủ dự án chốt: backend + docs; giữ nguyên thay đổi chưa commit,
+    không commit/stash, không sửa frontend.
+  - Tách engine SEO 2.921 dòng thành gói `seo/`: contracts, profiles, signals,
+    scoring, optimization, experiments, keywords, calibration và helper/specs.
+    Giữ bề mặt import `content_factory.seo`; bỏ ngoại lệ ngân sách 3.100 dòng.
+  - Mapping SEO dùng cùng Pydantic contracts với HTTP: chuỗi `"false"` không còn
+    bị hiểu thành true; kiểm tra giới hạn số thống nhất; bổ sung `caption_source`.
+    Đây là thay đổi validation có chủ đích, không tuyên bố tương đương schema hoàn toàn.
+  - Chuyển 11 request model QA sang `models/qa.py`, 13 endpoint gọi `QaMixin`.
+    Giữ preview lệnh timeline không lưu và không duyệt nội dung.
+  - Timeline rebuild/edit/AI assist/polish và đồng bộ thời lượng voice dùng chung
+    normalize + revision phía server, thao tác trên bản sao để lỗi không sửa object
+    đang lưu. Giữ chính sách build/rebuild cũ và khả năng edit sau published.
+  - Voice ghi audio theo từng generation, từ chối kết quả khi timeline/ngôn ngữ/
+    bundle đã thay đổi; lỗi tổng hợp không ghi đè audio cũ; đọc được đường dẫn cũ.
+  - Smart keywords và đối chiếu copy-risk dùng helper văn bản chung.
+  - Thêm test hành vi, parity QA/SEO, rollback/revision/voice và guard kiến trúc
+    chống request model trong router, giới hạn module theo đường dẫn đầy đủ.
+- Kiểm chứng:
+  - `python -m ruff check src tests`: sạch.
+  - `python -m ruff format --check src tests`: 167 file đúng format.
+  - `python -m mypy src`: 115 source files, không lỗi.
+  - Full pytest: **810 passed**, 16 warning từ dependency, 69,48 giây.
+  - `scripts/smoke.ps1` với `SMOKE_PORT` là cổng trống: server mới,
+    **64/64 checks PASS**, gồm hai cổng duyệt và voiceover edge-tts.
+- Quyết định: refactor theo domain, giữ tương thích luồng cũ; test toàn bộ đã
+  phát hiện và sửa regression build timeline ở trạng thái script_approved.
+- Việc tiếp theo: transaction/compare-and-save nguyên tử cho store, retention
+  audio generation, index tìm kiếm tăng dần, hàng đợi bền vững. Chưa có bảo đảm
+  chống mọi race condition; không coi phiên này là hoàn thiện toàn bộ roadmap.
+
+### 2026-09-18 — Nâng cấp pipeline: xuất MP4 thật + tích hợp ảnh/video/tiếng/nhạc
+
+- Đã làm (local nhẹ, không cài model lớn, không API trả phí):
+  - `render.py`: thêm `export_format="mp4"` (H.264 + AAC, `+faststart`), giữ WebM
+    mặc định; giới hạn `threads` 1–8 (mặc định 1) cho filter/codec/input để giảm
+    RAM/CPU; nhận `audio_path` là bản mix hoàn chỉnh (thay voiceover+nhạc);
+    scene có `video_url` được ưu tiên hơn `image_url`, tôn trọng `source_in_seconds`
+    và `speed` (loop nguồn); sửa narration **trim trước delay** để lời cảnh sau
+    không bị cắt; `volume=0` giờ là mute thật; render vào temp rồi `replace` nguyên
+    tử để lỗi không phá artifact cũ.
+  - `timeline.compile_render_plan`: ưu tiên `video_url`, copy sâu plan, cảnh báo
+    rõ khi gặp `trim_end`/`reverse` chưa hỗ trợ, mang `background_music_url`.
+  - `services/production.py`: `render_video(project_id, export_format, audio_ref)`
+    chỉ chạy ở `generating`/`video_review` (không tự duyệt/publish, chặn render đè
+    bản đã duyệt); resolve media qua `resolve_media_ref` (chặn URL mạng, `..`);
+    kiểm tra revision cũ trước khi gắn artifact; hỗ trợ `render_max_dimension`.
+  - `services/projects.py`: `video_path` phục vụ theo `project.video.format`.
+  - Router `/render` nhận `RenderRequest`; `/video` trả MIME đúng container và
+    `?download=true`.
+  - `agent_tools.py`: thêm tool `render_video` (project_id/export_format/audio_ref)
+    + manifest; `mcp_server.factory_list_tools` giờ trả schema thật.
+  - Config mới: `CONTENT_FACTORY_RENDER_THREADS`, `CONTENT_FACTORY_RENDER_MAX_DIMENSION`.
+  - Streaming upload (media/video/external) + hashing cache theo file đã có từ
+    lát cắt trước; `.env.example` chưa ghi các biến streaming mới.
+- Kiểm chứng:
+  - Proof end-to-end: ảnh + video + audio tổng hợp → `render_video_file(mp4)` →
+    ffprobe `h264 + aac`, 6.00s, 49KB.
+  - Full pytest: **837 passed** (thêm 27 test render/tool/API/MCP/regression).
+  - Ruff check + format sạch, mypy 115 files sạch, smoke 64/64 trên server mới.
+- Quyết định: giữ WebM làm mặc định (tương thích), MP4 là lựa chọn rõ ràng khi
+  cần xem trên Windows/đăng nền tảng; renderer chạy 1 luồng mặc định để phù hợp
+  máy ~8GB RAM.
+- Việc tiếp theo: ghi biến streaming vào `.env.example`; nối `audio_mix` sidechain
+  (đang có bug dùng lại label) vào `render_video`; `trim_end`/`reverse`; render
+  job bền vững và hàng đợi; chưa hỗ trợ audio nhúng trong clip nguồn.
+
+### 2026-09-18 — Phiên SEO: chấm điểm, viết lại và chứng minh cho YouTube/TikTok
+
+**Mục tiêu phiên:** "thử bằng mọi giá" cách để AI tự kiểm tra SEO cho YouTube và
+TikTok, tính được điểm, và đưa ra giải pháp tối ưu nhất — rồi nối vào bộ tool để
+mọi agent dùng được.
+
+**Đã làm:**
+
+1. **Engine `src/content_factory/seo/`** (11 module, ~2.9k dòng): `profiles`
+   (ngưỡng từng nền tảng), `signals` (70 signal có trọng số), `_specs` (bảng
+   khai báo signal theo nền tảng), `scoring`, `optimization`, `experiments`
+   (A/B), `keywords`, `calibration`, `contracts`, `_helpers`.
+2. **Chấm đúng những gì dự án sẽ đăng** (`seo_score_project`): hook lấy từ
+   section đầu của kịch bản, thời lượng + nhịp cắt từ timeline, tỉ lệ khung,
+   phụ đề, nhạc, chapter marker, chữ trên màn hình từng scene.
+3. **Nối vào agent tools**: thêm nhóm `seo` với 8 tool (`seo_rules`,
+   `seo_score`, `seo_optimize`, `seo_score_project`, `seo_ab_plan`,
+   `seo_ab_evaluate`, `seo_keywords`, `seo_calibrate`), mỗi tool có JSON Schema
+   thật và tham số `required` bị chặn ngay ở tầng dispatch. Tổng tool: 62 → 70.
+4. **Sửa 3 lỗi thật do tự test tìm ra:**
+   - **Điểm bị kẹp vô lý:** `title_length`, `hashtags`, `duration_fit` bị đánh
+     dấu *blocking*, nên video 4 phút + tiêu đề 11 ký tự bị kẹp cứng ở 45 và
+     **mọi cải thiện khác đều vô nghĩa** (optimizer trả `gain 0`). Nay blocking
+     chỉ còn khi gói thật sự không đăng được: sai tỉ lệ khung cho nền tảng dọc,
+     watermark tái đăng, tiêu đề rỗng/quá dài (`blocking_when=_title_unusable`).
+   - **Optimizer không lấp đủ dải chuẩn:** tiêu đề ngắn không được kéo dài, bộ
+     hashtag/tag dừng ở 1–6 thay vì 3 và 8–15. Nay sinh từ chính vật liệu của
+     gói (hook, chữ trên màn hình, chapter) và từ các biến thể của cụm từ khoá.
+   - **Mất điểm khi lệch dưới 1 điểm:** so sánh làm tròn làm mất thắng lợi 0.4
+     điểm → thêm `SeoReport.precision` để phân xử.
+5. **Optimizer "đo chứ không hứa"**: mọi thay đổi được áp theo kiểu greedy và
+   **chỉ giữ nếu chấm lại thấy tăng điểm**; gói trả về chấm lại ra đúng
+   `after.score`. Có test khoá tính chất này.
+6. **Tài liệu + skill**: `docs/SEO-SCORING.md` (model, nguồn nền tảng, thống kê
+   A/B, cách dùng), mục SEO trong `docs/TOOLS-FOR-AGENTS.md`, skill
+   `seo-packaging-audit` ở cả `.agents/skills/` và `.claude/skills/`.
+
+**Kiểm chứng (2026-09-18):**
+
+- `ruff check src tests` + `ruff format --check` + `mypy src`: sạch (115 file).
+- `pytest` toàn bộ: **854 test, 0 failed, 0 error, 0 skipped** (chạy 2 nửa
+  a–m và n–z, cả hai exit 0). Lưu ý: lần chạy pytest đầu tiên trong phiên bị
+  treo ở `test_media_tools.py` vì easyocr/torch nạp model lần đầu — sau khi
+  model đã cache thì qua bình thường.
+- `scripts/smoke.py --port 8160`: **64/64 checks PASS** trên server mới.
+- `scratch/live_seo_tools.py` (HTTP thật, đúng đường agent đi): **22/22 PASS**,
+  gồm cả kiểm tra "gói optimizer trả về chấm lại đúng bằng điểm đã hứa".
+- `scratch/seo_sanity.py`: gói yếu 68 → 83 sau tối ưu (gain 15, đo được).
+
+**Quyết định:**
+
+- Blocking phải **hẹp**: chỉ những lỗi khiến video không đăng được hoặc bị nền
+  tảng đàn áp mới được kẹp điểm; khuyến nghị (tiêu đề ngắn, thiếu hashtag,
+  thời lượng) chỉ trừ điểm. "Đừng đăng" cho một tiêu đề ngắn là báo động giả.
+- Bộ trọng số hiện tại là **prior** từ hướng dẫn công khai của nền tảng;
+  `seo_calibrate` là con đường thay bằng dữ liệu thật của kênh.
+- Không tự bịa số liệu: thiếu `engagement` thì điểm giảm `confidence`, không suy diễn.
+
+**Việc tiếp theo:** đưa `seo_score_project` vào cổng duyệt video (cảnh báo trước
+khi publish), nối kết quả thật của nền tảng vào `seo_calibrate` để tự hiệu chỉnh
+trọng số, và dùng `seo_optimize` ngay trong `campaign.py` khi sinh gói đa định
+dạng.

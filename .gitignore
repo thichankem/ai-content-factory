@@ -13,7 +13,21 @@ htmlcov/
 .env
 
 # Runtime data
-library/
+library/*
+!library/README.md
+storage/*
+!storage/README.md
+
+# Node / Next.js build artifacts
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Packaging
+*.egg-info/
+
+# Scratch workspace
+scratch/
 
 # Editor / OS
 .idea/

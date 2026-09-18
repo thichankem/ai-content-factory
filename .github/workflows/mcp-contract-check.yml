@@ -1,0 +1,26 @@
+name: MCP Contract Check
+
+# Validates the MCP server's tool-schema contract on every PR, so a change
+# that drops a tool or breaks a signature fails the build instead of shipping
+# a broken contract to agents (Claude, Codex, Gemini, ...).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  mcp-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: MCP tool-schema contract + smoke
+        run: python scripts/mcp_healthcheck.py --smoke

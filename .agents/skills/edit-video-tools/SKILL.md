@@ -38,14 +38,22 @@ Errors keep domain meaning: 404 not found, 409 state conflict, 403 rights,
    `trim_scene`, `set_scene_audio`, `bulk_update_scenes`, `set_keyframes`,
    `add_marker`, `ai_assist`
 9. `timeline_report` (score 0-100) and `render_plan` to verify
-10. `generate_voiceover`, `start_generation`
-11. `approve_stage` (stage: video) — HUMAN GATE
-12. `publish_project`
+10. Bind visuals: set `image_url` / `video_url` per scene (media-library asset,
+    `/media/{id}/download`, `/edited/{name}`, or a local path) and optionally
+    `background_music_url` on the project
+11. `generate_voiceover` (network TTS) OR prepare a finished mix with
+    `audio_mix` and pass it as `audio_ref`
+12. `render_video` (export_format: `webm` | `mp4`) — real ffmpeg export;
+    `mp4` gives H.264/AAC. Rendering never auto-approves or publishes.
+13. `approve_stage` (stage: video) — HUMAN GATE
+14. `publish_project`
 
 ## Hard rules
 
 - Never set `source_rights_confirmed: true` without an explicit human
   confirmation. Approval gates are always human decisions.
+- `render_video` only runs in `generating`/`video_review`; re-cut by going
+  back to review, never by re-rendering over an approved/published cut.
 - Scene ids come from `get_project` / `build_video_project` responses.
 - Prefer `analyze_script` / `timeline_report` after edits; fix issues
   before requesting the next gate.

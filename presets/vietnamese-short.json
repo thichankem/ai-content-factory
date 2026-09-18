@@ -1,0 +1,28 @@
+{
+  "name": "vietnamese-short",
+  "title": "Vietnamese vertical short",
+  "description": "Kịch bản ngắn cho TikTok/Reels/Shorts: hook thật nhanh, câu ngắn, khẩu ngữ tự nhiên, kết bằng lời kêu gọi nhẹ.",
+  "tone": "thân mật, nhanh, xưng 'bạn', tránh từ Hán-Việt nặng",
+  "structure": ["Hook", "Turn", "Payoff", "CTA"],
+  "hook_rules": [
+    "Mở bằng một con số, một mâu thuẫn, hoặc một câu hỏi trong 6 chữ đầu.",
+    "Không mở bằng lời chào, không dùng 'xin chào các bạn'.",
+    "Nêu rõ cái lợi hoặc cái mất ngay ở câu đầu."
+  ],
+  "sentence_max_units": 12,
+  "max_sections": 8,
+  "cta": "Theo dõi để xem phần tiếp theo.",
+  "banned_phrases": [
+    "trong video này",
+    "hôm nay chúng ta sẽ",
+    "hãy cùng tìm hiểu",
+    "các bạn ạ"
+  ],
+  "language_notes": {
+    "vi": "Dùng từ thuần Việt khi có thể; câu ngắn, ngắt nhịp rõ; đọc lên phải tự nhiên như đang nói chuyện."
+  },
+  "units_per_second": {
+    "vi": 2.7
+  },
+  "builtin": false
+}

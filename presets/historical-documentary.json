@@ -1,0 +1,34 @@
+{
+  "name": "historical-documentary",
+  "title": "Historical Documentary",
+  "description": "Phong cách phim tài liệu lịch sử nghiêm cẩn, mở đầu bằng thời khắc bước ngoặt, lời dẫn trầm ấm, đối chiếu tư liệu và số liệu xác thực.",
+  "tone": "trang trọng, khách quan, điềm tĩnh, gợi mở bối cảnh lịch sử, giàu hình ảnh tư liệu",
+  "structure": [
+    "Cold Open",
+    "Historical Context",
+    "Chain of Events",
+    "Turning Point",
+    "Aftermath & Legacy"
+  ],
+  "hook_rules": [
+    "Mở đầu bằng khoảnh khắc định mệnh hoặc cột mốc thời gian chấn động.",
+    "Nêu rõ bối cảnh không gian và thời gian trong 2 câu đầu.",
+    "Không mở bằng lời chào xáo rỗng hoặc câu hỏi hời hợt."
+  ],
+  "sentence_max_units": 16,
+  "max_sections": 12,
+  "cta": "Theo dõi để khám phá thêm những sự kiện lịch sử làm thay đổi thế giới.",
+  "banned_phrases": [
+    "như chúng ta đã biết",
+    "trong video hôm nay",
+    "hãy cùng xem",
+    "xin chào các bạn"
+  ],
+  "language_notes": {
+    "vi": "Dùng ngôn ngữ chuẩn xác, tôn trọng nhân vật lịch sử, trích dẫn ngày tháng và số liệu cụ thể."
+  },
+  "units_per_second": {
+    "vi": 2.5
+  },
+  "builtin": false
+}

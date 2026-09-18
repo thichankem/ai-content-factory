@@ -1,147 +1,1307 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Content Factory</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a73e8'/%3E%3Cpath d='M9 10h14v2H9zm0 5h10v2H9zm0 5h14v2H9z' fill='white'/%3E%3C/svg%3E">
+  <title>AI Content Factory — Studio Pro &amp; Autonomous Pipeline</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Cpath d='M9 10h14v2.5H9zm0 5h10v2.5H9zm0 5h14v2.5H9z' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/assets/style.css">
 </head>
-<body>
+<body class="studio-body">
+  <!-- ADOBE CREATIVE CLOUD APPLICATION MENU BAR -->
+  <div class="adobe-app-bar" id="adobe-app-bar">
+    <div class="adobe-badges-row">
+      <span class="adobe-badge pr" title="Adobe Premiere Pro NLE Studio">Pr</span>
+      <span class="adobe-badge ae" title="Adobe After Effects Motion Engine">Ae</span>
+      <span class="adobe-badge ps" title="Adobe Photoshop Creative Lab">Ps</span>
+      <span class="adobe-badge au" title="Adobe Audition Multi-track Mixer">Au</span>
+      <span class="adobe-badge me" title="Adobe Media Encoder Queue">Me</span>
+    </div>
+
+    <!-- Desktop Dropdown Menus -->
+    <nav class="adobe-menus" aria-label="Adobe Application Menus">
+      <div class="adobe-menu-item" tabindex="0">
+        <span class="adobe-menu-title">File</span>
+        <div class="adobe-dropdown">
+          <button class="adobe-menu-btn" id="menu-file-new"><span>New Production…</span><kbd>Ctrl+N</kbd></button>
+          <button class="adobe-menu-btn" id="menu-file-save"><span>Save Project</span><kbd>Ctrl+S</kbd></button>
+          <div class="adobe-menu-div"></div>
+          <button class="adobe-menu-btn" id="menu-file-ingest"><span>Ingest External AI Media…</span><kbd>Ctrl+I</kbd></button>
+          <button class="adobe-menu-btn" id="menu-file-export"><span>Export to Media Encoder…</span><kbd>Ctrl+M</kbd></button>
+          <button class="adobe-menu-btn" id="menu-file-render"><span>Render Video (ffmpeg)…</span><kbd>Enter</kbd></button>
+          <div class="adobe-menu-div"></div>
+          <button class="adobe-menu-btn" id="menu-file-cinema"><span>Cinema Fullscreen Mode</span><kbd>F</kbd></button>
+        </div>
+      </div>
+
+      <div class="adobe-menu-item" tabindex="0">
+        <span class="adobe-menu-title">Edit</span>
+        <div class="adobe-dropdown">
+          <button class="adobe-menu-btn" id="menu-edit-undo"><span>Undo</span><kbd>Ctrl+Z</kbd></button>
+          <button class="adobe-menu-btn" id="menu-edit-redo"><span>Redo</span><kbd>Ctrl+Shift+Z</kbd></button>
+          <div class="adobe-menu-div"></div>
+          <button class="adobe-menu-btn" id="menu-edit-cut"><span>Cut Clip</span><kbd>Ctrl+X</kbd></button>
+          <button class="adobe-menu-btn" id="menu-edit-copy"><span>Copy Clip</span><kbd>Ctrl+C</kbd></button>
+          <button class="adobe-menu-btn" id="menu-edit-paste"><span>Paste Clip</span><kbd>Ctrl+V</kbd></button>
+          <button class="adobe-menu-btn" id="menu-edit-duplicate"><span>Duplicate Scene</span><kbd>Ctrl+D</kbd></button>
+          <div class="adobe-menu-div"></div>
+          <button class="adobe-menu-btn" id="menu-edit-split"><span>Razor Split at Playhead</span><kbd>C</kbd></button>
+          <button class="adobe-menu-btn" id="menu-edit-delete"><span>Delete Clip</span><kbd>Del</kbd></button>
+        </div>
+      </div>
+
+      <div class="adobe-menu-item" tabindex="0">
+        <span class="adobe-menu-title">Clip</span>
+        <div class="adobe-dropdown">
+          <button class="adobe-menu-btn" id="menu-clip-speed"><span>Speed / Duration…</span><kbd>Ctrl+R</kbd></button>
+          <button class="adobe-menu-btn" id="menu-clip-reverse"><span>Reverse Playback</span><kbd>Alt+R</kbd></button>
+          <div class="adobe-menu-div"></div>
+          <button class="adobe-menu-btn" id="menu-clip-gain"><span>Audio Gain &amp; Volume…</span><kbd>G</kbd></button>
+          <button class="adobe-menu-btn" id="menu-clip-ai-look"><span>AI Suggest Cinematic Look</span><kbd>Alt+L</kbd></button>
+          <button class="adobe-menu-btn" id="menu-clip-ai-polish"><span>AI Polish Text &amp; Dialogue</span><kbd>Alt+P</kbd></button>
+        </div>
+      </div>
+
+      <div class="adobe-menu-item" tabindex="0">
+        <span class="adobe-menu-title">Sequence</span>
+        <div class="adobe-dropdown">
+          <button class="adobe-menu-btn" id="menu-seq-render"><span>Render In to Out</span><kbd>Enter</kbd></button>
+          <button class="adobe-menu-btn" id="menu-seq-snap"><span>Toggle Snapping</span><kbd>S</kbd></button>
+          <div class="adobe-menu-div"></div>
+          <button class="adobe-menu-btn" id="menu-seq-in"><span>Mark In</span><kbd>I</kbd></button>
+          <button class="adobe-menu-btn" id="menu-seq-out"><span>Mark Out</span><kbd>O</kbd></button>
+          <button class="adobe-menu-btn" id="menu-seq-clear-inout"><span>Clear In and Out</span><kbd>Alt+X</kbd></button>
+          <div class="adobe-menu-div"></div>
+          <button class="adobe-menu-btn" id="menu-seq-marker"><span>Add Timeline Marker</span><kbd>M</kbd></button>
+          <button class="adobe-menu-btn" id="menu-seq-safemargins"><span>Safe Margins (Action/Title)</span><kbd>Ctrl+'</kbd></button>
+        </div>
+      </div>
+
+      <div class="adobe-menu-item" tabindex="0">
+        <span class="adobe-menu-title">Audio</span>
+        <div class="adobe-dropdown">
+          <button class="adobe-menu-btn" id="menu-audio-tts"><span>Generate Neural Voiceover (Edge-TTS)</span><kbd>Ctrl+G</kbd></button>
+          <button class="adobe-menu-btn" id="menu-audio-beats"><span>BPM Beat Grid Sync</span><kbd>Ctrl+B</kbd></button>
+          <button class="adobe-menu-btn" id="menu-audio-ducking"><span>Auto-Duck Background Music</span><kbd>Alt+D</kbd></button>
+          <div class="adobe-menu-div"></div>
+          <button class="adobe-menu-btn" id="menu-audio-sfx-sos"><span>Play Morse S.O.S (Disaster)</span><kbd>Alt+1</kbd></button>
+          <button class="adobe-menu-btn" id="menu-audio-sfx-siren"><span>Play Air Raid Siren</span><kbd>Alt+2</kbd></button>
+          <button class="adobe-menu-btn" id="menu-audio-sfx-sonar"><span>Play Submarine Sonar Ping</span><kbd>Alt+3</kbd></button>
+          <button class="adobe-menu-btn" id="menu-audio-sfx-static"><span>Play Radio Static Chatter</span><kbd>Alt+4</kbd></button>
+          <button class="adobe-menu-btn" id="menu-audio-sfx-whistle"><span>Play Steam Engine Horn</span><kbd>Alt+5</kbd></button>
+        </div>
+      </div>
+
+      <div class="adobe-menu-item" tabindex="0">
+        <span class="adobe-menu-title">Graphics</span>
+        <div class="adobe-dropdown">
+          <button class="adobe-menu-btn" id="menu-gfx-text"><span>New Title Text Layer</span><kbd>T</kbd></button>
+          <button class="adobe-menu-btn" id="menu-gfx-captions"><span>Auto-Sync Kinetic Captions</span><kbd>Ctrl+Alt+C</kbd></button>
+          <div class="adobe-menu-div"></div>
+          <button class="adobe-menu-btn" id="menu-gfx-neon"><span>Style: Neon Cyber Glow</span><kbd>Alt+N</kbd></button>
+          <button class="adobe-menu-btn" id="menu-gfx-outline"><span>Style: Heavy Bold Outline</span><kbd>Alt+O</kbd></button>
+          <button class="adobe-menu-btn" id="menu-gfx-photolab"><span>Open Frame in Photo Lab (Photoshop)</span><kbd>Ctrl+P</kbd></button>
+        </div>
+      </div>
+
+      <div class="adobe-menu-item" tabindex="0">
+        <span class="adobe-menu-title">Window</span>
+        <div class="adobe-dropdown">
+          <button class="adobe-menu-btn" id="menu-win-editing"><span>Workspace: Video Studio (Premiere NLE)</span><kbd>2</kbd></button>
+          <button class="adobe-menu-btn" id="menu-win-photolab"><span>Workspace: Photo Lab (Photoshop)</span><kbd>3</kbd></button>
+          <button class="adobe-menu-btn" id="menu-win-pipeline"><span>Workspace: Pipeline Stepper</span><kbd>1</kbd></button>
+          <button class="adobe-menu-btn" id="menu-win-dag"><span>Workspace: Node Flow (DAG)</span><kbd>4</kbd></button>
+          <button class="adobe-menu-btn" id="menu-win-agents"><span>Workspace: Agents Orchestra</span><kbd>5</kbd></button>
+          <button class="adobe-menu-btn" id="menu-win-library"><span>Workspace: Document Library</span><kbd>6</kbd></button>
+          <button class="adobe-menu-btn" id="menu-win-empire"><span>Workspace: Empire Hub</span><kbd>7</kbd></button>
+        </div>
+      </div>
+
+      <div class="adobe-menu-item" tabindex="0">
+        <span class="adobe-menu-title">Help</span>
+        <div class="adobe-dropdown">
+          <button class="adobe-menu-btn" id="menu-help-shortcuts"><span>Keyboard Shortcuts Cheatsheet</span><kbd>?</kbd></button>
+          <button class="adobe-menu-btn" id="menu-help-benchmark"><span>Run Video Suite Benchmark Test</span><kbd>Alt+B</kbd></button>
+        </div>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Top Navigation Bar (Studio Control Center) -->
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">◈</span>
-      <span class="brand-name">AI Content Factory</span>
+      <div class="brand-mark">◈</div>
+      <div class="brand-info">
+        <div class="brand-name">AI Content Factory</div>
+        <div class="brand-sub">Adobe Creative Cloud &amp; TikTok Studio Pro Edition</div>
+      </div>
     </div>
+
+    <!-- Workspace Mode Switcher -->
+    <nav class="workspace-switcher" role="tablist" aria-label="Studio Workspaces">
+      <button class="ws-tab active" data-ws="pipeline" id="ws-tab-pipeline" title="Autonomous Pipeline Workflow (Key 1)">
+        <span class="ws-icon">🚀</span>
+        <span class="ws-title">Pipeline</span>
+      </button>
+      <button class="ws-tab" data-ws="editor" id="ws-tab-editor" title="Pro Video NLE Studio (Key 2)">
+        <span class="ws-icon">🎬</span>
+        <span class="ws-title">Video Studio</span>
+      </button>
+      <button class="ws-tab" data-ws="photolab" id="ws-tab-photolab" title="Photoshop Image &amp; Thumbnail Lab (Key 3)">
+        <span class="ws-icon">🎨</span>
+        <span class="ws-title">Photo Lab</span>
+      </button>
+      <button class="ws-tab" data-ws="workflow" id="ws-tab-workflow" title="Visual Node Workflow DAG (Key 4)">
+        <span class="ws-icon">🕸</span>
+        <span class="ws-title">Node Flow</span>
+      </button>
+      <button class="ws-tab" data-ws="orchestra" id="ws-tab-orchestra" title="AI Agent Orchestra (Key 5)">
+        <span class="ws-icon">⚡</span>
+        <span class="ws-title">Agents</span>
+      </button>
+      <button class="ws-tab" data-ws="library" id="ws-tab-library" title="Document Knowledge &amp; Research (Key 6)">
+        <span class="ws-icon">📚</span>
+        <span class="ws-title">Library</span>
+      </button>
+      <button class="ws-tab" data-ws="empire" id="ws-tab-empire" title="Multi-Format Empire (1 Topic ➔ 1 YouTube + 5-10 TikTok) (Key 7)">
+        <span class="ws-icon">🏛</span>
+        <span class="ws-title">Empire Hub</span>
+      </button>
+      <button class="ws-tab" data-ws="mediastudio" id="ws-tab-mediastudio" title="Media Studio — upload &amp; re-cook any media (Key 8)">
+        <span class="ws-icon">🎞️</span>
+        <span class="ws-title">Media Studio</span>
+      </button>
+    </nav>
+
+    <!-- Topbar Actions & System Status -->
     <div class="topbar-actions">
-      <span id="health" class="badge">connecting…</span>
+      <button id="btn-topbar-copilot" class="topbar-nav-btn primary glow-pulse" title="AI Natural Language Timeline Co-Pilot [Ctrl+K]">
+        <span>🤖</span> AI Co-Pilot <kbd class="topbar-kbd">Ctrl+K</kbd>
+      </button>
+      <button id="btn-topbar-ingest" class="topbar-nav-btn" title="Ingest External AI Media (Kling/Veo/ElevenLabs/Perplexity) [I]">
+        <span>📥</span> Ingest Assets
+      </button>
+      <button id="btn-topbar-compliance" class="topbar-nav-btn" title="QA Platform & Brand Kit Compliance Inspector">
+        <span>🛡️</span> QA &amp; Brand
+      </button>
+      <button id="btn-topbar-bridge" class="topbar-nav-btn" title="External AI Agent Prompt &amp; Result Bridge">
+        <span>⚡</span> Agent Bridge
+      </button>
+      <button id="btn-topbar-styles" class="topbar-nav-btn" title="Script Styles &amp; Presets Studio">
+        <span>🎨</span> Presets
+      </button>
+      <button id="btn-topbar-onthisday" class="topbar-nav-btn" title="Lịch sử Ngày này năm xưa — Gợi ý đề tài">
+        <span>📅</span> On This Day
+      </button>
+      <button id="btn-topbar-audit" class="topbar-nav-btn" title="AI Cost Guard &amp; Audit Trail Provenance">
+        <span>📊</span> Cost &amp; Audit
+      </button>
+      <button id="btn-cinema-mode" class="topbar-nav-btn" title="Cinema Mode (F)">
+        <span>⛶</span> Cinema
+      </button>
+      <span id="health" class="badge" title="Backend API Health">connecting…</span>
     </div>
   </header>
 
-  <div class="layout">
-    <!-- LEFT: projects -->
-    <aside class="sidebar">
-      <button id="btn-new-project" class="btn primary block">＋ New project</button>
-      <div class="sidebar-label">Projects</div>
+  <!-- MAIN STUDIO LAYOUT -->
+  <div class="layout" id="main-layout">
+    <!-- LEFT SIDEBAR: Projects & Production Navigator -->
+    <aside class="sidebar" id="main-sidebar">
+      <div class="sidebar-head">
+        <button id="btn-new-project" class="btn primary block">＋ New Production</button>
+        <div class="sidebar-label-row">
+          <span class="sidebar-label">Active Projects</span>
+          <span id="project-count" class="project-count">0</span>
+        </div>
+      </div>
+
+      <!-- Projects List -->
       <div id="projects" class="project-list"></div>
+
+      <!-- Quick Navigation & Library Widget -->
       <div class="sidebar-footer">
-        <div id="lib-stats" class="muted small"></div>
+        <div class="lib-card" id="sidebar-lib-card">
+          <div class="lib-card-title">📚 Document Library</div>
+          <div id="lib-stats">Indexing knowledge...</div>
+        </div>
       </div>
     </aside>
 
-    <!-- CENTER: research notebook -->
-    <main class="workspace">
+    <!-- CENTER MAIN WORKSPACE -->
+    <main class="workspace" id="main-workspace">
+      <!-- Empty State -->
       <div id="empty-state" class="empty-state">
-        <div class="empty-icon">◈</div>
-        <h2>Welcome to AI Content Factory</h2>
-        <p>Select a project from the left, or create a new one to start producing.</p>
-        <button id="btn-new-project-2" class="btn primary">＋ New project</button>
+        <div class="empty-icon-wrap">◈</div>
+        <h2>Autonomous Video Pipeline Studio</h2>
+        <p>Orchestrate multi-agent video production with Google Gemini, Anthropic Claude, OpenAI Codex, and DeepSeek. Select a project or start a new production.</p>
+        <button id="btn-new-project-2" class="btn primary">＋ Create First Project</button>
       </div>
 
+      <!-- Project Notebook / Active Workspace Container -->
       <div id="notebook" hidden>
-        <div class="nb-header">
-          <div>
-            <h2 id="nb-title"></h2>
-            <div id="nb-subtitle" class="muted small"></div>
-          </div>
-          <div class="nb-actions">
-            <button id="btn-research" class="btn">Run research</button>
-            <button id="btn-generate" class="btn primary">Generate script</button>
-          </div>
-        </div>
-
-        <div class="nb-tabs" role="tablist">
-          <button class="tab active" data-tab="sources" role="tab">Sources</button>
-          <button class="tab" data-tab="facts" role="tab">Key facts</button>
-          <button class="tab" data-tab="script" role="tab">Script</button>
-          <button class="tab" data-tab="documents" role="tab">Documents</button>
-        </div>
-
-        <div class="tab-panel active" id="panel-sources">
-          <div id="research-status" class="muted small panel-note"></div>
-          <div id="sources" class="sources"></div>
-        </div>
-
-        <div class="tab-panel" id="panel-facts">
-          <div id="facts" class="facts"></div>
-        </div>
-
-        <div class="tab-panel" id="panel-script">
-          <label class="field-label" for="script-box">Narration script</label>
-          <textarea id="script-box" rows="14" placeholder="No script yet — generate one or paste the final narration."></textarea>
-          <label class="inline">
-            <input type="checkbox" id="rights-box"> Source rights confirmed
-          </label>
-          <div class="row">
-            <button id="btn-save" class="btn primary">Save script</button>
-          </div>
-        </div>
-
-        <div class="tab-panel" id="panel-documents">
-          <div class="explorer">
-            <div class="explorer-header">
-              <h3>Document explorer</h3>
+        <!-- WORKSPACE VIEW 1: PIPELINE WORKFLOW -->
+        <section class="ws-view active" id="view-pipeline">
+          <!-- Project Header Bar -->
+          <div class="nb-header">
+            <div class="nb-header-left">
+              <h2 id="nb-title">Project Title</h2>
+              <div id="nb-subtitle" class="nb-subtitle">Topic narrative</div>
             </div>
-            <form id="doc-search-form" class="inline-form">
-              <input id="doc-query" placeholder="Search arXiv, Crossref, Gutenberg, Wikipedia, Internet Archive…">
-              <button type="submit" class="btn">Search</button>
-            </form>
-            <div id="doc-results" class="doc-results"></div>
-          </div>
-          <div class="explorer">
-            <div class="explorer-header">
-              <h3>Library</h3>
+            <div class="nb-actions">
+              <button id="btn-research" class="btn">🔬 Run Research</button>
+              <button id="btn-generate" class="btn primary">⚡ Generate Script</button>
             </div>
-            <form id="lib-search-form" class="inline-form">
-              <input id="lib-query" placeholder="Search downloaded documents…">
-              <button type="submit" class="btn">Search</button>
-            </form>
-            <div id="lib-hits" class="lib-hits"></div>
           </div>
-        </div>
+
+          <!-- Interactive 7-Stage Pipeline Stepper -->
+          <div class="pipeline-stepper-card">
+            <div class="pipeline-stepper-head">
+              <div class="pipeline-stepper-title">
+                <span>🚀</span> Pipeline Workflow Engine
+              </div>
+              <div id="pipeline-active-summary" class="muted small">Auto-orchestrated</div>
+            </div>
+            <div class="pipeline-flow">
+              <div class="pipe-node" data-stage="research" data-tab="sources" id="pipe-node-research">
+                <span class="pipe-node-idx">1</span>
+                <span>Research</span>
+              </div>
+              <span class="pipe-connector">→</span>
+              <div class="pipe-node" data-stage="script" data-tab="script" id="pipe-node-script">
+                <span class="pipe-node-idx">2</span>
+                <span>Scripting &amp; Linter</span>
+              </div>
+              <span class="pipe-connector">→</span>
+              <div class="pipe-node gate" data-stage="script_review" id="pipe-node-script-gate">
+                <span class="pipe-node-idx">3</span>
+                <span>Script Review</span>
+              </div>
+              <span class="pipe-connector">→</span>
+              <div class="pipe-node" data-stage="voiceover" id="pipe-node-voiceover">
+                <span class="pipe-node-idx">4</span>
+                <span>Voiceover TTS</span>
+              </div>
+              <span class="pipe-connector">→</span>
+              <div class="pipe-node" data-stage="video" id="pipe-node-video">
+                <span class="pipe-node-idx">5</span>
+                <span>Video &amp; Motion FX</span>
+              </div>
+              <span class="pipe-connector">→</span>
+              <div class="pipe-node gate" data-stage="video_review" id="pipe-node-video-gate">
+                <span class="pipe-node-idx">6</span>
+                <span>Final Gate</span>
+              </div>
+              <span class="pipe-connector">→</span>
+              <div class="pipe-node" data-stage="published" id="pipe-node-published">
+                <span class="pipe-node-idx">7</span>
+                <span>Publish</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage Sub-Tabs -->
+          <div class="nb-tabs" role="tablist">
+            <button class="tab active" data-tab="script" role="tab">
+              <span>📝</span> Script &amp; Linter
+            </button>
+            <button class="tab" data-tab="orchestra" role="tab">
+              <span>🤖</span> Agent Orchestra
+            </button>
+            <button class="tab" data-tab="sources" role="tab">
+              <span>🔬</span> Research Sources
+            </button>
+            <button class="tab" data-tab="facts" role="tab">
+              <span>💡</span> Key Facts
+            </button>
+            <button class="tab" data-tab="styles" role="tab">
+              <span>🎨</span> Style Presets
+            </button>
+            <button class="tab" data-tab="documents" role="tab">
+              <span>📚</span> Document Explorer
+            </button>
+          </div>
+
+          <!-- TAB PANEL 1: SCRIPT & QUALITY LINTER -->
+          <div class="tab-panel active" id="panel-script">
+            <div class="script-studio-layout">
+              <div class="script-editor-card">
+                <div class="script-editor-head">
+                  <label class="field-label" for="script-box"><strong>Narration Script</strong> (Structure cues supported)</label>
+                  <div class="script-tag-chips">
+                    <span class="script-tag-chip" data-insert="[Hook]">+[Hook]</span>
+                    <span class="script-tag-chip" data-insert="[Turn]">+[Turn]</span>
+                    <span class="script-tag-chip" data-insert="[Payoff]">+[Payoff]</span>
+                    <span class="script-tag-chip" data-insert="[CTA]">+[CTA]</span>
+                    <span class="script-tag-chip" data-insert="[Visual]">+[Visual]</span>
+                    <span class="script-tag-chip" data-insert="[Sound]">+[Sound]</span>
+                  </div>
+                </div>
+                <textarea id="script-box" rows="16" placeholder="[Hook]&#10;What if your phone is quietly listening to your heartbeat?&#10;&#10;[Context]&#10;New research reveals micro-vibrations can decode pulse rates.&#10;&#10;[Turn]&#10;Here is why tech giants are scrambling for patents.&#10;&#10;[Payoff]&#10;Privacy will never be the same.&#10;&#10;[CTA]&#10;Follow for the cutting edge of AI."></textarea>
+                <div class="script-editor-foot">
+                  <label class="inline">
+                    <input type="checkbox" id="rights-box"> <strong>Source rights confirmed</strong> (Required for approval)
+                  </label>
+                  <div class="row" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button id="btn-check-virality" class="btn primary" title="Đo lường độ lan tỏa & khả năng giữ chân khán giả (Retention)">🔥 Virality</button>
+                    <button id="btn-audit-sensitivity" class="btn" title="Soát nhạy cảm, tôn trọng nạn nhân & an toàn kiếm tiền">🛡️ Sensitivity</button>
+                    <button id="btn-extract-timeline" class="btn" title="Trích xuất chuỗi sự kiện và bước ngoặt">⏱️ Timeline</button>
+                    <button id="btn-reconcile-facts" class="btn" title="Đối chiếu số liệu đa nguồn">⚖️ Facts</button>
+                    <button id="btn-analyze-script" class="btn">🔍 Lint</button>
+                    <button id="btn-save" class="btn primary">💾 Save</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Real-Time Script Linter & Quality Score Gauge -->
+              <div class="script-analysis-card">
+                <div class="score-meter-wrap">
+                  <div class="score-circle" id="score-gauge" style="--score-pct: 100%;">
+                    <span class="score-val" id="score-val">100</span>
+                  </div>
+                  <div class="score-meta">
+                    <div class="score-label">Script Quality Score</div>
+                    <div class="score-sub" id="score-sub">Pacing &amp; duration match: Optimal</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="sidebar-label" style="margin-bottom: 8px;">Timing &amp; Sections</div>
+                  <div id="analysis-sections" class="analysis-sections">
+                    <div class="muted small">Write or generate a script to analyze spoken pacing.</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="sidebar-label" style="margin-bottom: 8px;">Lint Findings &amp; Advice</div>
+                  <div id="analysis-issues" class="analysis-issues">
+                    <div class="issue-item info">✨ Ready for automated script linting.</div>
+                  </div>
+                </div>
+
+                <!-- Virality & Retention Predictor Card -->
+                <div id="virality-card" style="margin-top: 14px; border-top: 1px solid var(--border-color, #2d3348); padding-top: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span class="sidebar-label">🔥 Virality &amp; Retention Predictor</span>
+                    <span id="virality-score-badge" class="badge ok">—</span>
+                  </div>
+                  <div class="virality-metrics-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+                    <div class="v-metric-box"><span class="v-metric-label">🎣 Hook Strength</span><strong id="v-hook-score">—</strong></div>
+                    <div class="v-metric-box"><span class="v-metric-label">⚡ Pacing Rhythm</span><strong id="v-pacing-score">—</strong></div>
+                    <div class="v-metric-box"><span class="v-metric-label">⏱️ Duration Fit</span><strong id="v-duration-score">—</strong></div>
+                    <div class="v-metric-box"><span class="v-metric-label">📣 CTA Impact</span><strong id="v-cta-score">—</strong></div>
+                  </div>
+                  <div id="virality-findings" class="analysis-issues">
+                    <div class="issue-item info">Nhấn "🔥 Virality" để đo lường sức hút và dự đoán tỷ lệ giữ chân (Retention &gt; 100%).</div>
+                  </div>
+                </div>
+
+                <!-- Sensitivity & Monetization Safety Guard Card -->
+                <div id="sensitivity-card" style="margin-top: 14px; border-top: 1px solid var(--border-color, #2d3348); padding-top: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span class="sidebar-label">🛡️ Policy &amp; Sensitivity Guard</span>
+                    <span id="safety-score-badge" class="badge ok">100/100 Safe</span>
+                  </div>
+                  <div id="sensitivity-findings" class="analysis-issues">
+                    <div class="issue-item info">Chưa phát hiện rủi ro nhạy cảm hoặc vi phạm chính sách nền tảng.</div>
+                  </div>
+                  <div id="sensitivity-disclaimer-wrap" style="display: none; margin-top: 8px;">
+                    <button id="btn-insert-disclaimer" class="btn sm" style="width: 100%;">＋ Chèn lời tưởng niệm / miễn trừ vào kịch bản</button>
+                  </div>
+                </div>
+
+                <!-- Structured Historical Timeline Card -->
+                <div id="history-timeline-card" style="margin-top: 14px; border-top: 1px solid var(--border-color, #2d3348); padding-top: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span class="sidebar-label">⏱️ Structured Timeline</span>
+                    <span id="timeline-stats-badge" class="badge">0 events</span>
+                  </div>
+                  <div id="timeline-events-list" class="analysis-sections">
+                    <div class="muted small">Nhấn "⏱️ Timeline" để tự trích xuất chuỗi sự kiện &amp; mốc cao trào.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB PANEL 2: AI AGENT ORCHESTRA -->
+          <div class="tab-panel" id="panel-orchestra">
+            <div class="sidebar-label" style="margin-bottom: 8px;">Orchestrated AI Providers &amp; Stage Assignment</div>
+            <div class="orchestra-grid" id="orchestra-grid">
+              <div class="agent-card" data-agent="gemini">
+                <div class="agent-card-accent"></div>
+                <div class="agent-card-head">
+                  <div class="agent-identity">
+                    <div class="agent-icon">✨</div>
+                    <div>
+                      <div class="agent-name">Google Gemini 2.0 / 1.5</div>
+                      <div class="muted small">Multimodal Vision &amp; Deep Grounded Research</div>
+                    </div>
+                  </div>
+                  <span class="agent-badge-tier">Tier 1</span>
+                </div>
+                <div class="agent-roles-list">
+                  <span class="role-chip">🔬 Web Grounding</span>
+                  <span class="role-chip">📚 Academic Search</span>
+                  <span class="role-chip">🖼 Visual Framing</span>
+                </div>
+                <div class="agent-card-foot">
+                  <span>Assigned: Research &amp; Scene Vision</span>
+                  <span style="color: #34d399;">● Online</span>
+                </div>
+              </div>
+
+              <div class="agent-card" data-agent="claude">
+                <div class="agent-card-accent"></div>
+                <div class="agent-card-head">
+                  <div class="agent-identity">
+                    <div class="agent-icon">🎯</div>
+                    <div>
+                      <div class="agent-name">Anthropic Claude 3.5 Sonnet</div>
+                      <div class="muted small">Viral Hook &amp; Narrative Crafting</div>
+                    </div>
+                  </div>
+                  <span class="agent-badge-tier">Tier 1</span>
+                </div>
+                <div class="agent-roles-list">
+                  <span class="role-chip">✍ Script Engine</span>
+                  <span class="role-chip">🎣 Hook Engineering</span>
+                  <span class="role-chip">⚡ Pacing Tuning</span>
+                </div>
+                <div class="agent-card-foot">
+                  <span>Assigned: Script Drafting &amp; Polishing</span>
+                  <span style="color: #34d399;">● Ready</span>
+                </div>
+              </div>
+
+              <div class="agent-card" data-agent="codex">
+                <div class="agent-card-accent"></div>
+                <div class="agent-card-head">
+                  <div class="agent-identity">
+                    <div class="agent-icon">⚡</div>
+                    <div>
+                      <div class="agent-name">OpenAI Codex / GPT-4o</div>
+                      <div class="muted small">Structured Scene JSON &amp; Motion</div>
+                    </div>
+                  </div>
+                  <span class="agent-badge-tier">Tier 1</span>
+                </div>
+                <div class="agent-roles-list">
+                  <span class="role-chip">🎬 Scene Breakdown</span>
+                  <span class="role-chip">📐 Motion Keyframes</span>
+                  <span class="role-chip">⏱ Beat Sync</span>
+                </div>
+                <div class="agent-card-foot">
+                  <span>Assigned: Video Timeline Composition</span>
+                  <span style="color: #34d399;">● Ready</span>
+                </div>
+              </div>
+
+              <div class="agent-card" data-agent="deepseek">
+                <div class="agent-card-accent"></div>
+                <div class="agent-card-head">
+                  <div class="agent-identity">
+                    <div class="agent-icon">🧠</div>
+                    <div>
+                      <div class="agent-name">DeepSeek V3 / R1</div>
+                      <div class="muted small">Reasoning &amp; Fact Verification</div>
+                    </div>
+                  </div>
+                  <span class="agent-badge-tier">Tier 2</span>
+                </div>
+                <div class="agent-roles-list">
+                  <span class="role-chip">🛡 Fact Checker</span>
+                  <span class="role-chip">📐 Logical Consistency</span>
+                  <span class="role-chip">⚖ Rights Verification</span>
+                </div>
+                <div class="agent-card-foot">
+                  <span>Assigned: Fact Checking &amp; Linting</span>
+                  <span style="color: #34d399;">● Ready</span>
+                </div>
+              </div>
+
+              <div class="agent-card" data-agent="local">
+                <div class="agent-card-accent"></div>
+                <div class="agent-card-head">
+                  <div class="agent-identity">
+                    <div class="agent-icon">⚙</div>
+                    <div>
+                      <div class="agent-name">Deterministic Local Engine</div>
+                      <div class="muted small">Offline Templates &amp; Canvas Renderer</div>
+                    </div>
+                  </div>
+                  <span class="agent-badge-tier">Zero-cost</span>
+                </div>
+                <div class="agent-roles-list">
+                  <span class="role-chip">🔒 Offline Safe</span>
+                  <span class="role-chip">🎙 Edge-TTS Voice</span>
+                  <span class="role-chip">🎞 WebM Canvas Engine</span>
+                </div>
+                <div class="agent-card-foot">
+                  <span>Assigned: Voiceover &amp; Video Export</span>
+                  <span style="color: #34d399;">● Always Available</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Specialized AI Agent Tool & Skill Matrix -->
+            <div class="sidebar-label" style="margin: 24px 0 10px 0;">⚡ Specialized AI Agent Tools &amp; Action Matrix</div>
+            <div class="agent-toolbox-grid">
+              <!-- Claude Tools -->
+              <div class="agent-tool-card" data-vendor="claude">
+                <div class="at-header">
+                  <span class="at-icon">🎯</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">Claude Viral Hook Generator</div>
+                    <span class="at-vendor-badge claude">Anthropic Claude</span>
+                  </div>
+                </div>
+                <p class="at-desc">Synthesize 3 viral curiosity hooks tailored to Vietnamese &amp; global short-form algorithms.</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="claude-hook">📋 Copy Prompt</button>
+                  <button class="btn sm primary at-btn-run" data-action="claude-hook">⚡ Run in Pipeline</button>
+                </div>
+              </div>
+
+              <div class="agent-tool-card" data-vendor="claude">
+                <div class="at-header">
+                  <span class="at-icon">✍</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">Claude Narrative Pacing Polisher</div>
+                    <span class="at-vendor-badge claude">Anthropic Claude</span>
+                  </div>
+                </div>
+                <p class="at-desc">Restructure script clauses to match optimal spoken tempo (3.8-4.2 syllables/sec for Vietnamese).</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="claude-polish">📋 Copy Prompt</button>
+                  <button class="btn sm primary at-btn-run" data-action="claude-polish">⚡ Polish Script</button>
+                </div>
+              </div>
+
+              <!-- Gemini Tools -->
+              <div class="agent-tool-card" data-vendor="gemini">
+                <div class="at-header">
+                  <span class="at-icon">✨</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">Gemini Multimodal Scene Framing</div>
+                    <span class="at-vendor-badge gemini">Google Gemini</span>
+                  </div>
+                </div>
+                <p class="at-desc">Analyze narrative sentiment and generate visual framing cues, camera movements, and b-roll directives.</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="gemini-framing">📋 Copy Prompt</button>
+                  <button class="btn sm primary at-btn-run" data-action="gemini-framing">⚡ Suggest Framing</button>
+                </div>
+              </div>
+
+              <div class="agent-tool-card" data-vendor="gemini">
+                <div class="at-header">
+                  <span class="at-icon">🔬</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">Gemini Grounded Research Pass</div>
+                    <span class="at-vendor-badge gemini">Google Gemini</span>
+                  </div>
+                </div>
+                <p class="at-desc">Deep federated search across arXiv, Crossref, and web to ground video topics in verified evidence.</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="gemini-research">📋 Copy Prompt</button>
+                  <button class="btn sm primary at-btn-run" data-action="gemini-research">⚡ Run Research</button>
+                </div>
+              </div>
+
+              <!-- Codex Tools -->
+              <div class="agent-tool-card" data-vendor="codex">
+                <div class="at-header">
+                  <span class="at-icon">⚡</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">Codex Scene Breakdown JSON</div>
+                    <span class="at-vendor-badge codex">OpenAI Codex</span>
+                  </div>
+                </div>
+                <p class="at-desc">Compile script narration into strict timeline JSON with duration math, transitions, and text positions.</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="codex-scenes">📋 Copy Prompt</button>
+                  <button class="btn sm primary at-btn-run" data-action="codex-scenes">⚡ Build Scenes</button>
+                </div>
+              </div>
+
+              <div class="agent-tool-card" data-vendor="codex">
+                <div class="at-header">
+                  <span class="at-icon">📐</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">Codex Keyframe Motion Math</div>
+                    <span class="at-vendor-badge codex">OpenAI Codex</span>
+                  </div>
+                </div>
+                <p class="at-desc">Calculate spatial coordinate offsets, scale zooms, and cubic bezier curves for kinetic typography.</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="codex-motion">📋 Copy Prompt</button>
+                  <button class="btn sm primary at-btn-run" data-action="codex-motion">⚡ Apply Motion</button>
+                </div>
+              </div>
+
+              <!-- DeepSeek Tools -->
+              <div class="agent-tool-card" data-vendor="deepseek">
+                <div class="at-header">
+                  <span class="at-icon">🧠</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">DeepSeek Anti-Plagiarism Linter</div>
+                    <span class="at-vendor-badge deepseek">DeepSeek R1</span>
+                  </div>
+                </div>
+                <p class="at-desc">Rigorous copy-risk scanner against source bibliography to enforce original phrasing ("Transform, do not copy").</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="deepseek-copyrisk">📋 Copy Prompt</button>
+                  <button class="btn sm primary at-btn-run" data-action="deepseek-copyrisk">⚡ Scan Copy Risk</button>
+                </div>
+              </div>
+
+              <div class="agent-tool-card" data-vendor="deepseek">
+                <div class="at-header">
+                  <span class="at-icon">🛡</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">DeepSeek Fact Verification Auditor</div>
+                    <span class="at-vendor-badge deepseek">DeepSeek R1</span>
+                  </div>
+                </div>
+                <p class="at-desc">Cross-examine narration claims against peer-reviewed papers to eliminate hallucinations.</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="deepseek-facts">📋 Copy Prompt</button>
+                  <button class="btn sm primary at-btn-run" data-action="deepseek-facts">⚡ Audit Facts</button>
+                </div>
+              </div>
+
+              <!-- Local Deterministic Tools -->
+              <div class="agent-tool-card" data-vendor="local">
+                <div class="at-header">
+                  <span class="at-icon">🎙</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">Edge-TTS Neural Voice Synthesizer</div>
+                    <span class="at-vendor-badge local">Local Engine</span>
+                  </div>
+                </div>
+                <p class="at-desc">Generate native Vietnamese neural speech (HoaiMy / NamMinh) and measure clip durations offline.</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="local-voice">📋 Voice Settings</button>
+                  <button class="btn sm primary at-btn-run" data-action="local-voice">⚡ Synthesize Voice</button>
+                </div>
+              </div>
+
+              <div class="agent-tool-card" data-vendor="local">
+                <div class="at-header">
+                  <span class="at-icon">🎵</span>
+                  <div class="at-title-wrap">
+                    <div class="at-name">Local Web Audio SFX Engine</div>
+                    <span class="at-vendor-badge local">Local Engine</span>
+                  </div>
+                </div>
+                <p class="at-desc">Synthesize procedural viral sound effects (Whoosh, Pop, Impact, Camera click, Ding) in real-time.</p>
+                <div class="at-actions">
+                  <button class="btn sm at-btn-prompt" data-action="local-sfx">📋 Test SFX</button>
+                  <button class="btn sm primary at-btn-run" data-action="local-sfx">⚡ Open Studio SFX</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+          <!-- TAB PANEL 3: RESEARCH SOURCES -->
+          <div class="tab-panel" id="panel-sources">
+            <div id="research-status" class="muted small" style="margin-bottom: 12px;"></div>
+            <div id="sources" class="sources-container"></div>
+          </div>
+
+          <!-- TAB PANEL 4: KEY FACTS -->
+          <div class="tab-panel" id="panel-facts">
+            <div id="facts" class="facts-grid"></div>
+          </div>
+
+          <!-- TAB PANEL 5: STYLE PRESETS -->
+          <div class="tab-panel" id="panel-styles">
+            <div class="script-studio-layout">
+              <div class="script-editor-card">
+                <div class="script-editor-head">
+                  <h3>Scripting Presets &amp; Rules</h3>
+                  <select id="style-selector" class="ed-select" style="min-width: 180px;"></select>
+                </div>
+                <div id="style-details" class="meta" style="grid-template-columns: 1fr;">
+                  <div>Tone: <strong id="style-tone">—</strong></div>
+                  <div>Structure: <strong id="style-structure">—</strong></div>
+                  <div>Max Sentence Units: <strong id="style-units">—</strong></div>
+                </div>
+                <div>
+                  <label class="field-label"><strong>Hook Directives</strong></label>
+                  <ul id="style-hooks" style="padding-left: 20px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;"></ul>
+                </div>
+              </div>
+              <div class="script-analysis-card">
+                <h3>Apply Style Preset</h3>
+                <p class="muted small">Selecting a style changes the prompt instructions, pacing rules, and linting standards for AI generation.</p>
+                <button id="btn-apply-style" class="btn primary">Apply Preset to Project</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB PANEL 6: DOCUMENT EXPLORER -->
+          <div class="tab-panel" id="panel-documents">
+            <div class="explorer-grid">
+              <div class="explorer-card">
+                <div class="explorer-head">
+                  <h3>Academic &amp; Public Sources</h3>
+                  <div class="muted small">arXiv, Crossref, Gutenberg, Wikipedia, Internet Archive</div>
+                </div>
+                <form id="doc-search-form" class="inline-form">
+                  <input id="doc-query" placeholder="Search physics, neuroscience, history, tech...">
+                  <button type="submit" class="btn primary">Search</button>
+                </form>
+                <div id="doc-results" class="doc-results"></div>
+              </div>
+
+              <div class="explorer-card">
+                <div class="explorer-head">
+                  <h3>Local Library Knowledge Index</h3>
+                  <div class="muted small">Ranked BM25 / Full-Text Search on saved PDFs</div>
+                </div>
+                <form id="lib-search-form" class="inline-form">
+                  <input id="lib-query" placeholder="Search ingested papers...">
+                  <button type="submit" class="btn primary">Search</button>
+                </form>
+                <div id="lib-hits" class="lib-hits"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE VIEW 2: PHOTO & PHOTOSHOP LAB -->
+        <section class="ws-view" id="view-photolab">
+          <div class="photolab-container">
+            <!-- Left Photoshop Toolbar -->
+            <div class="photolab-toolbar">
+              <button class="pl-tool-btn active" data-tool="select" title="Move &amp; Select (V)">↖</button>
+              <button class="pl-tool-btn" data-tool="crop" title="Crop &amp; Frame (C)">✂</button>
+              <button class="pl-tool-btn" data-tool="brush" title="Paint Brush (B)">🖌</button>
+              <button class="pl-tool-btn" data-tool="eraser" title="Eraser (E)">🧹</button>
+              <button class="pl-tool-btn" data-tool="text" title="Add Typography (T)">T</button>
+              <button class="pl-tool-btn" data-tool="rect" title="Rectangle Shape (U)">▢</button>
+              <button class="pl-tool-btn" data-tool="circle" title="Circle / Ellipse">◯</button>
+              <button class="pl-tool-btn" data-tool="arrow" title="Pointer Arrow Shape">↗</button>
+              <button class="pl-tool-btn" data-tool="eyedropper" title="Color Eyedropper (I)">💧</button>
+              <span class="pro-sep" style="margin: 8px 0;"></span>
+              <div class="pl-color-picker-wrap" title="Foreground Color">
+                <input type="color" id="pl-fore-color" value="#6366f1" class="pl-color-input">
+              </div>
+            </div>
+
+            <!-- Center Photoshop Stage & Canvas -->
+            <div class="photolab-viewport">
+              <div class="photolab-viewport-topbar">
+                <div class="pl-preset-chips">
+                  <span class="pl-chip active" data-aspect="9:16">📱 TikTok Cover 9:16</span>
+                  <span class="pl-chip" data-aspect="16:9">📺 YouTube 16:9</span>
+                  <span class="pl-chip" data-aspect="1:1">📷 Instagram 1:1</span>
+                  <span class="pl-chip" data-aspect="4:5">🖼 Reels 4:5</span>
+                </div>
+                <div class="pl-quick-actions">
+                  <button id="btn-pl-import-frame" class="btn sm">📸 Capture from Video</button>
+                  <button id="btn-pl-clear" class="btn sm">🗑 Clear</button>
+                  <button id="btn-pl-export-png" class="btn sm primary">⚡ Export PNG</button>
+                </div>
+              </div>
+
+              <div class="photolab-canvas-stage" id="photolab-canvas-stage">
+                <canvas id="photolab-canvas" width="720" height="1280"></canvas>
+              </div>
+
+              <div class="photolab-viewport-foot">
+                <span id="pl-dimensions">720 × 1280 px · 100% Zoom</span>
+                <div class="pl-zoom-ctrl">
+                  <button id="btn-pl-zoom-out" class="btn sm icon-btn">−</button>
+                  <span id="pl-zoom-val">100%</span>
+                  <button id="btn-pl-zoom-in" class="btn sm icon-btn">＋</button>
+                  <button id="btn-pl-zoom-fit" class="btn sm">Fit</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Photoshop Panels (Layers & Color Adjustments) -->
+            <div class="photolab-panels">
+              <!-- Tab Navigation inside Photo Lab -->
+              <div class="pl-tab-bar">
+                <button class="pl-tab-btn active" data-pltab="adjust">Adjustments</button>
+                <button class="pl-tab-btn" data-pltab="layers">Layers</button>
+                <button class="pl-tab-btn" data-pltab="templates">Templates</button>
+              </div>
+
+              <!-- Panel: Color Adjustments & Filters -->
+              <div class="pl-tab-content active" id="pl-panel-adjust">
+                <h4>Color &amp; Tone Curves</h4>
+                <label>Brightness <span id="pl-adj-bright-val" class="val">0</span>
+                  <input type="range" id="pl-adj-bright" min="-100" max="100" value="0">
+                </label>
+                <label>Contrast <span id="pl-adj-contrast-val" class="val">0</span>
+                  <input type="range" id="pl-adj-contrast" min="-100" max="100" value="0">
+                </label>
+                <label>Saturation <span id="pl-adj-sat-val" class="val">100%</span>
+                  <input type="range" id="pl-adj-sat" min="0" max="200" value="100">
+                </label>
+                <label>Hue Shift <span id="pl-adj-hue-val" class="val">0°</span>
+                  <input type="range" id="pl-adj-hue" min="-180" max="180" value="0">
+                </label>
+                <label>Exposure <span id="pl-adj-exp-val" class="val">0</span>
+                  <input type="range" id="pl-adj-exp" min="-50" max="50" value="0">
+                </label>
+                <label>Vignette <span id="pl-adj-vig-val" class="val">0</span>
+                  <input type="range" id="pl-adj-vig" min="0" max="100" value="0">
+                </label>
+                <label>Blur FX <span id="pl-adj-blur-val" class="val">0px</span>
+                  <input type="range" id="pl-adj-blur" min="0" max="20" value="0">
+                </label>
+
+                <div class="pl-filter-grid">
+                  <button class="pl-filter-btn active" data-filter="none">Normal</button>
+                  <button class="pl-filter-btn" data-filter="cyberpunk">Cyberpunk</button>
+                  <button class="pl-filter-btn" data-filter="vintage">Vintage</button>
+                  <button class="pl-filter-btn" data-filter="dramatic">Dramatic</button>
+                  <button class="pl-filter-btn" data-filter="blackwhite">B &amp; W</button>
+                  <button class="pl-filter-btn" data-filter="neon">Neon Glow</button>
+                </div>
+              </div>
+
+              <!-- Panel: Layers -->
+              <div class="pl-tab-content" id="pl-panel-layers">
+                <div class="pl-layers-head">
+                  <span>Layer Hierarchy</span>
+                  <div class="pl-layer-actions">
+                    <button id="btn-pl-add-layer" class="btn sm">＋ Layer</button>
+                    <button id="btn-pl-del-layer" class="btn sm danger">🗑</button>
+                  </div>
+                </div>
+                <div class="pl-layers-list" id="pl-layers-list">
+                  <!-- Layers rendered dynamically -->
+                </div>
+                <label style="margin-top: 12px;">Layer Opacity <span id="pl-layer-op-val" class="val">100%</span>
+                  <input type="range" id="pl-layer-op" min="0" max="100" value="100">
+                </label>
+                <label>Blend Mode
+                  <select id="pl-layer-blend" class="ed-select">
+                    <option value="source-over">Normal</option>
+                    <option value="multiply">Multiply</option>
+                    <option value="screen">Screen</option>
+                    <option value="overlay">Overlay</option>
+                    <option value="color-dodge">Color Dodge</option>
+                    <option value="lighter">Lighter / Add</option>
+                  </select>
+                </label>
+              </div>
+
+              <!-- Panel: Viral Thumbnail Templates -->
+              <div class="pl-tab-content" id="pl-panel-templates">
+                <h4>Viral Creator Templates</h4>
+                <div class="pl-template-grid">
+                  <div class="pl-template-card" data-template="tiktok-shock">
+                    <div class="pl-temp-preview temp-1">😲 BOLD HOOK</div>
+                    <div class="pl-temp-title">TikTok Curiosity Hook</div>
+                  </div>
+                  <div class="pl-template-card" data-template="youtube-split">
+                    <div class="pl-temp-preview temp-2">⚡ VS 💡</div>
+                    <div class="pl-temp-title">YouTube Comparison</div>
+                  </div>
+                  <div class="pl-template-card" data-template="neon-cyber">
+                    <div class="pl-temp-preview temp-3">◈ AI FUTURE</div>
+                    <div class="pl-temp-title">Cyber Neon Tech</div>
+                  </div>
+                  <div class="pl-template-card" data-template="quote-clean">
+                    <div class="pl-temp-preview temp-4">“DEEP FACT”</div>
+                    <div class="pl-temp-title">Minimal Quote Card</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE VIEW 3: NODE WORKFLOW DAG -->
+        <section class="ws-view" id="view-workflow">
+          <div class="workflow-dag-container">
+            <div class="dag-topbar">
+              <div class="dag-info">
+                <h3>Autonomous Production DAG</h3>
+                <span class="muted small" id="dag-status-line">Drag blocks, wire them, audit the checklist, then execute the real pipeline.</span>
+              </div>
+              <div class="dag-actions">
+                <button id="btn-dag-tidy" class="btn" title="Re-lay out the blocks in execution order">📐 Tidy</button>
+                <button id="btn-dag-reset" class="btn" title="Reload the saved flow">↺ Reload</button>
+                <button id="btn-dag-checklist" class="btn">🩺 Run Checklist Audit</button>
+                <button id="btn-dag-save" class="btn">💾 Save DAG</button>
+                <button id="btn-dag-run" class="btn primary">🚀 Execute Workflow Run</button>
+              </div>
+            </div>
+
+            <!-- Flow Workbench: palette · canvas · inspector -->
+            <div class="dag-workbench">
+              <aside class="dag-palette">
+                <div class="sidebar-label">Block Palette</div>
+                <div id="dag-palette-list" class="dag-palette-list">
+                  <div class="muted small">Loading blocks…</div>
+                </div>
+                <p class="muted small dag-hint">Drag a block onto the canvas, or click to append. Click a block, then drag its <strong>＋</strong> handle into another block to link them. <kbd>Backspace</kbd> deletes the selection, <kbd>Esc</kbd> cancels a link.</p>
+                <div class="sidebar-label">Run Inputs (JSON)</div>
+                <textarea id="dag-inputs" rows="4" spellcheck="false" placeholder='{"script": "[Hook] ..."}'></textarea>
+                <div class="sidebar-label">Pre-Save Checklist</div>
+                <div id="dag-checklist" class="dag-checklist">
+                  <div class="muted small">Run the checklist audit to validate the flow.</div>
+                </div>
+              </aside>
+
+              <!-- Visual Flow Canvas -->
+              <div class="dag-canvas-wrap" id="dag-canvas-wrap">
+                <svg id="dag-links" class="dag-links" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div class="dag-nodes-flow" id="dag-nodes-flow"></div>
+                <div id="dag-empty" class="dag-empty muted small">Drop a block here to start building the flow.</div>
+              </div>
+
+              <aside class="dag-inspector">
+                <div class="sidebar-label">Block Inspector</div>
+                <div id="dag-inspector-body" class="dag-inspector-body muted small">Click a block on the canvas to edit it.</div>
+              </aside>
+            </div>
+
+            <!-- DAG Run Output Terminal -->
+            <div class="dag-terminal">
+              <div class="dag-term-head">
+                <span>Console &amp; Execution Stream</span>
+                <span id="dag-run-status" class="muted small">Idle</span>
+              </div>
+              <pre id="dag-term-logs" class="dag-term-body">Select a project and click 'Execute Workflow Run' or 'Run Checklist Audit'.</pre>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE VIEW 4: MULTI-FORMAT CONTENT EMPIRE HUB -->
+        <section class="ws-view" id="view-empire">
+          <div class="empire-container">
+            <!-- Empire Topbar / Configuration Banner -->
+            <div class="empire-banner">
+              <div class="empire-banner-info">
+                <div class="empire-title-row">
+                  <span class="empire-badge">🏛 CONTENT EMPIRE</span>
+                  <h2 id="empire-topic-title">1 Topic ➔ 1 YouTube Master + 5–10 TikTok/Shorts</h2>
+                </div>
+                <p class="empire-subtitle">Chiến lược nội dung Faceless &amp; Full AI cho chủ đề Lịch sử &amp; Thảm họa. Phối ghép 6 tầng tư liệu lai (Hybrid Media) chống tạo cảm giác AI giả tạo.</p>
+              </div>
+              <div class="empire-banner-actions">
+                <div class="empire-config-group">
+                  <label class="empire-select-label">Shorts
+                    <select id="empire-shorts-count" class="ed-select sm">
+                      <option value="3">3 Shorts</option>
+                      <option value="5" selected>5 Shorts</option>
+                      <option value="7">7 Shorts</option>
+                      <option value="10">10 Shorts</option>
+                    </select>
+                  </label>
+                  <label class="empire-select-label">YouTube
+                    <select id="empire-yt-duration" class="ed-select sm">
+                      <option value="8">8 Phút</option>
+                      <option value="10" selected>10 Phút</option>
+                      <option value="12">12 Phút</option>
+                      <option value="15">15 Phút</option>
+                    </select>
+                  </label>
+                </div>
+                <button id="btn-empire-generate" class="btn primary">⚡ Re-Generate Campaign</button>
+                <button id="btn-empire-ingest" class="btn">📥 Ingest Footage &amp; Media</button>
+                <button id="btn-empire-export" class="btn">📦 Export All Packs</button>
+              </div>
+            </div>
+
+            <!-- Golden Hybrid Media Allocation Bar -->
+            <div class="hybrid-ratio-card">
+              <div class="ratio-head">
+                <div class="ratio-title">
+                  <span>⚖️ Công Thức Tư Liệu Lai (Hybrid Media Ratio)</span>
+                  <span class="ratio-tooltip">Chuẩn mực chống cảm giác "AI rẻ tiền" và tăng tối đa uy tín cho kênh tài liệu</span>
+                </div>
+                <div class="ratio-summary-badge">100% Hoàn Hảo Cho Kênh Tài Liệu</div>
+              </div>
+              <div class="ratio-bar">
+                <div class="ratio-seg seg-ai" style="width: 30%;" title="30% AI Reconstruction (Kling / Veo / Wan 2.1)">30% AI Video</div>
+                <div class="ratio-seg seg-photo" style="width: 20%;" title="20% Historical Photos (Public Domain / Wikimedia)">20% Ảnh Thật</div>
+                <div class="ratio-seg seg-map" style="width: 15%;" title="15% Dynamic Maps (Radar / GPS Trajectory)">15% Bản Đồ</div>
+                <div class="ratio-seg seg-doc" style="width: 15%;" title="15% Declassified Docs (Báo chí / Hồ sơ mật)">15% Báo &amp; Hồ Sơ</div>
+                <div class="ratio-seg seg-diagram" style="width: 10%;" title="10% Technical Diagrams (Sơ đồ mặt cắt kỹ thuật)">10% Sơ Đồ</div>
+                <div class="ratio-seg seg-motion" style="width: 10%;" title="10% Kinetic Motion (Infographics / Typography)">10% Motion</div>
+              </div>
+              <div class="ratio-legend">
+                <span class="leg-item"><i class="leg-dot dot-ai"></i> 30% AI Kling/Veo</span>
+                <span class="leg-item"><i class="leg-dot dot-photo"></i> 20% Ảnh lịch sử phục chế</span>
+                <span class="leg-item"><i class="leg-dot dot-map"></i> 15% Bản đồ hành trình 3D</span>
+                <span class="leg-item"><i class="leg-dot dot-doc"></i> 15% Hồ sơ giải mật &amp; Nhật báo</span>
+                <span class="leg-item"><i class="leg-dot dot-diagram"></i> 10% Sơ đồ kỹ thuật blueprint</span>
+                <span class="leg-item"><i class="leg-dot dot-motion"></i> 10% Kinetic motion typography</span>
+              </div>
+            </div>
+
+            <!-- Dual Split Matrix: YouTube Master on Left, TikTok Shorts Series on Right -->
+            <div class="empire-split-layout">
+              <!-- LEFT: YouTube Master Branch (8-12m, 16:9) -->
+              <div class="empire-branch yt-branch">
+                <div class="branch-head">
+                  <div class="branch-title-wrap">
+                    <span class="branch-icon">🎬</span>
+                    <div>
+                      <div class="branch-title">YouTube Long Masterpiece</div>
+                      <div class="branch-meta" id="empire-yt-meta">8–12 Phút · 16:9 · 40–60 Cảnh Kịch Tính</div>
+                    </div>
+                  </div>
+                  <div class="branch-actions">
+                    <button id="btn-copy-yt-script" class="btn sm">📋 Copy Script</button>
+                  </div>
+                </div>
+
+                <!-- 8-Step Dramatic Story Arc Visualizer -->
+                <div class="story-arc-stepper">
+                  <div class="arc-step" title="Mở đầu tò mò">1. Hook</div>
+                  <div class="arc-arrow">→</div>
+                  <div class="arc-step" title="Bối cảnh lịch sử">2. Context</div>
+                  <div class="arc-arrow">→</div>
+                  <div class="arc-step" title="Thời khắc kích hoạt">3. Event</div>
+                  <div class="arc-arrow">→</div>
+                  <div class="arc-step" title="Diễn biến dồn dập">4. Escalation</div>
+                  <div class="arc-arrow">→</div>
+                  <div class="arc-step" title="Đỉnh điểm thảm kịch">5. Climax</div>
+                  <div class="arc-arrow">→</div>
+                  <div class="arc-step" title="Hậu quả chấn động">6. Consequence</div>
+                  <div class="arc-arrow">→</div>
+                  <div class="arc-step" title="Hồ sơ giải mật">7. Twist</div>
+                  <div class="arc-arrow">→</div>
+                  <div class="arc-step" title="Bài học &amp; Di sản">8. Ending</div>
+                </div>
+
+                <!-- YouTube Master Script Container -->
+                <div class="empire-editor-card">
+                  <div class="field-label-row">
+                    <label><strong>YouTube Master Narration &amp; Director Cues</strong></label>
+                    <span class="muted small" id="yt-word-count">~1,500 từ · 10 phút</span>
+                  </div>
+                  <textarea id="empire-yt-script" class="empire-script-box" rows="12" spellcheck="false" placeholder="Loading YouTube Master Script..."></textarea>
+                </div>
+
+                <!-- 5x Viral Titles & SEO Description Accordion -->
+                <div class="empire-subcard">
+                  <div class="subcard-title">🎯 5x YouTube Viral Titles (High CTR)</div>
+                  <div id="empire-yt-titles" class="title-list"></div>
+                </div>
+
+                <div class="empire-subcard">
+                  <div class="subcard-title">⏱️ YouTube SEO Description &amp; Timestamps</div>
+                  <textarea id="empire-yt-desc" class="empire-desc-box" rows="5" spellcheck="false"></textarea>
+                  <button id="btn-copy-yt-desc" class="btn sm" style="margin-top: 6px;">📋 Copy Description &amp; Chapters</button>
+                </div>
+
+                <!-- YouTube Scenes Breakdown with Hybrid Badges -->
+                <div class="empire-subcard">
+                  <div class="subcard-title">🎬 Danh Sách Cảnh Phân Bổ Theo Tỉ Lệ Lai (Hybrid Scenes)</div>
+                  <div id="empire-yt-scenes" class="empire-scene-grid"></div>
+                </div>
+              </div>
+
+              <!-- RIGHT: TikTok / Shorts Multi-Angle Matrix (30-60s, 9:16) -->
+              <div class="empire-branch tiktok-branch">
+                <div class="branch-head">
+                  <div class="branch-title-wrap">
+                    <span class="branch-icon">📱</span>
+                    <div>
+                      <div class="branch-title">TikTok / Shorts Viral Series</div>
+                      <div class="branch-meta">30–60s · 9:16 · Từng Góc Nhìn Độc Lập</div>
+                    </div>
+                  </div>
+                  <div class="branch-actions">
+                    <span id="shorts-badge-count" class="badge ok">5 Shorts</span>
+                  </div>
+                </div>
+
+                <div class="tiktok-note">
+                  💡 <em>Đừng cắt đại YouTube!</em> Mỗi video ngắn dưới đây là một góc tiếp cận tâm lý giật gân riêng biệt kích thích tỉ lệ giữ chân (Retention &gt; 100%).
+                </div>
+
+                <!-- Shorts Horizontal Tabs -->
+                <div id="empire-shorts-tabs" class="shorts-tab-bar"></div>
+
+                <!-- Active Short Detail Card -->
+                <div id="empire-short-card" class="active-short-card">
+                  <div class="short-card-header">
+                    <div class="short-angle-badge" id="short-active-angle">Tín hiệu cảnh báo</div>
+                    <input type="text" id="short-active-title" class="short-title-input" placeholder="Tiêu đề short...">
+                  </div>
+
+                  <div class="hook-spotlight">
+                    <div class="hook-tag">🔥 HOOK (0–3 GIÂY)</div>
+                    <textarea id="short-active-hook" class="short-hook-box" rows="2"></textarea>
+                  </div>
+
+                  <div class="field-label-row" style="margin-top: 8px;">
+                    <label><strong>Kịch bản 9:16 Chuẩn Nhịp (30–60s)</strong></label>
+                    <span id="short-active-dur" class="muted small">50s · 180 từ</span>
+                  </div>
+                  <textarea id="short-active-script" class="short-script-box" rows="8" spellcheck="false"></textarea>
+
+                  <div class="short-action-bar">
+                    <button id="btn-save-active-short" class="btn sm primary">💾 Save Short</button>
+                    <button id="btn-copy-short-script" class="btn sm">📋 Copy Script</button>
+                    <button id="btn-copy-short-kling" class="btn sm">🎥 Copy 9:16 Kling Prompt</button>
+                    <button id="btn-copy-short-mj" class="btn sm">🖼️ Copy 9:16 Midjourney Prompt</button>
+                  </div>
+                </div>
+
+                <!-- 10x TikTok Retention Hooks Collection -->
+                <div class="empire-subcard" style="margin-top: 14px;">
+                  <div class="subcard-title">🪝 10x TikTok Retention Hooks (0–3 Giây)</div>
+                  <div id="empire-tiktok-hooks" class="hooks-grid"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Full-Width Bottom Section: 15-Asset Generative Prompts Matrix -->
+            <div class="empire-prompts-card">
+              <div class="prompts-card-head">
+                <div class="prompts-card-title">
+                  <span>⚡ Gói 15 Tài Nguyên Toàn Diện Cho Từng AI Agent</span>
+                  <span class="muted small">Sao chép 1-click cho Kling, Veo, Midjourney, Suno, ElevenLabs</span>
+                </div>
+                <!-- Prompt Matrix Tabs -->
+                <div class="pm-tab-bar">
+                  <button class="pm-tab-btn active" data-pmtab="kling">🎬 Kling / Veo Prompts</button>
+                  <button class="pm-tab-btn" data-pmtab="mj">🖼️ Midjourney &amp; Thumbnails</button>
+                  <button class="pm-tab-btn" data-pmtab="suno">🎵 Suno Soundtracks</button>
+                  <button class="pm-tab-btn" data-pmtab="eleven">🎙️ ElevenLabs Voiceover</button>
+                  <button class="pm-tab-btn" data-pmtab="factcheck">🔍 Fact-Check Report</button>
+                </div>
+              </div>
+
+              <!-- Prompt Tab Panels -->
+              <div class="pm-tab-content active" id="pm-panel-kling">
+                <div id="pm-kling-list" class="prompt-item-list"></div>
+              </div>
+
+              <div class="pm-tab-content" id="pm-panel-mj">
+                <div id="pm-mj-list" class="prompt-item-list"></div>
+              </div>
+
+              <div class="pm-tab-content" id="pm-panel-suno">
+                <div id="pm-suno-list" class="prompt-item-list"></div>
+              </div>
+
+              <div class="pm-tab-content" id="pm-panel-eleven">
+                <div id="pm-eleven-content" class="eleven-profile-card"></div>
+              </div>
+
+              <div class="pm-tab-content" id="pm-panel-factcheck">
+                <div id="pm-factcheck-content" class="factcheck-box"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE VIEW 5: MEDIA STUDIO (upload & re-cook any media) -->
+        <section class="ws-view" id="view-mediastudio">
+          <div class="media-studio-container">
+            <div class="media-studio-header">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <h2>🎞️ Media Studio Pro</h2>
+                  <p class="media-sub">Tải kho tư liệu đa phương tiện, phiên âm AI, xào nấu kịch bản (Content Re-Cook), và tìm kiếm ngữ nghĩa.</p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button id="btn-ms-dedup" class="btn" title="Quét tìm ảnh/clip trùng lặp qua thuật toán dHash Perceptual Hashing">🧹 Quét Khử Trùng (dHash)</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Media Search & Filter Bar -->
+            <div class="media-tools-bar" style="display: flex; gap: 10px; margin: 12px 0; align-items: center; flex-wrap: wrap;">
+              <div style="display: flex; gap: 6px; flex: 1; min-width: 280px;">
+                <input type="text" id="ms-semantic-search" placeholder="🔍 Tìm kiếm tư liệu ngữ nghĩa (vd: 'người mặc áo lính', 'tàu chiến chìm')..." class="ed-select" style="flex: 1;">
+                <button id="btn-ms-search" class="btn primary">Tìm kiếm</button>
+                <button id="btn-ms-search-clear" class="btn sm">✕</button>
+              </div>
+            </div>
+
+            <div class="media-upload-row">
+              <input type="file" id="ms-file-input" multiple />
+              <select id="ms-language"><option value="en">English</option><option value="vi">Tiếng Việt</option></select>
+              <button id="ms-upload-btn" class="media-btn primary">⬆ Upload to Library</button>
+              <span id="ms-upload-status" class="media-status"></span>
+            </div>
+
+            <div id="ms-search-results-label" class="muted small" style="margin: 6px 0; display: none;"></div>
+            <div class="media-grid" id="ms-media-grid">
+              <div class="media-empty">No media yet — upload something to begin.</div>
+            </div>
+            <div class="media-detail" id="ms-detail" hidden>
+              <h3 id="ms-detail-title"></h3>
+              <div id="ms-detail-body"></div>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
 
-    <!-- RIGHT: pipeline inspector -->
-    <aside class="inspector">
-      <div id="inspector-empty" class="inspector-empty muted">Select a project</div>
+    <!-- RIGHT INSPECTOR: Live Production State & Decision Gates -->
+    <aside class="inspector" id="main-inspector">
+      <div id="inspector-empty" class="muted" style="text-align: center; padding: 40px 10px;">Select a project to inspect pipeline state.</div>
+
       <div id="inspector-content" hidden>
+        <!-- Pipeline State Card -->
         <div class="inspector-card">
           <div class="inspector-head">
-            <h3>Pipeline</h3>
+            <h3>Pipeline State</h3>
             <span id="status-badge" class="status draft">draft</span>
           </div>
           <dl id="detail-meta" class="meta"></dl>
         </div>
 
+        <!-- Video Preview & Generation Actions -->
         <div class="inspector-card">
           <div id="progress-wrap" class="progress-wrap" hidden>
             <div class="progress"><div id="progress-bar"></div></div>
             <span id="progress-label" class="muted small"></span>
           </div>
+
           <div id="video-card" class="video-card" hidden>
             <img id="video-thumb" alt="Video thumbnail">
-            <div id="video-meta" class="muted small"></div>
-            <button id="btn-open-editor" class="btn primary block mt">Open video editor</button>
+            <div id="video-meta"></div>
+            <button id="btn-open-editor" class="btn primary block" style="margin-top: 8px;">🎬 Open Video Studio</button>
           </div>
+
           <div id="published-box" class="published" hidden></div>
           <div id="error-box" class="error" hidden></div>
+
           <div id="actions" class="actions">
-            <button id="btn-approve-script" class="btn">Approve script</button>
-            <button id="btn-start" class="btn primary">Start generation</button>
-            <button id="btn-approve-video" class="btn">Approve video</button>
-            <button id="btn-reject-video" class="btn danger">Reject video</button>
-            <button id="btn-publish" class="btn primary">Publish</button>
+            <button id="btn-approve-script" class="btn">✅ Approve Script (Gate 1)</button>
+            <button id="btn-start" class="btn primary">🚀 Start Video Generation</button>
+            <button id="btn-approve-video" class="btn">⭐ Approve Video (Gate 2)</button>
+            <button id="btn-reject-video" class="btn danger">❌ Reject Video</button>
+            <button id="btn-publish" class="btn primary">📢 Publish to YouTube / Shorts</button>
           </div>
         </div>
 
+        <!-- Sensitivity & Monetization Policy Card -->
+        <div class="inspector-card" id="inspector-sensitivity-card">
+          <div class="inspector-head">
+            <h3>🛡️ Monetization &amp; Ethics</h3>
+            <span id="inspector-safety-badge" class="badge ok">100 / 100</span>
+          </div>
+          <div id="inspector-safety-summary" class="muted small" style="margin-top: 4px;">Script is compliant with platform advertiser guidelines.</div>
+        </div>
+
+        <!-- Attached Documents -->
         <div class="inspector-card">
-          <h3>Attached documents</h3>
+          <h3>Attached Documents</h3>
           <div id="attached-docs" class="attached"></div>
         </div>
 
+        <!-- Review Decision History -->
         <div class="inspector-card">
-          <h3>Review history</h3>
+          <h3>Review History Audit</h3>
           <div id="approvals" class="approvals"></div>
         </div>
 
@@ -150,291 +1310,1103 @@
     </aside>
   </div>
 
-  <!-- Video editor -->
+  <!-- FULLSCREEN VIDEO STUDIO OVERLAY (ADOBE PREMIERE PRO & CREATIVE SUITE) -->
   <div id="editor" class="editor-overlay" hidden>
+    <!-- Studio Topbar -->
     <div class="editor-topbar">
       <div class="editor-brand">
-        <span class="brand-mark">▶</span>
-        <h2>Video editor</h2>
+        <span class="adobe-badge pr" style="font-size: 13px; padding: 2px 6px;">Pr</span>
+        <h2>Premiere Video Studio Pro</h2>
         <select id="ed-aspect" class="ed-select">
-          <option value="9:16">9:16 · Vertical</option>
-          <option value="16:9">16:9 · Landscape</option>
-          <option value="1:1">1:1 · Square</option>
-          <option value="4:5">4:5 · Portrait</option>
+          <option value="9:16" selected>9:16 · Vertical Shorts / TikTok</option>
+          <option value="16:9">16:9 · Landscape Cinematic (YouTube)</option>
+          <option value="1:1">1:1 · Square Feed</option>
+          <option value="4:5">4:5 · Portrait Reels</option>
         </select>
         <select id="ed-fps" class="ed-select">
-          <option value="24">24 fps</option>
-          <option value="30" selected>30 fps</option>
-          <option value="60">60 fps</option>
+          <option value="24">24 fps Cinematic Film</option>
+          <option value="30" selected>30 fps Broadcast Standard</option>
+          <option value="60">60 fps Ultra Smooth</option>
         </select>
         <select id="ed-quality" class="ed-select">
-          <option value="low">Quality: Low</option>
-          <option value="medium">Quality: Medium</option>
-          <option value="high" selected>Quality: High</option>
+          <option value="low">Draft Proxy (540p)</option>
+          <option value="medium">ProRes 422 Proxy</option>
+          <option value="high" selected>Master Quality (1080p)</option>
         </select>
       </div>
+
       <div class="editor-actions">
-        <span id="ed-status" class="muted small"></span>
-        <button id="btn-ed-voice" class="btn" title="Synthesize narration for every scene">🎙 Voiceover</button>
-        <button id="btn-ed-undo" class="btn" title="Undo">↶</button>
-        <button id="btn-ed-redo" class="btn" title="Redo">↷</button>
-        <button id="btn-ed-save" class="btn">Save</button>
-        <button id="btn-ed-export" class="btn primary">Export video</button>
-        <button id="btn-ed-close" class="btn" title="Close">✕</button>
+        <span id="ed-status">Ready</span>
+        <button id="btn-ed-copilot" class="btn primary glow-pulse" title="AI Natural Language Timeline Co-Pilot [Ctrl+K]">🤖 Co-Pilot</button>
+        <button id="btn-ed-ai-thumbs" class="btn" title="AI Auto-Thumbnails with CTR Prediction">✨ CTR Thumbs</button>
+        <button id="btn-ed-safezone" class="btn toggle-active" title="Toggle Action &amp; Title Safe Margins / TikTok Overlay (Ctrl+')">⊞ Safe Margins</button>
+        <button id="btn-ed-device" class="btn" title="Toggle Phone Frame Bezel">📱 Phone Mockup</button>
+        <button id="btn-ed-voice" class="btn" title="Synthesize neural narration voiceover (Edge-TTS) [Ctrl+G]">🎙 Voiceover</button>
+        <button id="btn-ed-undo" class="btn" title="Undo (Ctrl+Z)">↶ Undo</button>
+        <button id="btn-ed-redo" class="btn" title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
+        <button id="btn-ed-capture" class="btn" title="Send Frame to Photoshop Lab for Thumbnail [Ctrl+P]">📸 Thumbnail</button>
+        <button id="btn-ed-save" class="btn" title="Save Project to Disk (Ctrl+S)">💾 Save</button>
+        <button id="btn-ed-export" class="btn primary" title="Export to Media Encoder Queue (Ctrl+M)">⚡ Export</button>
+        <button id="btn-ed-close" class="btn icon-btn" title="Close Studio (Esc)">✕</button>
       </div>
     </div>
 
+    <!-- Adobe Premiere Pro Workspace Tabs Bar -->
+    <div class="premiere-workspace-bar">
+      <div class="pr-ws-tabs" role="tablist" aria-label="Premiere Workspaces">
+        <button class="pr-ws-tab active" data-prtab="scene" id="pr-tab-editing">🎬 Editing</button>
+        <button class="pr-ws-tab" data-prtab="color" id="pr-tab-color">🎨 Color (Lumetri)</button>
+        <button class="pr-ws-tab" data-prtab="effects" id="pr-tab-effects">✨ Effects (Ae)</button>
+        <button class="pr-ws-tab" data-prtab="audio" id="pr-tab-audio">🎙 Audio (Audition)</button>
+        <button class="pr-ws-tab" data-prtab="text" id="pr-tab-graphics">📝 Graphics &amp; Captions</button>
+        <button class="pr-ws-tab" data-prtab="export" id="pr-tab-export">⚡ Export (Media Encoder)</button>
+        <button class="pr-ws-tab" data-prtab="ai" id="pr-tab-ai">🤖 AI Co-Pilot</button>
+      </div>
+      <div class="pr-sequence-meta">
+        <span class="pr-seq-dot">●</span>
+        <span id="pr-seq-title">Sequence 01 · 1080×1920 (9:16) @ 30.00 fps</span>
+      </div>
+    </div>
+
+    <!-- Studio Main Workspace: Left Tool Dock, Center Canvas Viewport & VU Meter, Right Inspector -->
     <div class="editor-body">
+      <!-- Left Tool Palette (Adobe Premiere Classic Tools) -->
+      <div class="editor-left-dock" aria-label="Adobe Tools Palette">
+        <button class="dock-tool-btn active" data-tool="select" title="Selection Tool (V)">↖<small>V</small></button>
+        <button class="dock-tool-btn" data-tool="track-forward" title="Track Select Forward (A)">⇉<small>A</small></button>
+        <button class="dock-tool-btn" data-tool="ripple" title="Ripple Edit Tool (B)">⇥<small>B</small></button>
+        <button class="dock-tool-btn" data-tool="blade" id="dock-btn-blade" title="Razor Cut / Split (C)">✂<small>C</small></button>
+        <button class="dock-tool-btn" data-tool="slip" title="Slip Tool (Y)">⇄<small>Y</small></button>
+        <button class="dock-tool-btn" data-tool="pen" title="Pen Keyframe Tool (P)">🖋<small>P</small></button>
+        <button class="dock-tool-btn" data-tool="hand" title="Hand Tool (H)">✋<small>H</small></button>
+        <button class="dock-tool-btn" data-tool="text" title="Type Tool (T)">T<small>T</small></button>
+        <span class="pro-sep" style="margin: 4px 0;"></span>
+        <button class="dock-tool-btn" data-tool="audio" title="Audio SFX Pad">🎵</button>
+        <button class="dock-tool-btn" data-tool="color" title="Lumetri Color">🎨</button>
+        <button class="dock-tool-btn" data-tool="vfx" title="Shaders">⚡</button>
+      </div>
+
+      <!-- Center Program Monitor Area -->
       <div class="editor-preview">
-        <div class="canvas-frame" id="canvas-frame">
-          <canvas id="preview-canvas"></canvas>
+        <!-- Program Monitor Header Bar -->
+        <div class="pr-monitor-bar">
+          <span class="pr-monitor-label">Program Monitor: <strong>Sequence 01</strong></span>
+          <div class="pr-monitor-tools">
+            <select id="pr-monitor-res" class="ed-select sm">
+              <option value="1">Full (1080p)</option>
+              <option value="0.5" selected>1/2 (540p)</option>
+              <option value="0.25">1/4 (Draft)</option>
+            </select>
+            <button id="btn-pr-safemargins" class="btn sm toggle-active" title="Toggle Safe Margins Action/Title (Ctrl+')">⊞ Safe Margins</button>
+            <button id="btn-pr-tiktok-zone" class="btn sm toggle-active" title="Toggle TikTok Safe Zone">📱 TikTok Zone</button>
+          </div>
         </div>
+
+        <!-- Monitor + VU Meter Row -->
+        <div class="monitor-vu-row">
+          <div class="canvas-viewport-wrap" id="canvas-viewport-wrap">
+            <div class="canvas-frame" id="canvas-frame">
+              <canvas id="preview-canvas"></canvas>
+
+              <!-- Action & Title Safe Margins Overlay (Adobe Standard) -->
+              <div class="adobe-safe-margins" id="adobe-safe-margins">
+                <div class="safe-action-box" title="Action Safe Zone (90%)"></div>
+                <div class="safe-title-box" title="Title Safe Zone (80%)"></div>
+                <div class="safe-crosshair" title="Center Crosshair"></div>
+              </div>
+
+              <!-- TikTok Safe Zone Transparent Guides Overlay -->
+              <div class="tiktok-safe-zone" id="tiktok-safe-zone">
+                <div class="tz-top-bar">
+                  <span>Following | For You</span>
+                  <span class="tz-search">🔍</span>
+                </div>
+                <div class="tz-right-rail">
+                  <div class="tz-icon-box"><span class="tz-avatar">👤</span></div>
+                  <div class="tz-icon-box"><span>❤️</span><small>892K</small></div>
+                  <div class="tz-icon-box"><span>💬</span><small>14.2K</small></div>
+                  <div class="tz-icon-box"><span>🔖</span><small>58K</small></div>
+                  <div class="tz-icon-box"><span>↗️</span><small>Share</small></div>
+                  <div class="tz-icon-box"><span class="tz-disc">💿</span></div>
+                </div>
+                <div class="tz-bottom-bar">
+                  <div class="tz-author">@aicontentfactory</div>
+                  <div class="tz-caption">Optimal viral caption zone #ai #shorts</div>
+                  <div class="tz-sound">🎵 Original Sound - Trending Beat</div>
+                </div>
+                <div class="tz-safe-box-border" title="Keep critical titles inside this box!">SAFE ZONE</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Audition Live Stereo Audio VU Peak Meter -->
+          <div class="audio-vu-meter" id="audio-vu-meter" title="Master Audio Peak Levels (Adobe Audition)">
+            <div class="vu-scale">
+              <span class="vu-mark clip">+3</span>
+              <span class="vu-mark">0</span>
+              <span class="vu-mark">-3</span>
+              <span class="vu-mark">-6</span>
+              <span class="vu-mark">-12</span>
+              <span class="vu-mark">-18</span>
+              <span class="vu-mark">-24</span>
+              <span class="vu-mark">-36</span>
+              <span class="vu-mark">-48</span>
+              <span class="vu-mark">-60</span>
+            </div>
+            <div class="vu-channels">
+              <div class="vu-channel">
+                <div class="vu-track-label">L</div>
+                <div class="vu-bar">
+                  <div class="vu-clip" id="vu-clip-l"></div>
+                  <div class="vu-fill" id="vu-fill-l" style="height: 0%;"></div>
+                </div>
+              </div>
+              <div class="vu-channel">
+                <div class="vu-track-label">R</div>
+                <div class="vu-bar">
+                  <div class="vu-clip" id="vu-clip-r"></div>
+                  <div class="vu-fill" id="vu-fill-r" style="height: 0%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Player Controls & SMPTE Monospace Timecode -->
         <div class="player-controls">
-          <button id="btn-play" class="btn icon-btn">▶</button>
-          <span id="play-time" class="muted small">0:00 / 0:00</span>
-          <input id="seek" type="range" min="0" max="1000" value="0">
+          <button id="btn-mark-in" class="btn icon-btn" title="Mark In Point (I)">{</button>
+          <button id="btn-step-back" class="btn icon-btn" title="Step Back 1s (Left Arrow)">◀</button>
+          <button id="btn-play" class="btn icon-btn play-main-btn" title="Play / Pause (Spacebar)">▶</button>
+          <button id="btn-step-forward" class="btn icon-btn" title="Step Forward 1s (Right Arrow)">▶</button>
+          <button id="btn-mark-out" class="btn icon-btn" title="Mark Out Point (O)">}</button>
+          <button id="btn-loop" class="btn icon-btn active" title="Loop Playback">🔁</button>
+          <span id="play-time" class="timecode-display font-mono" title="SMPTE Timecode 00:00:00:00">00:00:00:00 / 00:00:00:00</span>
+          <input id="seek" type="range" min="0" max="1000" value="0" class="time-scrubber">
+          <div class="vol-control">
+            <span id="vol-icon" title="Master Level">🔊</span>
+            <input id="master-vol" type="range" min="0" max="100" value="100" class="vol-slider" title="Master Audio Fader">
+          </div>
         </div>
       </div>
 
+      <!-- Right Scene & Motion Properties Inspector -->
       <div class="editor-props">
-        <h3>Scene</h3>
-        <label>Text
-          <textarea id="prop-text" rows="3"></textarea>
-        </label>
-        <label>Duration <span id="prop-duration-val" class="val">3s</span>
-          <input id="prop-duration" type="range" min="0.5" max="20" step="0.5" value="3">
-        </label>
-        <label>Speed <span id="prop-speed-val" class="val">1x</span>
-          <input id="prop-speed" type="range" min="0.5" max="2" step="0.25" value="1">
-        </label>
-        <div class="two-col">
-          <label>Background
-            <input id="prop-bg" type="color" value="#1a1d27">
-          </label>
-          <label>Text color
-            <input id="prop-color" type="color" value="#ffffff">
-          </label>
+        <!-- Inspector Tabs Header -->
+        <div class="props-tabs-header">
+          <button class="props-tab-btn active" data-ptab="scene">Scene</button>
+          <button class="props-tab-btn" data-ptab="text">Captions</button>
+          <button class="props-tab-btn" data-ptab="color">Color LUTs</button>
+          <button class="props-tab-btn" data-ptab="audio">Audio &amp; SFX</button>
+          <button class="props-tab-btn" data-ptab="ai">AI Magic</button>
         </div>
-        <label>Transition
-          <select id="prop-transition">
-            <option value="cut">Cut</option>
-            <option value="fade">Fade</option>
-            <option value="slide">Slide</option>
-            <option value="zoom">Zoom</option>
-            <option value="wipe">Wipe</option>
-            <option value="circle">Circle</option>
-            <option value="dissolve">Dissolve</option>
-          </select>
-        </label>
-        <div class="two-col">
-          <label>Text position
-            <select id="prop-position">
-              <option value="top">Top</option>
-              <option value="center">Center</option>
-              <option value="bottom">Bottom</option>
+
+        <!-- TAB 1: SCENE & MOTION -->
+        <div class="props-tab-panel active" id="ptab-panel-scene">
+          <label>Narration &amp; Text Script
+            <textarea id="prop-text" rows="3"></textarea>
+          </label>
+
+          <div class="two-col">
+            <label>Duration <span id="prop-duration-val" class="val">3s</span>
+              <input id="prop-duration" type="range" min="0.5" max="20" step="0.5" value="3">
+            </label>
+            <label>Speed Ramp <span id="prop-speed-val" class="val">1x</span>
+              <input id="prop-speed" type="range" min="0.5" max="2" step="0.25" value="1">
+            </label>
+          </div>
+
+          <div class="two-col">
+            <label>Background Color
+              <input id="prop-bg" type="color" value="#1a1d27">
+            </label>
+            <label>Text Color
+              <input id="prop-color" type="color" value="#ffffff">
+            </label>
+          </div>
+
+          <label>Scene Transition
+            <select id="prop-transition">
+              <option value="cut">Cut (Instant)</option>
+              <option value="fade">Smooth Fade</option>
+              <option value="slide">Dynamic Slide</option>
+              <option value="zoom">Punch Zoom</option>
+              <option value="wipe">Directional Wipe</option>
+              <option value="circle">Circular Iris</option>
+              <option value="dissolve">Cross Dissolve</option>
             </select>
           </label>
-          <label>Text style
-            <select id="prop-style">
-              <option value="normal">Normal</option>
-              <option value="title">Title</option>
-              <option value="subtitle">Subtitle</option>
-              <option value="caption">Caption</option>
-              <option value="neon">Neon</option>
-              <option value="outline">Outline</option>
-              <option value="shadow">Shadow</option>
-            </select>
+
+          <div class="two-col">
+            <label>Ken Burns Motion
+              <select id="prop-kenburns">
+                <option value="none">Static</option>
+                <option value="pan-left">Pan Left</option>
+                <option value="pan-right">Pan Right</option>
+                <option value="zoom-in">Slow Zoom In</option>
+                <option value="zoom-out">Slow Zoom Out</option>
+              </select>
+            </label>
+            <label>Visual Filter
+              <select id="prop-filter">
+                <option value="none">None</option>
+                <option value="grayscale">Grayscale</option>
+                <option value="sepia">Sepia</option>
+                <option value="invert">Invert</option>
+                <option value="blur">Blur</option>
+                <option value="vignette">Vignette</option>
+                <option value="warm">Warm Golden</option>
+                <option value="cool">Cool Ice</option>
+                <option value="contrast">High Contrast</option>
+                <option value="brightness">Bright Boost</option>
+              </select>
+            </label>
+          </div>
+
+          <h4>Keyframe Transform &amp; Motion</h4>
+          <div class="two-col">
+            <label>Scale <span id="prop-scale-val" class="val">1</span>
+              <input id="prop-scale" type="range" min="0.5" max="2" step="0.05" value="1">
+            </label>
+            <label>Rotation <span id="prop-rot-val" class="val">0°</span>
+              <input id="prop-rot" type="range" min="-180" max="180" step="1" value="0">
+            </label>
+          </div>
+
+          <div class="two-col">
+            <label>Offset X <span id="prop-posx-val" class="val">0</span>
+              <input id="prop-posx" type="range" min="-100" max="100" step="1" value="0">
+            </label>
+            <label>Offset Y <span id="prop-posy-val" class="val">0</span>
+              <input id="prop-posy" type="range" min="-100" max="100" step="1" value="0">
+            </label>
+          </div>
+
+          <div class="two-col">
+            <label>Opacity <span id="prop-opacity-val" class="val">100%</span>
+              <input id="prop-opacity" type="range" min="0" max="1" step="0.05" value="1">
+            </label>
+            <label>Easing Curve
+              <select id="prop-easing">
+                <option value="linear">Linear</option>
+                <option value="ease-in">Ease In</option>
+                <option value="ease-out">Ease Out</option>
+                <option value="ease-in-out" selected>Smooth Ease In-Out</option>
+              </select>
+            </label>
+          </div>
+
+          <h4>Emoji Sticker &amp; Overlay</h4>
+          <div class="two-col">
+            <label>Sticker Emoji
+              <input id="prop-overlay-emoji" placeholder="🔥 ⚡ 💡 🤯">
+            </label>
+            <label>Sticker Position
+              <select id="prop-overlay-pos">
+                <option value="top-left">Top Left</option>
+                <option value="top-right" selected>Top Right</option>
+                <option value="center">Center</option>
+                <option value="bottom-left">Bottom Left</option>
+                <option value="bottom-right">Bottom Right</option>
+              </select>
+            </label>
+          </div>
+
+          <label>Sticker Size <span id="prop-overlay-size-val" class="val">48</span>
+            <input id="prop-overlay-size" type="range" min="16" max="140" value="48">
           </label>
+
+          <div class="props-actions">
+            <button id="btn-scene-add" class="btn">＋ Add Scene</button>
+            <button id="btn-scene-dup" class="btn">Duplicate</button>
+            <button id="btn-scene-del" class="btn danger">Delete</button>
+          </div>
         </div>
-        <label>Font size <span id="prop-font-val" class="val">44</span>
-          <input id="prop-font" type="range" min="16" max="120" value="44">
-        </label>
-        <div class="two-col">
-          <label>Filter
-            <select id="prop-filter">
-              <option value="none">None</option>
-              <option value="grayscale">Grayscale</option>
-              <option value="sepia">Sepia</option>
-              <option value="invert">Invert</option>
-              <option value="blur">Blur</option>
-              <option value="vignette">Vignette</option>
-              <option value="warm">Warm</option>
-              <option value="cool">Cool</option>
-              <option value="contrast">Contrast</option>
-              <option value="brightness">Brightness</option>
-            </select>
+
+        <!-- TAB 2: KINETIC CAPTIONS & SUBTITLES -->
+        <div class="props-tab-panel" id="ptab-panel-text">
+          <div class="two-col">
+            <label>Text Position
+              <select id="prop-position">
+                <option value="top">Top Third</option>
+                <option value="center">Center Stage</option>
+                <option value="bottom" selected>Bottom Caption</option>
+              </select>
+            </label>
+            <label>Kinetic Preset
+              <select id="prop-style">
+                <option value="normal">Clean Sans</option>
+                <option value="title">Bold Title</option>
+                <option value="subtitle">Subtitle</option>
+                <option value="caption">Caption Chip</option>
+                <option value="neon" selected>Neon Cyber Glow</option>
+                <option value="outline">Heavy Stroke Outline</option>
+                <option value="shadow">Cinematic Drop Shadow</option>
+              </select>
+            </label>
+          </div>
+
+          <label>Font Size <span id="prop-font-val" class="val">44</span>
+            <input id="prop-font" type="range" min="16" max="120" value="44">
           </label>
-          <label>Ken Burns
-            <select id="prop-kenburns">
-              <option value="none">None</option>
-              <option value="pan-left">Pan left</option>
-              <option value="pan-right">Pan right</option>
-              <option value="zoom-in">Zoom in</option>
-              <option value="zoom-out">Zoom out</option>
-            </select>
+
+          <div class="two-col">
+            <label>Text Entrance Animation
+              <select id="prop-entrance">
+                <option value="none">None</option>
+                <option value="fade">Fade In</option>
+                <option value="slide-up" selected>Slide Up</option>
+                <option value="zoom">Zoom Pop</option>
+                <option value="bounce">Bounce In</option>
+                <option value="blur-in">Motion Blur In</option>
+              </select>
+            </label>
+            <label>Text Exit Animation
+              <select id="prop-exit">
+                <option value="none">None</option>
+                <option value="fade">Fade Out</option>
+                <option value="slide-down">Slide Down</option>
+                <option value="zoom">Zoom Out</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="inline" style="margin-top: 12px;">
+            <input type="checkbox" id="prop-captions" checked> Render Kinetic Captions on Canvas
           </label>
+
+          <div style="margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+            <h4>♿ Accessible Captions (Simplified Reading)</h4>
+            <p class="muted small" style="margin-bottom: 6px;">Tối ưu câu chữ ngắn gọn, dễ đọc, phù hợp người xem lướt trên TikTok / Shorts.</p>
+            <div class="row" style="display: flex; gap: 8px;">
+              <select id="sel-subtitle-level" class="ed-select sm" style="flex: 1;">
+                <option value="basic">Basic (Đơn giản hoá từ vựng)</option>
+                <option value="intermediate">Intermediate (Rút gọn câu dài)</option>
+              </select>
+              <button id="btn-simplify-subtitles" class="btn sm primary">✨ Simplify</button>
+            </div>
+          </div>
         </div>
-        <div class="two-col">
-          <label>Entrance
-            <select id="prop-entrance">
-              <option value="none">None</option>
-              <option value="fade">Fade</option>
-              <option value="slide-up">Slide up</option>
-              <option value="zoom">Zoom</option>
-              <option value="bounce">Bounce</option>
-              <option value="blur-in">Blur in</option>
+
+        <!-- TAB 3: COLOR GRADING & LUTS -->
+        <div class="props-tab-panel" id="ptab-panel-color">
+          <label>Cinematic Color LUT
+            <select id="prop-grade">
+              <option value="none">Natural / Rec.709</option>
+              <option value="teal-orange" selected>Teal &amp; Orange Blockbuster</option>
+              <option value="noir">Dark Film Noir</option>
+              <option value="vintage">Vintage Kodachrome</option>
+              <option value="cyberpunk">Cyberpunk Neon</option>
+              <option value="pastel">Soft Pastel Dream</option>
             </select>
           </label>
-          <label>Exit
-            <select id="prop-exit">
-              <option value="none">None</option>
-              <option value="fade">Fade</option>
-              <option value="slide-down">Slide down</option>
-              <option value="zoom">Zoom</option>
-            </select>
-          </label>
-        </div>
-        <div class="two-col">
-          <label>Effect
+
+          <label>Visual FX Shaders
             <select id="prop-effect">
               <option value="none">None</option>
-              <option value="glitch">Glitch</option>
-              <option value="pixelate">Pixelate</option>
-              <option value="scanlines">Scanlines</option>
-              <option value="film-grain">Film grain</option>
-              <option value="old-film">Old film</option>
-              <option value="dreamy">Dreamy</option>
-              <option value="sharpen">Sharpen</option>
+              <option value="glitch">Cyber Glitch</option>
+              <option value="pixelate">8-bit Pixelate</option>
+              <option value="scanlines">Retro CRT Scanlines</option>
+              <option value="film-grain">Fine Film Grain (35mm)</option>
+              <option value="old-film">Vintage 1920s Projector</option>
+              <option value="dreamy">Dreamy Bloom Glow</option>
+              <option value="sharpen">Edge Sharpen</option>
               <option value="mosaic">Mosaic</option>
             </select>
           </label>
-          <label>Grade
-            <select id="prop-grade">
-              <option value="none">None</option>
-              <option value="teal-orange">Teal &amp; orange</option>
-              <option value="noir">Noir</option>
-              <option value="vintage">Vintage</option>
-              <option value="cyberpunk">Cyberpunk</option>
-              <option value="pastel">Pastel</option>
-            </select>
-          </label>
         </div>
-        <h4>Motion (keyframes)</h4>
-        <label>Scale <span id="prop-scale-val" class="val">1</span>
-          <input id="prop-scale" type="range" min="0.5" max="2" step="0.05" value="1">
-        </label>
-        <label>Rotation <span id="prop-rot-val" class="val">0°</span>
-          <input id="prop-rot" type="range" min="-180" max="180" step="1" value="0">
-        </label>
-        <label>Opacity <span id="prop-opacity-val" class="val">100%</span>
-          <input id="prop-opacity" type="range" min="0" max="1" step="0.05" value="1">
-        </label>
-        <div class="two-col">
-          <label>Offset X <span id="prop-posx-val" class="val">0</span>
-            <input id="prop-posx" type="range" min="-100" max="100" step="1" value="0">
-          </label>
-          <label>Offset Y <span id="prop-posy-val" class="val">0</span>
-            <input id="prop-posy" type="range" min="-100" max="100" step="1" value="0">
-          </label>
-        </div>
-        <label>Easing
-          <select id="prop-easing">
-            <option value="linear">Linear</option>
-            <option value="ease-in">Ease in</option>
-            <option value="ease-out">Ease out</option>
-            <option value="ease-in-out" selected>Ease in-out</option>
-          </select>
-        </label>
-        <h4>Overlay sticker</h4>
-        <div class="two-col">
-          <label>Emoji
-            <input id="prop-overlay-emoji" placeholder="🔥 (empty = off)">
-          </label>
-          <label>Position
-            <select id="prop-overlay-pos">
-              <option value="top-left">Top left</option>
-              <option value="top-right" selected>Top right</option>
-              <option value="center">Center</option>
-              <option value="bottom-left">Bottom left</option>
-              <option value="bottom-right">Bottom right</option>
-            </select>
-          </label>
-        </div>
-        <label>Sticker size <span id="prop-overlay-size-val" class="val">48</span>
-          <input id="prop-overlay-size" type="range" min="16" max="140" value="48">
-        </label>
-        <label>Voice pitch <span id="prop-pitch-val" class="val">1x</span>
-          <input id="prop-pitch" type="range" min="0.5" max="2" step="0.1" value="1">
-        </label>
-        <div class="props-actions">
-          <button id="btn-scene-add" class="btn">＋ Add</button>
-          <button id="btn-scene-dup" class="btn">Duplicate</button>
-          <button id="btn-scene-del" class="btn danger">Delete</button>
-        </div>
-        <label class="inline">
-          <input type="checkbox" id="prop-captions"> Captions
-        </label>
-        <label class="inline">
-          <input type="checkbox" id="prop-music"> Background music
-        </label>
 
-        <div class="ai-assist">
-          <h3>✨ AI Assist</h3>
-          <p class="muted small">One-click AI editing — the AI reads your scenes and applies the best look, pacing and text.</p>
-          <div class="props-actions">
-            <button id="btn-ai-auto" class="btn primary">⚡ Auto-edit all</button>
-            <button id="btn-ai-beat" class="btn">🎵 Beat sync</button>
+        <!-- TAB 4: AUDIO, VOICEOVER & SFX -->
+        <div class="props-tab-panel" id="ptab-panel-audio">
+          <div style="margin-bottom: 12px; padding: 10px; background: rgba(99, 102, 241, 0.08); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <strong>🎚️ Auto-Duck Background Music</strong>
+              <span class="badge" style="background: rgba(99,102,241,0.2); color:#818cf8;">Sidechain FFmpeg</span>
+            </div>
+            <p class="muted small" style="margin-bottom: 8px;">Tự động hạ nhỏ âm lượng nhạc nền khi có lời đọc narration, tránh át tiếng.</p>
+            <button id="btn-auto-duck-music" class="btn sm primary" style="width: 100%;">🎚️ Apply Sidechain Auto-Ducking</button>
           </div>
-          <label>BPM <span id="prop-bpm-val" class="val">120</span>
+
+          <h4>Voiceover Narration</h4>
+          <label>Voice Pitch <span id="prop-pitch-val" class="val">1x</span>
+            <input id="prop-pitch" type="range" min="0.5" max="2" step="0.1" value="1">
+          </label>
+
+          <label class="inline">
+            <input type="checkbox" id="prop-music"> Background Beat Music
+          </label>
+
+          <label>BPM Tempo Grid <span id="prop-bpm-val" class="val">120</span>
             <input id="prop-bpm" type="range" min="60" max="180" value="120">
           </label>
-          <div class="props-actions">
-            <button id="btn-ai-suggest" class="btn">💡 Suggest look</button>
-            <button id="btn-ai-polish" class="btn">✨ Polish text</button>
+
+          <h4>Viral Sound Effects (SFX) Pad</h4>
+          <div class="sfx-grid">
+            <button class="sfx-btn" data-sfx="whoosh">💨 Whoosh</button>
+            <button class="sfx-btn" data-sfx="pop">🫧 Pop</button>
+            <button class="sfx-btn" data-sfx="camera">📸 Click</button>
+            <button class="sfx-btn" data-sfx="impact">💥 Impact</button>
+            <button class="sfx-btn" data-sfx="level">🆙 Level Up</button>
+            <button class="sfx-btn" data-sfx="ding">🔔 Ding</button>
           </div>
-          <button id="btn-ai-captions" class="btn">📝 Auto-captions</button>
+
+          <h4>Historical &amp; Disaster SFX Pad</h4>
+          <div class="sfx-grid">
+            <button class="sfx-btn" data-sfx="sos" title="Morse Code S.O.S (Titanic / Distress Call)">📻 Morse S.O.S</button>
+            <button class="sfx-btn" data-sfx="siren" title="Air Raid / Emergency Warning Siren">🚨 Air Siren</button>
+            <button class="sfx-btn" data-sfx="sonar" title="Submarine Sonar Echo Ping (Kursk / Oceanic)">🌊 Sonar Ping</button>
+            <button class="sfx-btn" data-sfx="static" title="Vintage Radio Static &amp; Pilot Chatter">📻 Radio Static</button>
+            <button class="sfx-btn" data-sfx="whistle" title="Steam Engine &amp; Ocean Liner Horn">🚢 Steam Horn</button>
+          </div>
+        </div>
+
+        <!-- TAB 5: AI CO-PILOT & ASSIST -->
+        <div class="props-tab-panel" id="ptab-panel-ai">
+          <h3>✨ AI Video Co-Pilot</h3>
+          <p class="muted small">Intelligent auto-director: analyzes scene emotion, adjusts pacing to music beats, and polishes styling.</p>
+          <div class="props-actions">
+            <button id="btn-ai-auto" class="btn primary">⚡ Auto-Edit All</button>
+            <button id="btn-ai-beat" class="btn">🎵 Beat Sync</button>
+          </div>
+          <div class="props-actions">
+            <button id="btn-ai-suggest" class="btn">💡 Suggest Look</button>
+            <button id="btn-ai-polish" class="btn">✨ Polish Text</button>
+          </div>
+          <button id="btn-ai-captions" class="btn block">📝 Auto Sync Captions</button>
+        </div>
+
+        <!-- TAB 6: ADOBE MEDIA ENCODER EXPORT QUEUE -->
+        <div class="props-tab-panel" id="ptab-panel-export">
+          <div class="me-header-row">
+            <span class="adobe-badge me" style="font-size: 13px; padding: 2px 6px;">Me</span>
+            <h3>Adobe Media Encoder Export</h3>
+          </div>
+          <p class="muted small">Configure master render presets, codecs, bitrates, and queue to background encoder.</p>
+
+          <label>Export Format &amp; Codec
+            <select id="me-codec" class="ed-select">
+              <option value="webm" selected>WebM (VP9 + Opus Audio) · Instant Browser</option>
+              <option value="mp4">H.264 / MP4 (High Profile L5.1) · YouTube/TikTok</option>
+              <option value="prores">Apple ProRes 422 HQ · Lossless Master</option>
+            </select>
+          </label>
+
+          <label>Resolution &amp; Social Preset
+            <select id="me-preset" class="ed-select">
+              <option value="tiktok" selected>TikTok / Shorts 9:16 (1080 × 1920) · High Bitrate</option>
+              <option value="youtube-4k">YouTube 4K UHD 16:9 (3840 × 2160) · 60 Mbps</option>
+              <option value="youtube-1080">YouTube 1080p FHD 16:9 (1920 × 1080) · 16 Mbps</option>
+              <option value="reels">Instagram Reels 4:5 (1080 × 1350) · Mobile Master</option>
+              <option value="square">Instagram Feed 1:1 (1080 × 1080)</option>
+            </select>
+          </label>
+
+          <div class="two-col">
+            <label>Target Bitrate <span id="me-bitrate-val" class="val">16 Mbps</span>
+              <input type="range" id="me-bitrate" min="4" max="60" value="16">
+            </label>
+            <label>Audio Quality
+              <select id="me-audio-bitrate" class="ed-select">
+                <option value="320" selected>AAC 320 kbps (Studio)</option>
+                <option value="192">AAC 192 kbps (Standard)</option>
+                <option value="128">AAC 128 kbps (Draft)</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="me-meta-box">
+            <div class="me-meta-row"><span>Estimated File Size:</span> <strong id="me-est-size">~18.4 MB</strong></div>
+            <div class="me-meta-row"><span>Render Engine:</span> <strong>FFmpeg Native + WebM Stream</strong></div>
+            <div class="me-meta-row"><span>Output Destination:</span> <code>storage/exports/</code></div>
+          </div>
+
+          <div class="props-actions" style="margin-top: 14px;">
+            <button id="btn-me-export-now" class="btn primary block">⚡ Export Immediately (WebM)</button>
+          </div>
+          <div class="props-actions" style="margin-top: 8px;">
+            <button id="btn-me-render-ffmpeg" class="btn block">🎬 Render Real Video (Backend FFmpeg)</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="editor-timeline">
-      <div class="tl-track-label">Scenes</div>
-      <div id="timeline" class="timeline"></div>
-      <div class="tl-track-label">Text</div>
-      <div id="timeline-text" class="timeline"></div>
-      <div class="tl-track-label">Music</div>
-      <div id="timeline-music" class="timeline"></div>
+    <!-- PRO TIMELINE ENGINE TOOLBAR -->
+    <div class="pro-bar" id="pro-bar">
+      <div class="pro-row">
+        <span class="pro-title">🛠 Sequence Engine</span>
+        <span class="pro-score" id="pro-score" title="Editing readiness score">—</span>
+        <span class="pro-stats" id="pro-stats">Timeline ready</span>
+        <span class="pro-spacer"></span>
+        <div class="pro-actions">
+          <button id="btn-tl-snap" class="btn sm toggle-active" title="Toggle Snapping [S]">🧲 Snap</button>
+          <button id="btn-tl-link" class="btn sm toggle-active" title="Linked Selection [Ctrl+L]">🔗 Link</button>
+          <button id="btn-pro-mark" class="btn sm" title="Add Marker at playhead (M)">📍 Marker</button>
+          <span class="pro-sep"></span>
+          <button id="btn-pro-split" class="btn sm" title="Split scene at playhead (C)">✂ Split</button>
+          <button id="btn-pro-merge" class="btn sm" title="Merge selected scene into next">⛓ Merge</button>
+          <button id="btn-pro-dup" class="btn sm" title="Duplicate selected scene">⧉ Duplicate</button>
+          <button id="btn-pro-del" class="btn sm danger" title="Delete selected scene (Del)">🗑 Delete</button>
+          <span class="pro-sep"></span>
+          <button id="btn-pro-up" class="btn sm" title="Move selected scene earlier">←</button>
+          <button id="btn-pro-down" class="btn sm" title="Move selected scene later">→</button>
+          <span class="pro-sep"></span>
+          <button id="btn-pro-clean" class="btn sm" title="Repair ids, ranges, transitions, and keyframes">🧹 Clean</button>
+          <button id="btn-pro-check" class="btn sm" title="Re-run the professional validator">🩺 Check</button>
+          <button id="btn-pro-plan" class="btn sm" title="Compile timeline into render plan">📋 Render Plan</button>
+          <button id="btn-pro-toggle" class="btn sm icon-btn" title="Show or hide details">▾</button>
+        </div>
+      </div>
+      <div class="pro-detail" id="pro-detail">
+        <ul class="pro-issues" id="pro-issues"></ul>
+        <pre class="pro-plan" id="pro-plan-out" hidden></pre>
+      </div>
+    </div>
+
+    <!-- Multi-Track NLE Timeline with Time Ruler & Calibrated Tracks -->
+    <div class="editor-timeline" id="editor-timeline">
+      <!-- Time Ruler Row with Frame/Second Markings -->
+      <div class="tl-ruler-row">
+        <div class="tl-ruler-header">
+          <span class="tl-ruler-timecode" id="tl-ruler-tc">00:00:00:00</span>
+        </div>
+        <div class="tl-ruler-track" id="tl-ruler-track">
+          <div class="tl-ruler-ticks" id="tl-ruler-ticks"></div>
+          <div class="tl-playhead-needle" id="tl-playhead-needle">
+            <div class="tl-playhead-head"></div>
+            <div class="tl-playhead-line"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video Track V2: Captions & Overlays -->
+      <div class="tl-track-row">
+        <div class="tl-track-header v2">
+          <span class="tl-track-tag">V2</span>
+          <span class="tl-track-name">Captions &amp; Titles</span>
+          <div class="tl-track-btns">
+            <button class="tl-mini-btn" title="Toggle Track Output">👁</button>
+            <button class="tl-mini-btn" title="Lock Track">🔒</button>
+          </div>
+        </div>
+        <div id="timeline-text" class="timeline"></div>
+      </div>
+
+      <!-- Video Track V1: Main Video / Image Footage -->
+      <div class="tl-track-row">
+        <div class="tl-track-header v1">
+          <span class="tl-track-tag">V1</span>
+          <span class="tl-track-name">Video &amp; Scenes</span>
+          <div class="tl-track-btns">
+            <button class="tl-mini-btn" title="Toggle Track Output">👁</button>
+            <button class="tl-mini-btn" title="Lock Track">🔒</button>
+          </div>
+        </div>
+        <div id="timeline" class="timeline"></div>
+      </div>
+
+      <!-- Audio Track A1: Voiceover Narration -->
+      <div class="tl-track-row">
+        <div class="tl-track-header a1">
+          <span class="tl-track-tag">A1</span>
+          <span class="tl-track-name">Master Voiceover</span>
+          <div class="tl-track-btns">
+            <button class="tl-mini-btn" title="Mute Track">M</button>
+            <button class="tl-mini-btn" title="Solo Track">S</button>
+            <button class="tl-mini-btn" title="Lock Track">🔒</button>
+          </div>
+        </div>
+        <div id="timeline-voice" class="timeline"></div>
+      </div>
+
+      <!-- Audio Track A2: Music Soundtrack & Beats -->
+      <div class="tl-track-row">
+        <div class="tl-track-header a2">
+          <span class="tl-track-tag">A2</span>
+          <span class="tl-track-name">Music &amp; Soundtrack</span>
+          <div class="tl-track-btns">
+            <button class="tl-mini-btn" title="Mute Track">M</button>
+            <button class="tl-mini-btn" title="Solo Track">S</button>
+            <button class="tl-mini-btn" title="Lock Track">🔒</button>
+          </div>
+        </div>
+        <div id="timeline-music" class="timeline"></div>
+      </div>
     </div>
   </div>
 
-  <!-- New project modal -->
+  <!-- EXTERNAL AI AGENT PROMPT BRIDGE MODAL -->
+  <div id="bridge-modal" class="modal-overlay" hidden>
+    <div class="modal wide">
+      <h2>⚡ External AI Agent Prompt &amp; Import Bridge</h2>
+      <p class="muted small">Export tailored prompt briefs for Claude Code, Codex, DeepSeek, or Gemini, or import completed scripts and scenes back into the pipeline.</p>
+
+      <div class="two-col">
+        <label>Target AI Agent
+          <select id="bridge-agent-select" class="ed-select">
+            <option value="claude">Anthropic Claude Code / 3.5 Sonnet</option>
+            <option value="gemini">Google Gemini 2.0 / Flash</option>
+            <option value="codex">OpenAI Codex / GPT-4o</option>
+            <option value="deepseek">DeepSeek V3 / R1 Reasoner</option>
+          </select>
+        </label>
+        <label>Project Brief Export
+          <button id="btn-copy-brief" class="btn" style="margin-top: 2px;">📋 Copy Formatted Brief</button>
+        </label>
+      </div>
+
+      <label>Live Agent Brief Preview
+        <textarea id="bridge-brief-preview" rows="8" readonly placeholder="Select a project to generate an exportable Markdown brief..."></textarea>
+      </label>
+
+      <label><strong>Import Agent Output Markdown</strong> (Paste response containing script / scenes JSON / style)
+        <textarea id="bridge-import-text" rows="8" placeholder="Paste response from Claude / Gemini / Codex / DeepSeek here..."></textarea>
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-bridge-close" class="btn">Cancel</button>
+        <button type="button" id="btn-bridge-import" class="btn primary">Parse &amp; Import into Pipeline</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXTERNAL AI ASSET INGESTION MODAL -->
+  <div id="ingest-modal" class="modal-overlay" hidden>
+    <div class="modal wide" style="max-width: 860px;">
+      <div class="modal-header-row" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+        <div>
+          <h2>📥 External AI Asset &amp; Media Ingestion</h2>
+          <p class="muted small">Tải và đồng bộ kết quả từ Kling, Veo, Midjourney, ElevenLabs, Suno, và Perplexity trực tiếp vào scene và timeline.</p>
+        </div>
+        <button type="button" class="btn sm" id="btn-ingest-close-x" style="padding: 4px 10px;">✕</button>
+      </div>
+
+      <!-- Ingest Tabs -->
+      <div class="ingest-tabs" role="tablist">
+        <button class="ingest-tab active" data-itab="media">🎬 Footage (Kling / Veo / MJ)</button>
+        <button class="ingest-tab" data-itab="audio">🎙️ Voice &amp; Music (ElevenLabs / Suno)</button>
+        <button class="ingest-tab" data-itab="dossier">🧠 Research &amp; Fact-Check (Perplexity)</button>
+        <button class="ingest-tab" data-itab="batch">📦 Batch Dropzone</button>
+      </div>
+
+      <!-- TAB 1: SCENE MEDIA -->
+      <div class="ingest-panel active" id="ipanel-media">
+        <div class="two-col" style="margin-bottom: 12px;">
+          <label>Target Scene
+            <select id="ingest-scene-select" class="ed-select">
+              <option value="">(Select target scene...)</option>
+            </select>
+          </label>
+          <label>Asset Classification
+            <select id="ingest-media-type" class="ed-select">
+              <option value="scene_video">🎬 AI Reconstruction Video (Kling / Veo / Wan)</option>
+              <option value="scene_image">🖼️ Historical Photo / Art (Midjourney / Flux)</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="ingest-box-grid">
+          <div class="ingest-box">
+            <h4>Option A: Link Online Media URL</h4>
+            <label>Media Asset URL
+              <input id="ingest-media-url" type="url" placeholder="https://assets.klingai.com/... or cdn.midjourney.com/...">
+            </label>
+            <label>Attribution / Tool Tag
+              <input id="ingest-media-attribution" placeholder="e.g. Kling AI 1.5 Pro (1080p) or National Archives">
+            </label>
+            <button id="btn-apply-media-url" class="btn primary" style="margin-top: 8px;">🔗 Link Media to Scene</button>
+          </div>
+
+          <div class="ingest-box">
+            <h4>Option B: Upload Local File</h4>
+            <div class="drop-zone" id="media-drop-zone">
+              <span class="drop-icon">📁</span>
+              <p class="small">Drag &amp; drop video (.mp4, .webm) or image (.jpg, .png)</p>
+              <input type="file" id="ingest-file-input" accept="video/*,image/*" style="display: none;">
+              <button type="button" class="btn sm" id="btn-browse-media">Browse File...</button>
+              <div id="media-file-name" class="muted small" style="margin-top: 4px;"></div>
+            </div>
+            <button id="btn-upload-media-file" class="btn primary" style="margin-top: 8px;">⬆️ Upload &amp; Bind to Scene</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: AUDIO & MUSIC -->
+      <div class="ingest-panel" id="ipanel-audio" hidden>
+        <div class="two-col">
+          <div class="ingest-box">
+            <h4>🎙️ ElevenLabs Narration Audio</h4>
+            <label>Audio URL or S3 link
+              <input id="ingest-voice-url" placeholder="https://... voiceover.mp3">
+            </label>
+            <div class="row" style="gap: 8px; margin-top: 8px; align-items: center;">
+              <input type="file" id="ingest-voice-file" accept="audio/*" style="display: none;">
+              <button type="button" class="btn sm" id="btn-browse-voice">Browse MP3...</button>
+              <span id="voice-file-name" class="muted small"></span>
+            </div>
+            <button id="btn-apply-voice" class="btn primary" style="margin-top: 12px;">🎙️ Ingest Voiceover Track</button>
+          </div>
+
+          <div class="ingest-box">
+            <h4>🎵 Suno / Udio Background Music</h4>
+            <label>Soundtrack URL or S3 link
+              <input id="ingest-music-url" placeholder="https://cdn.suno.ai/track.mp3">
+            </label>
+            <div class="row" style="gap: 8px; margin-top: 8px; align-items: center;">
+              <input type="file" id="ingest-music-file" accept="audio/*" style="display: none;">
+              <button type="button" class="btn sm" id="btn-browse-music">Browse BGM...</button>
+              <span id="music-file-name" class="muted small"></span>
+            </div>
+            <button id="btn-apply-music" class="btn primary" style="margin-top: 12px;">🎵 Ingest Background Soundtrack</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: RESEARCH & FACT-CHECK -->
+      <div class="ingest-panel" id="ipanel-dossier" hidden>
+        <label>Perplexity / DeepResearch Investigation Dossier (Markdown or Text)
+          <textarea id="ingest-dossier-text" rows="8" placeholder="Paste key facts, timeline events, citations, and verified sources from Perplexity or ChatGPT DeepResearch..."></textarea>
+        </label>
+        <div class="row" style="display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 8px;">
+          <input id="ingest-dossier-source" placeholder="Source Provider (e.g. Perplexity Pro / Admiralty Court 1912)" style="flex: 1;">
+          <button id="btn-apply-dossier" class="btn primary">🧠 Ingest into Knowledge Cache</button>
+        </div>
+      </div>
+
+      <!-- TAB 4: BATCH DROPZONE -->
+      <div class="ingest-panel" id="ipanel-batch" hidden>
+        <div class="drop-zone large" id="batch-drop-zone">
+          <span class="drop-icon" style="font-size: 32px;">📦</span>
+          <h3>Batch Media Ingestion Engine</h3>
+          <p class="muted small">Drop multiple files named <code>scene_1.*</code>, <code>scene_2.*</code>, <code>voiceover.*</code>, <code>bgm.*</code> to automatically route and bind to the correct pipeline elements.</p>
+          <input type="file" id="batch-file-input" multiple style="display: none;">
+          <button type="button" class="btn primary sm" id="btn-browse-batch" style="margin-top: 8px;">Choose Files...</button>
+          <div id="batch-file-list" class="batch-file-list" style="margin-top: 8px;"></div>
+        </div>
+        <button id="btn-process-batch" class="btn primary" style="margin-top: 12px;" disabled>⚡ Auto-Bind All Files to Pipeline</button>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 16px;">
+        <button type="button" id="btn-ingest-close" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW PRODUCTION MODAL -->
   <div id="modal" class="modal-overlay" hidden>
     <div class="modal">
-      <h2>New project</h2>
+      <h2>New Video Production</h2>
       <form id="create-form">
-        <label>Name
-          <input id="name" maxlength="120" placeholder="The quiet power of small habits" required>
+        <label>Production Title
+          <input id="name" maxlength="120" placeholder="e.g. The Quiet Power of Micro-Habits" required>
         </label>
-        <label>Topic
-          <input id="topic" maxlength="500" placeholder="Story angle / source to explore" required>
+        <label>Topic / Angle / Source
+          <input id="topic" maxlength="500" placeholder="e.g. How 1% daily increments compound into life-changing mastery" required>
         </label>
-        <div class="row">
-          <label>Language
+        <div class="two-col">
+          <label>Target Language
             <input id="language" value="vi" maxlength="8">
           </label>
-          <label>Duration (s)
+          <label>Target Duration (Seconds)
             <input id="duration" type="number" value="45" min="5" max="600">
           </label>
         </div>
         <div class="modal-actions">
           <button type="button" id="btn-modal-cancel" class="btn">Cancel</button>
-          <button type="submit" class="btn primary">Create</button>
+          <button type="submit" class="btn primary">Initialize Pipeline</button>
         </div>
       </form>
     </div>
   </div>
 
+  <!-- ON THIS DAY / HISTORICAL DISASTERS MODAL -->
+  <div id="onthisday-modal" class="modal-overlay" hidden>
+    <div class="modal modal-lg" style="max-width: 820px; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span>📅</span> Lịch sử Ngày này năm xưa (On This Day)
+        </h2>
+        <button type="button" id="btn-onthisday-close" class="btn sm">✕</button>
+      </div>
+      <p class="muted small" style="margin-top: -8px; margin-bottom: 16px;">
+        Khám phá các cột mốc thảm họa, sự kiện hàng không, hàng hải chấn động để tạo video kỷ niệm có tính lan tỏa và lưu trữ cao.
+      </p>
+      <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+        <input type="text" id="onthisday-search-input" placeholder="Tìm kiếm (Titanic, Chornobyl, MH370, động đất, sóng thần...)" class="ed-select" style="flex: 1;">
+        <button type="button" id="btn-onthisday-today" class="btn primary">Hôm nay</button>
+        <button type="button" id="btn-onthisday-all" class="btn">Tất cả cột mốc</button>
+      </div>
+      <div id="onthisday-events-grid" class="orchestra-grid" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;">
+        <!-- Dynamically rendered event cards -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ADOBE CREATIVE SUITE SHORTCUTS CHEATSHEET MODAL -->
+  <div id="shortcuts-modal" class="modal-overlay" hidden>
+    <div class="modal modal-lg" style="max-width: 780px; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <h2 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span class="adobe-badge pr" style="font-size: 13px; padding: 2px 6px;">Pr</span>
+          <span>Adobe Creative Suite Keyboard Shortcuts</span>
+        </h2>
+        <button type="button" id="btn-shortcuts-close" class="btn sm">✕</button>
+      </div>
+      <p class="muted small" style="margin-top: -6px; margin-bottom: 18px;">
+        Standard NLE keyboard mappings matching Adobe Premiere Pro, After Effects, and Photoshop.
+      </p>
+
+      <div class="shortcuts-grid">
+        <div class="shortcut-group">
+          <h4>Playback &amp; Transport</h4>
+          <div class="shortcut-row"><span>Play / Pause Toggle</span><kbd>Space</kbd></div>
+          <div class="shortcut-row"><span>Step Back 1s</span><kbd>◀ Left</kbd></div>
+          <div class="shortcut-row"><span>Step Forward 1s</span><kbd>▶ Right</kbd></div>
+          <div class="shortcut-row"><span>Mark In Point</span><kbd>I</kbd></div>
+          <div class="shortcut-row"><span>Mark Out Point</span><kbd>O</kbd></div>
+          <div class="shortcut-row"><span>Clear In / Out Points</span><kbd>Alt + X</kbd></div>
+          <div class="shortcut-row"><span>Cinema Fullscreen Mode</span><kbd>F</kbd></div>
+        </div>
+
+        <div class="shortcut-group">
+          <h4>Adobe Premiere Tools</h4>
+          <div class="shortcut-row"><span>Selection Tool</span><kbd>V</kbd></div>
+          <div class="shortcut-row"><span>Razor Blade (Split Clip)</span><kbd>C</kbd></div>
+          <div class="shortcut-row"><span>Track Select Forward</span><kbd>A</kbd></div>
+          <div class="shortcut-row"><span>Ripple Edit Tool</span><kbd>B</kbd></div>
+          <div class="shortcut-row"><span>Slip Tool</span><kbd>Y</kbd></div>
+          <div class="shortcut-row"><span>Pen Tool (Keyframes)</span><kbd>P</kbd></div>
+          <div class="shortcut-row"><span>Hand Tool (Pan)</span><kbd>H</kbd></div>
+          <div class="shortcut-row"><span>Type Tool (Titles)</span><kbd>T</kbd></div>
+        </div>
+
+        <div class="shortcut-group">
+          <h4>Timeline Operations</h4>
+          <div class="shortcut-row"><span>Toggle Snapping Magnet</span><kbd>S</kbd></div>
+          <div class="shortcut-row"><span>Add Marker at Playhead</span><kbd>M</kbd></div>
+          <div class="shortcut-row"><span>Speed &amp; Duration</span><kbd>Ctrl + R</kbd></div>
+          <div class="shortcut-row"><span>Audio Gain &amp; Normalize</span><kbd>G</kbd></div>
+          <div class="shortcut-row"><span>Delete Selected Scene</span><kbd>Delete</kbd></div>
+          <div class="shortcut-row"><span>Duplicate Selected Scene</span><kbd>Ctrl + D</kbd></div>
+        </div>
+
+        <div class="shortcut-group">
+          <h4>Project &amp; Workspaces</h4>
+          <div class="shortcut-row"><span>Save Project to Disk</span><kbd>Ctrl + S</kbd></div>
+          <div class="shortcut-row"><span>Undo</span><kbd>Ctrl + Z</kbd></div>
+          <div class="shortcut-row"><span>Redo</span><kbd>Ctrl + Shift + Z</kbd></div>
+          <div class="shortcut-row"><span>Export to Media Encoder</span><kbd>Ctrl + M</kbd></div>
+          <div class="shortcut-row"><span>Switch Workspaces</span><kbd>Keys 1 – 7</kbd></div>
+          <div class="shortcut-row"><span>Send Frame to Photo Lab</span><kbd>Ctrl + P</kbd></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI NATURAL LANGUAGE TIMELINE CO-PILOT MODAL (SPOTLIGHT / RAYCAST / CAPCUT AI STYLE) -->
+  <div id="command-bar-modal" class="modal-overlay" hidden>
+    <div class="modal command-bar-dialog" style="max-width: 680px; padding: 0; overflow: hidden; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.4); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.25);">
+      <div class="cmd-bar-header">
+        <span class="cmd-bar-icon">🤖</span>
+        <input type="text" id="copilot-cmd-input" class="cmd-bar-input" placeholder="Nhập lệnh điều khiển video tự nhiên (vd: 'tăng tốc intro lên 1.5x', 'cắt đôi cảnh 2')..." autocomplete="off" spellcheck="false">
+        <button type="button" id="btn-copilot-run" class="btn primary sm">Thực thi ↵</button>
+        <button type="button" id="btn-copilot-close" class="btn sm" style="padding: 4px 8px;">✕</button>
+      </div>
+      
+      <div class="cmd-bar-body">
+        <div class="cmd-suggestions-label">GỢI Ý LỆNH TỰ NHIÊN (VIỆT &amp; ANH)</div>
+        <div class="cmd-chips-grid">
+          <button class="cmd-chip" data-cmd="tăng tốc intro lên 1.5x">⚡ Tăng tốc intro lên 1.5x</button>
+          <button class="cmd-chip" data-cmd="cắt đôi cảnh 1">✂️ Cắt đôi cảnh 1</button>
+          <button class="cmd-chip" data-cmd="xoá cảnh 2">🗑️ Xoá cảnh 2</button>
+          <button class="cmd-chip" data-cmd="đảo ngược video cảnh 1">🔄 Đảo ngược (Reverse) cảnh 1</button>
+          <button class="cmd-chip" data-cmd="đặt âm lượng cảnh 1 là 80%">🔊 Đặt âm lượng cảnh 1 là 80%</button>
+          <button class="cmd-chip" data-cmd="thêm marker ở 5 giây">📍 Thêm marker ở 5s</button>
+          <button class="cmd-chip" data-cmd="tự động căn thời lượng khớp lời">⏱️ Tự căn thời lượng (Auto-fit)</button>
+          <button class="cmd-chip" data-cmd="căn nhịp nhạc theo beat BPM">🎵 Căn nhịp nhạc (Beat-sync)</button>
+        </div>
+
+        <div id="copilot-result-box" class="cmd-result-box" style="display: none;">
+          <div class="cmd-result-head">
+            <span id="copilot-status-badge" class="badge ok">Thành công</span>
+            <span id="copilot-intent-tag" class="muted small"></span>
+          </div>
+          <p id="copilot-message" class="cmd-result-msg"></p>
+        </div>
+      </div>
+
+      <div class="cmd-bar-footer">
+        <span><kbd>Enter</kbd> để chạy lệnh</span>
+        <span><kbd>Esc</kbd> để đóng</span>
+        <span>Hỗ trợ song ngữ Tiếng Việt &amp; English</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- QA PLATFORM & BRAND KIT COMPLIANCE INSPECTOR MODAL -->
+  <div id="compliance-modal" class="modal-overlay" hidden>
+    <div class="modal modal-lg" style="max-width: 820px; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <h2 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span>🛡️</span> QA Platform &amp; Brand Compliance Inspector
+        </h2>
+        <button type="button" id="btn-compliance-close" class="btn sm">✕</button>
+      </div>
+      <p class="muted small" style="margin-top: -6px; margin-bottom: 16px;">
+        Kiểm định tiêu chuẩn phát hành video trên các nền tảng mạng xã hội, phát hiện vi phạm từ cấm, rà soát tỷ lệ khung hình và đối chiếu nhận diện thương hiệu.
+      </p>
+
+      <!-- Platform Tabs -->
+      <div class="ingest-tabs" role="tablist">
+        <button class="ingest-tab active" data-qaplatform="tiktok">📱 TikTok (9:16)</button>
+        <button class="ingest-tab" data-qaplatform="youtube_shorts">⚡ YouTube Shorts (9:16)</button>
+        <button class="ingest-tab" data-qaplatform="youtube">📺 YouTube Master (16:9)</button>
+        <button class="ingest-tab" data-qaplatform="instagram_reels">📸 Instagram Reels</button>
+        <button class="ingest-tab" data-qaplatform="facebook">👥 Facebook</button>
+        <button class="ingest-tab" data-qaplatform="brand">🎨 Brand Kit</button>
+        <button class="ingest-tab" data-qaplatform="copyright">🔒 Copyright Hash</button>
+      </div>
+
+      <!-- Platform Check Panel -->
+      <div id="qapanel-platform" class="qa-panel-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 12px 0;">
+          <div>Đang kiểm tra cho: <strong id="qa-selected-platform-name">TikTok (9:16)</strong></div>
+          <button id="btn-run-platform-check" class="btn primary sm">🩺 Quét Quy Chuẩn Nền Tảng</button>
+        </div>
+        <div id="qa-platform-issues" class="analysis-issues">
+          <div class="issue-item info">Bấm "Quét Quy Chuẩn Nền Tảng" để đối chiếu thời lượng, tỷ lệ khung hình và từ cấm.</div>
+        </div>
+      </div>
+
+      <!-- Brand Check Panel -->
+      <div id="qapanel-brand" class="qa-panel-content" hidden>
+        <div style="margin: 12px 0;">
+          <h4>Đối chiếu Bộ Nhận Diện Thương Hiệu (Brand Kit)</h4>
+          <p class="muted small">Kiểm tra màu sắc chủ đạo, phông chữ và logo thương hiệu đã được sử dụng đúng chuẩn chưa.</p>
+          <div class="two-col" style="margin-top: 10px;">
+            <label>Màu Thương Hiệu (Palette Hex)
+              <input type="text" id="qa-brand-palette" value="#6366f1, #06b6d4, #121826" placeholder="#hex1, #hex2">
+            </label>
+            <label>Phông Chữ Chuẩn
+              <input type="text" id="qa-brand-font" value="Inter, Outfit" placeholder="Font names...">
+            </label>
+          </div>
+          <label class="inline" style="margin: 8px 0;">
+            <input type="checkbox" id="qa-brand-has-logo" checked> Video có gắn Logo / Watermark thương hiệu
+          </label>
+          <button id="btn-run-brand-check" class="btn primary sm" style="margin-top: 6px;">🎨 Quét Nhận Diện Brand Kit</button>
+        </div>
+        <div id="qa-brand-issues" class="analysis-issues">
+          <div class="issue-item info">Bấm quét để kiểm tra độ nhất quán của thương hiệu.</div>
+        </div>
+      </div>
+
+      <!-- Copyright Check Panel -->
+      <div id="qapanel-copyright" class="qa-panel-content" hidden>
+        <div style="margin: 12px 0;">
+          <h4>Kiểm Tra Bản Quyền Âm Thanh (Audio Fingerprint)</h4>
+          <p class="muted small">Soát dấu vân tay âm thanh SHA-256 đối chiếu với kho nhạc đã bảo hộ để tránh bị gậy bản quyền.</p>
+          <button id="btn-run-copyright-check" class="btn primary sm" style="margin-top: 6px;">🔒 Quét Dấu Vân Tay Bản Quyền</button>
+        </div>
+        <div id="qa-copyright-issues" class="analysis-issues">
+          <div class="issue-item info">Bấm quét để đối chiếu vân tay âm thanh với danh sách bảo hộ.</div>
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 16px;">
+        <button type="button" id="btn-compliance-close-foot" class="btn">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI AUTO-THUMBNAIL GENERATOR & PREDICTED CTR MODAL -->
+  <div id="thumbnail-gen-modal" class="modal-overlay" hidden>
+    <div class="modal modal-lg" style="max-width: 860px; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span>✨</span> AI Auto-Thumbnail Generator &amp; CTR Predictor
+        </h2>
+        <button type="button" id="btn-thumbgen-close" class="btn sm">✕</button>
+      </div>
+      <p class="muted small" style="margin-top: -6px; margin-bottom: 14px;">
+        AI trích xuất tự động các khung hình có độ tương phản và biểu cảm cao nhất từ video, phủ text hook giật gân và dự đoán tỷ lệ click (CTR %).
+      </p>
+
+      <div class="row" style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 14px; flex-wrap: wrap;">
+        <label style="flex: 1; min-width: 220px;">Dòng Chữ Hook Phủ Lên Thumbnail
+          <input type="text" id="thumbgen-overlay-text" placeholder="vd: SỰ THẬT KINH HOÀNG, BÍ MẬT 1912..." class="ed-select">
+        </label>
+        <label style="width: 140px;">Số Khung Hình
+          <select id="thumbgen-topk" class="ed-select">
+            <option value="3" selected>Top 3 Frames</option>
+            <option value="5">Top 5 Frames</option>
+          </select>
+        </label>
+        <button id="btn-run-thumbgen" class="btn primary" style="height: 38px;">⚡ Tạo Thumbnails &amp; Đo CTR</button>
+      </div>
+
+      <div id="thumbgen-loading" class="muted small" style="display: none; padding: 12px; text-align: center;">Đang trích xuất khung hình và tính toán điểm CTR...</div>
+
+      <div id="thumbgen-cards-grid" class="thumbgen-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px;">
+        <!-- Dynamically rendered candidate cards with CTR badges -->
+      </div>
+
+      <div class="modal-actions" style="margin-top: 16px;">
+        <button type="button" id="btn-thumbgen-close-foot" class="btn">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- COST GUARD & PROVENANCE AUDIT LOG MODAL -->
+  <div id="audit-modal" class="modal-overlay" hidden>
+    <div class="modal modal-lg" style="max-width: 860px; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span>📊</span> AI Cost Guard &amp; Provenance Audit Trail
+        </h2>
+        <button type="button" id="btn-audit-close" class="btn sm">✕</button>
+      </div>
+      <p class="muted small" style="margin-top: -6px; margin-bottom: 14px;">
+        Kiểm soát chi phí API thời gian thực và theo dõi nguồn gốc từng chỉnh sửa của AI (AI Provenance Audit).
+      </p>
+
+      <!-- Cost Guard Card -->
+      <div style="padding: 14px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 10px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h4 style="margin: 0;">💰 Chi Phí Dự Toán Cuộc Gọi AI</h4>
+          <span id="cost-status-badge" class="badge ok">Trong Ngân Sách</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 10px;">
+          <div class="v-metric-box"><span>Vision Video</span><strong id="cost-vision">$0.00</strong></div>
+          <div class="v-metric-box"><span>Audio LLM</span><strong id="cost-audio">$0.00</strong></div>
+          <div class="v-metric-box"><span>TTS Speech</span><strong id="cost-tts">$0.00</strong></div>
+          <div class="v-metric-box"><span>STT Whisper</span><strong id="cost-stt">$0.00</strong></div>
+          <div class="v-metric-box"><span>Embeddings</span><strong id="cost-emb">$0.00</strong></div>
+          <div class="v-metric-box" style="border-color: #6366f1;"><span>Tổng Dự Toán</span><strong id="cost-total" style="color: #38bdf8;">$0.00</strong></div>
+        </div>
+      </div>
+
+      <!-- Provenance Audit Log Table -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h4 style="margin: 0;">📜 Nhật Ký Kiểm Toán (Audit Trail)</h4>
+          <button id="btn-refresh-audit" class="btn sm">↺ Làm mới</button>
+        </div>
+        <div id="audit-log-list" style="max-height: 280px; overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 8px;">
+          <div class="muted small" style="text-align: center; padding: 20px;">Chưa có nhật ký phát sinh.</div>
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 16px;">
+        <button type="button" id="btn-audit-close-foot" class="btn">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
   <script src="/assets/app.js"></script>
   <script src="/assets/editor.js"></script>
+  <script src="/assets/flow.js"></script>
 </body>
 </html>

@@ -1,0 +1,32 @@
+{
+  "name": "mystery-investigation",
+  "title": "Mystery & Investigation (Bí ẩn & Điều tra)",
+  "description": "Khám phá các vụ mất tích bí ẩn, tai nạn chưa có lời giải: dẫn dắt manh mối, đối chiếu các giả thuyết, duy trì góc nhìn hoài nghi khoa học.",
+  "tone": "huyền bí, lôi cuốn, tỉnh táo, phân định rõ ràng giữa sự thật và giả thuyết",
+  "structure": [
+    "The Disappearance/Anomaly",
+    "Initial Search & Clues",
+    "Hypothesis 1 (Official)",
+    "Hypothesis 2 (Alternative)",
+    "Current Consensus & Unsolved Questions"
+  ],
+  "hook_rules": [
+    "Nêu lên sự biến mất không dấu vết hoặc điểm bất thường khó giải thích nhất.",
+    "Đặt câu hỏi cốt lõi mà các nhà điều tra chưa có lời giải đáp."
+  ],
+  "sentence_max_units": 15,
+  "max_sections": 10,
+  "cta": "Theo bạn giả thuyết nào là hợp lý nhất? Hãy để lại bình luận phía dưới.",
+  "banned_phrases": [
+    "chắc chắn 100% là do người ngoài hành tinh",
+    "sự thật rùng rợn bị che giấu",
+    "trong video hôm nay"
+  ],
+  "language_notes": {
+    "vi": "Bắt buộc gắn nhãn 'theo một số giả thuyết' hoặc 'chưa được kiểm chứng' khi nhắc đến thuyết âm mưu."
+  },
+  "units_per_second": {
+    "vi": 2.6
+  },
+  "builtin": false
+}
