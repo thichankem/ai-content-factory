@@ -1,16 +1,16 @@
 import { create } from "zustand";
-import { Scene } from "@/types/project";
-import { TimelineTrack } from "@/types/timeline";
+import { VideoScene } from "@/types/timeline";
+import { TimelineTrack } from "@/types/studio";
 
 interface TimelineStore {
   selectedSceneIndex: number | null;
   zoom: number;
   tracks: TimelineTrack[];
-  scenes: Scene[];
+  scenes: VideoScene[];
   setSelectedSceneIndex: (index: number | null) => void;
   setZoom: (zoom: number) => void;
-  setScenes: (scenes: Scene[]) => void;
-  updateScene: (index: number, partial: Partial<Scene>) => void;
+  setScenes: (scenes: VideoScene[]) => void;
+  updateScene: (index: number, partial: Partial<VideoScene>) => void;
 }
 
 const DEFAULT_TRACKS: TimelineTrack[] = [

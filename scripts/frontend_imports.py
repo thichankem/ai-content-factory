@@ -53,8 +53,12 @@ _EXPORT_DECL_RE = re.compile(
     r"(?:function|const|let|var|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)",
     re.MULTILINE,
 )
-# `export { a, b as c }`
-_EXPORT_LIST_RE = re.compile(r"^\s*export\s*\{([^}]*)\}", re.MULTILINE)
+# `export { a, b as c }` and `export type { a }`.
+_EXPORT_LIST_RE = re.compile(r"^\s*export\s+(?:type\s+)?\{([^}]*)\}", re.MULTILINE)
+# `export * as ns from "..."` — a namespace re-export, e.g. the api barrel.
+_EXPORT_NAMESPACE_RE = re.compile(
+    r"^\s*export\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s+from", re.MULTILINE
+)
 # `export * from "..."` — makes named exports unresolvable.
 _EXPORT_STAR_RE = re.compile(r"^\s*export\s*\*\s*from", re.MULTILINE)
 # `export default`
@@ -86,6 +90,7 @@ def exported_names(path: Path) -> tuple[set[str], bool, bool]:
     text = path.read_text(encoding="utf-8", errors="replace")
 
     names = set(_EXPORT_DECL_RE.findall(text))
+    names |= set(_EXPORT_NAMESPACE_RE.findall(text))
     for group in _EXPORT_LIST_RE.findall(text):
         for part in group.split(","):
             part = part.strip()
