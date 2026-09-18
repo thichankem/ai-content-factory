@@ -234,7 +234,9 @@ Mặt khác, `useExternalIngestion.uploadAssetMutation` (`hooks/useExternalInges
 
 ### L16. Mã chết và dependency thừa
 
-- `src/components/layout/Topbar.tsx` (197 dòng) — không nơi nào import. Nó cũng lặp lại `useEffect` bắt `Ctrl+K` giống `SidebarWorkflowNav.tsx:93-103` → nếu render, hai listener cùng chạy và `setCommandBarOpen(true)` gọi hai lần.
+> **Trạng thái 18/09/2026:** `Topbar.tsx` và 3 tệp rác do test sinh ra trong `storage/uploads/` **đã được xóa**. Ba mục dưới đây vẫn còn.
+
+- ~~`src/components/layout/Topbar.tsx` (197 dòng) — không nơi nào import~~ — **ĐÃ XÓA 18/09/2026.** Nó lặp lại `useEffect` bắt `Ctrl+K` giống `SidebarWorkflowNav.tsx:93-103` → nếu còn được render, hai listener sẽ cùng chạy và `setCommandBarOpen(true)` gọi hai lần.
 - `@radix-ui/react-dropdown-menu` trong `package.json` — không dùng.
 - `frontend/README.md` mô tả cấu trúc không khớp thực tế (ví dụ liệt kê `frontend/index.html` là "Vanilla/FastAPI fallback entry (satisfies smoke test)" trong khi thực tế nó **chính là** ứng dụng production).
 
@@ -273,6 +275,6 @@ Các giá trị `1200`, `1400`, `900`, `1100`, `1600` ms xuất hiện rải rá
 | L13 | 50 chỗ `any` | P2 | TB |
 | L14 | Không error/loading/empty state | P2 | Nhỏ |
 | L15 | Nút upload rỗng | P2 | Rất nhỏ |
-| L16–L18 | Dead code, trùng lặp, magic number | P3 | Nhỏ |
+| L16–L18 | Dead code, trùng lặp, magic number | P3 | Nhỏ — *`Topbar.tsx` đã xóa 18/09/2026; rác test trong `storage/uploads/` đã dọn cùng lúc* |
 
 **Ba mục P0 xử lý trước:** L2, L3, L8. Cả ba đều cùng một chủ đề — **UI đang khẳng định những điều không đúng** (dự án tồn tại, thao tác thành công, nhật ký kiểm toán có thật). Với một quy trình mà toàn bộ giá trị nằm ở hai cổng duyệt con người, đó là lỗi nghiêm trọng nhất có thể có.

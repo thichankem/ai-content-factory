@@ -159,7 +159,7 @@ Backend đã có `tests/test_architecture.py` áp ngân sách dòng cho module. 
 
 ### 3.9 [P3] Dead code & dependency thừa
 
-- `src/components/layout/Topbar.tsx` — 197 dòng, **không nơi nào import** (không xuất hiện trong `page.tsx`). Bản sao chức năng điều hướng của `SidebarWorkflowNav`. Đáng chú ý: nó lặp lại **cùng một** `useEffect` bắt `Ctrl+K` như `SidebarWorkflowNav.tsx:93-103`. Nếu sau này có ai render nó, hai listener sẽ cùng chạy.
+- ~~`src/components/layout/Topbar.tsx` — 197 dòng, không nơi nào import~~ — **ĐÃ XÓA 18/09/2026.** Tệp này là tàn dư của một quyết định xóa có chủ ý: `docs/KE-HOACH-TONG-THE.md:1483` ghi *"Loại bỏ hoàn toàn thanh Topbar ở trên đỉnh theo yêu cầu người vận hành"*. Đáng chú ý khi nó còn tồn tại: nó lặp lại **cùng một** `useEffect` bắt `Ctrl+K` như `SidebarWorkflowNav.tsx:93-103`, nên nếu có ai render nó thì hai listener sẽ cùng chạy.
 - `@radix-ui/react-dropdown-menu` — khai trong `package.json`, không dùng ở đâu.
 - **Hai HTTP client cùng tồn tại:** `lib/api-client.ts` (cũ, 13 tệp còn import) và `lib/api/client.ts` (mới, chưa tệp nào import). Đây là trạng thái chuyển tiếp của refactor đang diễn ra — cần hoàn tất, không để tồn tại song song lâu.
 - `tailwindcss-animate` — có trong `plugins` của `tailwind.config.ts` nhưng không được import ở mã nguồn; các class `animate-in`/`fade-in-*` trong `components/ui/dialog.tsx` phụ thuộc plugin này, nên cần giữ **hoặc** gỡ cả hai cho nhất quán.
@@ -217,5 +217,5 @@ export function apiFetch<T>(path: string, options?: RequestOptions): Promise<T> 
 2. Sửa `invalidateQueries` (3.2) — vài dòng, sửa một lỗi thật.
 3. Thêm `enabled` cho `audit-trail` và `seo-rules` (3.6) — vài dòng.
 4. Gộp rewrites còn một wildcard `(3.7)` — vài dòng.
-5. Xoá `Topbar.tsx` và dep thừa (3.9).
+5. ~~Xoá `Topbar.tsx`~~ — đã xong 18/09/2026. Còn lại: dep thừa `@radix-ui/react-dropdown-menu` (cần `npm install` để cập nhật `package-lock.json` cùng lúc, nếu không `npm ci` sẽ lỗi).
 6. Dựng khung test trước khi refactor bất cứ thứ gì (xem `05`).

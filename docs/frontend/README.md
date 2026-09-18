@@ -35,7 +35,7 @@ Thứ tự đọc đề xuất: `01` ➔ `02` ➔ `03` ➔ `05` ➔ `04`.
 | Số tệp kiểm thử frontend | **0** |
 | Cấu hình ESLint | **không có**, dù `package.json` khai báo `"lint": "next lint"` |
 | Dependency không dùng | `@radix-ui/react-dropdown-menu`, `tailwindcss-animate` |
-| Component chết | `src/components/layout/Topbar.tsx` (197 dòng, không nơi nào import) |
+| Component chết | `src/components/layout/Topbar.tsx` (197 dòng, không nơi nào import) — **đã xóa 18/09/2026** |
 | `next/dynamic` / code-splitting | **0 chỗ** |
 | `error.tsx` / `loading.tsx` / `not-found.tsx` | **không có** |
 

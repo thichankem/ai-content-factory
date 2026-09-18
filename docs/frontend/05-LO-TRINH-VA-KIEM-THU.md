@@ -132,7 +132,7 @@ Dùng `npm ci` (không phải `npm install`) để tôn trọng `package-lock.js
 
 - Chạy `npm audit` và ghi kết quả vào `docs/KE-HOACH-TONG-THE.md` (`03`-A5).
 - Xoá `@radix-ui/react-dropdown-menu` khỏi `package.json` (không dùng).
-- Xoá `Topbar.tsx` (dead code, `01`-3.9).
+- ~~Xoá `Topbar.tsx` (dead code)~~ — đã xong 18/09/2026. Còn lại: gỡ `@radix-ui/react-dropdown-menu` khỏi `package.json`, **nhớ cập nhật `package-lock.json` cùng lúc** (nếu không `npm ci` trong CI sẽ lỗi vì hai tệp lệch nhau).
 
 ### 3.4 Ngân sách hiệu năng
 
