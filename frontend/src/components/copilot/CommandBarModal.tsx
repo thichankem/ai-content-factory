@@ -63,8 +63,10 @@ export function CommandBarModal() {
       });
       setStatusMessage(res.message || `Đã thực thi thành công: ${res.parsed_command.intent}`);
       setInput("");
-    } catch (err: any) {
-      setStatusMessage(`Lỗi thực thi: ${err.message}`);
+    } catch (error) {
+      setStatusMessage(
+        `Lỗi thực thi: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   };
 

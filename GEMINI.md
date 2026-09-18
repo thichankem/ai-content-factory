@@ -7,8 +7,10 @@ Guidance and instructions for Google Antigravity and Gemini AI coding agents wor
 The **AI Content Factory** — an AI-assisted short-form and long-form video pipeline with two mandatory human review gates (script approval, final video approval).
 The full pipeline comprises:
 
-- **FastAPI backend** (`src/content_factory`) with 61 REST tools and an MCP server (`mcp_server.py`).
-- **Next.js 14 Frontend** (`frontend/`) with Cyberpunk Studio design.
+- **FastAPI backend** (`src/content_factory`) with 19 feature routers, the self-describing agent tool registry (`GET /tools` + `POST /tools/call`), and an MCP server (`mcp_server.py`).
+- **Two frontends for the same product** — know which one you are editing:
+  - `frontend/index.html` + `app.js` + `editor.js` + `flow.js` — the **vanilla studio**, 15,650 lines, served by FastAPI at `/`, covered by the smoke test. **This is the product.**
+  - `frontend/src/**` — a **Next.js 14 rewrite**, 97 files / 17,726 lines, on its own server at port 3000. FastAPI does not mount or proxy it and CI does not build it.
 - **Multimodal AI Vision & Perception Engine** (`src/content_factory/vision.py`, `media_tools.py`, `ai_video_editor.py`).
 
 ## Vision-First Principles for Antigravity
@@ -19,11 +21,15 @@ The full pipeline comprises:
 
 ## Architecture & Conventions
 
-- Skills live in `.agents/skills/<name>/SKILL.md` (for Antigravity/Gemini) and `.claude/skills/<name>/SKILL.md` (for Claude).
+- Skills live in `.agents/skills/<name>/SKILL.md` (for Antigravity/Gemini) and `.claude/skills/<name>/SKILL.md` (for Claude) — 35 in each, kept in step.
+- **Never let the UI assert something that did not happen.** A figure an operator acts on must come from the server, and a failed request must read as a failure. Fabricated placeholder data, a success path inside a `catch` block, and `alert()` announcing work that called nothing are all bugs — three were found and removed across the Next.js client. An empty state, a disabled control with a reason, or an error message is the correct rendering.
+- **Verify frontend edits.** Node.js is not installed by default, so `npm` may be missing entirely; fix that before editing TypeScript. `python scripts/frontend_imports.py` (no dependencies) catches deleted modules and renamed exports; `npm run type-check` and `npm run build` in `frontend/` are what actually prove a change.
 - External agents operate via `POST /tools/call`, `GET /tools`, the MCP server (`mcp_server.py`), or the plain-Markdown bridge (`brief.md`).
 - The state machine in `src/content_factory/state.py` is authoritative — never bypass it.
 - Source rights are NEVER auto-confirmed by any AI agent without human operator verification.
 - Always run quality gates after editing Python code:
+
+  The Python gates are currently **red** (242 `ruff` findings, 13 unformatted files, 43 `mypy` errors, 11 `pytest` failures from a missing `ffmpeg`). Run them and read the number; do not report a gate as green without evidence.
 
   ```bash
   python -m ruff check src tests

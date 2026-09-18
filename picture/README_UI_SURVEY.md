@@ -2,6 +2,11 @@
 
 Tài liệu này cung cấp mục lục chi tiết và phân tích các phân hệ chức năng cho toàn bộ **41 ảnh chụp màn hình độ phân giải cao (Full HD / 4K)** được lưu trữ trong thư mục `picture/`, phục vụ cho việc nghiên cứu, khảo sát và thiết kế giao diện (UI/UX) cho trình biên tập video.
 
+> [!IMPORTANT]
+> **Các ảnh không nằm trong repository.** Ở bản checkout hiện tại, `picture/` chỉ chứa đúng tệp README này — không có tệp ảnh nào, và 6 thư mục con được nhắc ở các mục 1–6 cũng không tồn tại. Tài liệu vì vậy là **danh mục khảo sát** (đọc được độc lập), không phải chỉ mục tra cứu ảnh.
+>
+> Hai điều chỉnh về số liệu, đo trực tiếp trên tệp này: bảng có **36 dòng mục** (không phải 41 — con số 41 có thể đã tính cả các ảnh không được lập bảng), và có **6 nhóm** sản phẩm. Nếu bạn đưa các ảnh trở lại repository, hãy tạo lại cây thư mục đúng như tên trong tiêu đề mỗi mục để các đường dẫn đó có nghĩa.
+
 ---
 
 ## 1. Adobe Premiere Pro 2025 (`picture/01_Adobe_Premiere_Pro_2025/`)

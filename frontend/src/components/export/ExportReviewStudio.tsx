@@ -295,14 +295,16 @@ export function ExportReviewStudio() {
               <div className="space-y-1">
                 <label className="text-gray-400 text-[11px]">Định dạng Nền tảng:</label>
                 <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: "tiktok", label: "TikTok 9:16" },
-                    { id: "yt_shorts", label: "Shorts 9:16" },
-                    { id: "yt_long", label: "YouTube 16:9" },
-                  ].map((p) => (
+                  {(
+                    [
+                      { id: "tiktok", label: "TikTok 9:16" },
+                      { id: "yt_shorts", label: "Shorts 9:16" },
+                      { id: "yt_long", label: "YouTube 16:9" },
+                    ] as const
+                  ).map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => setExportPreset(p.id as any)}
+                      onClick={() => setExportPreset(p.id)}
                       className={`p-1.5 rounded text-[10px] font-bold transition-colors ${
                         exportPreset === p.id
                           ? "bg-nle-cyan text-black"
@@ -319,14 +321,16 @@ export function ExportReviewStudio() {
               <div className="space-y-1">
                 <label className="text-gray-400 text-[11px]">Bộ mã hóa Video (Codec):</label>
                 <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: "h264", label: "H.264 (Phổ thông)" },
-                    { id: "hevc", label: "H.265 / HEVC" },
-                    { id: "av1", label: "AV1 Ultra" },
-                  ].map((c) => (
+                  {(
+                    [
+                      { id: "h264", label: "H.264 (Phổ thông)" },
+                      { id: "hevc", label: "H.265 / HEVC" },
+                      { id: "av1", label: "AV1 Ultra" },
+                    ] as const
+                  ).map((c) => (
                     <button
                       key={c.id}
-                      onClick={() => setCodec(c.id as any)}
+                      onClick={() => setCodec(c.id)}
                       className={`p-1.5 rounded text-[10px] font-bold transition-colors ${
                         codec === c.id
                           ? "bg-nle-violet text-white"

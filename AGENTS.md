@@ -8,13 +8,24 @@ The **AI Content Factory** — an AI-assisted short-form video pipeline with two
 mandatory human review gates (script approval, final video approval).
 
 The full pipeline is implemented: a FastAPI backend
-(`src/content_factory`), a vanilla-JS frontend (`frontend/`), a pytest suite
-(`tests/`), helper scripts (`scripts/`), and CI (`.github/workflows/ci.yml`).
-It covers project creation, AI script drafting (with a built-in offline
-template provider), the mandatory script approval gate, a simulated production
-worker, the mandatory final-video approval gate, and publishing. The design
-documents under `docs/` and real video rendering / publishing integrations are
-still planned.
+(`src/content_factory`), a pytest suite (`tests/`), helper scripts (`scripts/`),
+and CI (`.github/workflows/ci.yml`). It covers project creation, AI script
+drafting (with a built-in offline template provider), the mandatory script
+approval gate, a simulated production worker, the mandatory final-video approval
+gate, and publishing.
+
+### There are two frontends. Know which one you are editing.
+
+- **`frontend/index.html` + `app.js` + `editor.js` + `flow.js` + `style.css`**
+  (15,650 lines) — the **vanilla studio**. FastAPI serves it at `/`
+  (`api/routers/index.py`), it needs no build step, and it is what the smoke test
+  covers. **This is the product.**
+- **`frontend/src/**`** (97 files, 17,726 lines) — a **Next.js 14 rewrite** on its
+  own server at port 3000. FastAPI does not mount or proxy it and CI does not
+  build it.
+
+Do not assume a change to one affects the other; they share no code, no styles and
+no build. `docs/frontend/` audits both.
 
 ## Conventions
 
@@ -31,6 +42,22 @@ still planned.
   not bypass it in the service layer.
 - Source rights are never auto-confirmed, by any code path, for any provider
   or external agent.
+- **Never let the UI assert something that did not happen.** A number an operator
+  will act on — a readiness score, a confirmation, a spend figure, a hash, an
+  audit row — must come from the server, and a failed request must read as a
+  failure. Three shapes of this bug were found and removed across the frontend
+  and are not to be reintroduced:
+  - *fabricated placeholder data*: invented demo records shown as real results
+    (fake audit rows with fake SHA-256 hashes, a hardcoded SEO score badged
+    “measured”, a demo script presented as the project's script, a hardcoded
+    media bin).
+  - *a success path in a `catch`*: reporting completion from the error branch, so
+    a failure looked finished.
+  - *`alert()` announcing work*: a button that popped a confirmation while
+    calling nothing, or while swallowing the mutation's rejection.
+
+  An empty state, a disabled control with a reason, or an error message is always
+  the correct rendering. Client state is never the authority for a gate.
 
 ## Backend layout
 
@@ -65,9 +92,16 @@ and a change log. Read it before starting work and update it when you finish,
 following the template at the bottom of that file.
 
 `docs/TOOLCHAIN.md` lists the optional local media/AI tools;
-`scripts/toolcheck.py` reports which are actually installed.
+`scripts/toolcheck.py` reports which are actually installed — run it before
+debugging a media failure, because the most common cause is a missing `ffmpeg`.
 `docs/AGENT-BRIDGE.md` documents the Markdown contract used with external AI
 agents (Claude Code, Codex, DeepSeek, Gemini).
+
+Before claiming a quality gate is green, run it and read the number. The Python
+gates are currently **red** — 242 `ruff` findings, 13 unformatted files, 43 `mypy`
+errors in 7 files, and 11 `pytest` failures caused by `ffmpeg` not being on
+`PATH`. `README.md` carries the full table; do not contradict it without
+evidence.
 
 ## Workflow
 
@@ -84,5 +118,22 @@ agents (Claude Code, Codex, DeepSeek, Gemini).
   `python -m pytest`.
 - Before reporting a large task done, run the smoke test: `scripts/smoke.ps1`
   (Windows) or `scripts/smoke.sh` (Linux/macOS/WSL).
+- After editing anything under `frontend/src/`, verify it. Node.js is **not**
+  installed by default, so `npm` may be missing entirely; fix that first rather
+  than editing TypeScript unverified.
+
+  ```bash
+  python scripts/frontend_imports.py       # no dependencies; checks every import resolves
+  cd frontend && npm run type-check        # tsc --noEmit
+  cd frontend && npm run build             # next build
+  ```
+
+  `frontend_imports.py` catches deleted modules and renamed exports, which is the
+  most common breakage in this tree. It cannot catch a type error, a wrong prop
+  or a wrong data shape — those need `tsc`. A change to the Next.js client is not
+  verified until `tsc` has run clean.
+- The vanilla studio has no test suite and no type system. If you change it, the
+  smoke test is your only guard: it asserts that `/` loads and that the pages the
+  scripts depend on still respond.
 - Do not invent files or commands that do not exist yet. If a step depends on
   unimplemented infrastructure, mark it as planned.

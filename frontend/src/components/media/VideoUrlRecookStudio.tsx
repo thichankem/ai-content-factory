@@ -280,6 +280,16 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
             <span>{ingestStatus}</span>
           </div>
         )}
+
+        {/* A failed download reads as a failure. The previous version reported
+            success here even when the request had failed, having invented a clip
+            to show instead. */}
+        {ingestError && (
+          <div className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 p-2 rounded-lg flex items-start space-x-1.5">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{ingestError}</span>
+          </div>
+        )}
       </div>
 
       {/* Main Dual Workspace: Left Video Deconstruction & Transcript | Right AI Re-Cook Studio */}
@@ -367,7 +377,7 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
                 <label className="text-[10px] text-gray-400 font-semibold block mb-1">Chế Độ Biến Tấu:</label>
                 <select
                   value={recookMode}
-                  onChange={(e) => setRecookMode(e.target.value as any)}
+                  onChange={(e) => setRecookMode(e.target.value as ReCookMode)}
                   className="w-full bg-nle-panel border border-nle-border rounded px-2 py-1 text-xs text-white outline-none"
                 >
                   <option value="balanced">⚖️ Cân Bằng (Balanced)</option>
@@ -381,7 +391,9 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
                 <label className="text-[10px] text-gray-400 font-semibold block mb-1">Văn Phong (Hook Style):</label>
                 <select
                   value={recookStyle}
-                  onChange={(e) => setRecookStyle(e.target.value as any)}
+                  onChange={(e) =>
+                    setRecookStyle(e.target.value as "viral-hook" | "storytelling" | "shocking-facts")
+                  }
                   className="w-full bg-nle-panel border border-nle-border rounded px-2 py-1 text-xs text-white outline-none"
                 >
                   <option value="viral-hook">🔥 Giật Gân 3s (Viral Hook)</option>
@@ -414,7 +426,7 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
               <Button
                 size="sm"
                 variant="outline"
-                disabled={isRecooking}
+                disabled={isRecooking || !downloadedMedia}
                 onClick={handleRunRecook}
                 className="text-xs border-rose-500/40 text-rose-300 hover:bg-rose-950/30"
               >
@@ -426,15 +438,40 @@ export function VideoUrlRecookStudio({ onAddMediaAsset }: VideoUrlRecookStudioPr
               </Button>
             </div>
 
+            {recookError && (
+              <div className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 p-2 rounded-lg flex items-start space-x-1.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{recookError}</span>
+              </div>
+            )}
+
             {/* Re-Cooked Script Editor / Preview */}
             <div className="flex-1 flex flex-col space-y-1">
-              <textarea
-                value={recookedScript}
-                onChange={(e) => setRecookedScript(e.target.value)}
-                rows={9}
-                className="w-full flex-1 p-3 bg-nle-base border border-nle-border rounded-lg text-xs text-gray-200 font-sans leading-relaxed resize-none outline-none focus:border-nle-cyan/50"
-              />
+              {recookedScript ? (
+                <textarea
+                  value={recookedScript}
+                  onChange={(e) => setRecookedScript(e.target.value)}
+                  rows={9}
+                  className="w-full flex-1 p-3 bg-nle-base border border-nle-border rounded-lg text-xs text-gray-200 font-sans leading-relaxed resize-none outline-none focus:border-nle-cyan/50"
+                />
+              ) : (
+                <div className="flex-1 min-h-[180px] flex flex-col items-center justify-center gap-1 p-3 rounded-lg bg-nle-base border border-dashed border-nle-border text-xs text-gray-500 text-center">
+                  <FileText className="w-5 h-5 text-gray-600" />
+                  <span className="text-gray-300 font-semibold">Chưa có kịch bản tái cấu trúc</span>
+                  <span>
+                    Nạp video ở trên, chọn chế độ rồi bấm &quot;Tái Cấu Trúc Script Ngay&quot;. Engine sẽ
+                    tạo một dự án mới cùng kịch bản đã viết lại.
+                  </span>
+                </div>
+              )}
             </div>
+
+            {recookedProjectId && (
+              <p className="text-[11px] text-gray-400">
+                Engine đã tạo dự án mới <code className="font-mono text-nle-cyan">{recookedProjectId}</code>{" "}
+                và ghi kịch bản này vào đó.
+              </p>
+            )}
 
             {/* Action Bar: Send to Script and Production Timeline */}
             <div className="pt-2 border-t border-nle-border flex flex-col sm:flex-row items-center justify-between gap-2">

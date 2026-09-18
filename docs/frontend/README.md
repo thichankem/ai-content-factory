@@ -14,9 +14,45 @@ Bộ tài liệu này là **báo cáo đánh giá frontend** của AI Content Fa
 | [`02-DANH-SACH-LOI.md`](./02-DANH-SACH-LOI.md) | Danh sách lỗi cụ thể kèm `file:line`, nguyên nhân, cách sửa | Sửa được ngay |
 | [`03-BAO-MAT-VA-DO-TIN-CAY.md`](./03-BAO-MAT-VA-DO-TIN-CAY.md) | Bảo mật, phơi nhiễm qua proxy, CVE của Next.js 14, và vấn đề "UI báo thành công giả" | Cao |
 | [`04-CHUC-NANG-DE-XUAT.md`](./04-CHUC-NANG-DE-XUAT.md) | Đề xuất chức năng mới: WebCodecs/WebGPU, undo/redo, offline, cộng tác, a11y, i18n | Trung hạn |
-| [`05-LO-TRINH-NANG-CAP-VA-KIEM-THU.md`](./05-LO-TRINH-NANG-CAP-VA-KIEM-THU.md) | Lộ trình nâng cấp Next/React, chiến lược kiểm thử, quality gate cho frontend | Dài hạn |
+| [`05-LO-TRINH-VA-KIEM-THU.md`](./05-LO-TRINH-VA-KIEM-THU.md) | Lộ trình nâng cấp Next/React, chiến lược kiểm thử, quality gate cho frontend | Dài hạn |
 
 Thứ tự đọc đề xuất: `01` ➔ `02` ➔ `03` ➔ `05` ➔ `04`.
+
+---
+
+## ⚠️ Bộ tài liệu này mô tả thời điểm **trước** lần refactor — đọc mục dưới đây trước
+
+Toàn bộ phần còn lại của bộ tài liệu được viết khi bản Next.js **chưa từng được biên dịch** (không có Node.js trên máy, `types/api.ts` vừa bị xóa, 62 lỗi TypeScript, 50 chỗ `any`). Kể từ đó frontend đã được refactor xong và **lần đầu tiên build được**. Các phát hiện bên dưới vẫn đúng về *nguyên nhân*, nhưng nhiều mục **đã được sửa**; đừng đọc chúng như danh sách việc còn tồn.
+
+### Kết quả refactor (đo lại sau khi hoàn tất)
+
+| Chỉ số | Trước | Sau |
+| :--- | :--- | :--- |
+| `tsc --noEmit` | **62 lỗi** | **0 lỗi** |
+| `next build` | chưa từng chạy | ✓ biên dịch thành công, `/` = 259 kB first load |
+| Số chỗ `any` | 50 | **0** |
+| `alert()` báo việc chưa làm | 10 | **0** |
+| Dữ liệu bịa trong UI (audit, SEO, media bin, thumbnail, kịch bản mặc định, re-cook) | 6 màn hình | **0** |
+| Gate 1 | không thể vượt qua từ bản Next | đã nối: `PUT /projects/{id}/script` lưu kịch bản + ghi nhận xác nhận bản quyền |
+| `Topbar.tsx` (197 dòng, không ai import) | còn | đã xóa |
+| `lib/api-client.ts` (client cũ) | còn, 13 tệp import | đã xóa cùng refactor |
+| Tệp `.ts/.tsx` / số dòng | 96 / ~11.000 | **97 / 17.726** |
+
+Chi tiết và bằng chứng: ghi chú thay đổi ngày 18/09/2026 ở mục 9 của `docs/KE-HOACH-TONG-THE.md`.
+
+### Vẫn còn nguyên (chưa sửa)
+
+| Hạng mục | Trạng thái |
+| :--- | :--- |
+| Cấu hình ESLint | **không có** — `"lint": "next lint"` trong `package.json` vẫn không chạy được |
+| Tệp kiểm thử frontend | **0** |
+| Job frontend trong CI | **không có** |
+| `next/dynamic` / code-splitting | **0 chỗ** |
+| `error.tsx` / `loading.tsx` / `not-found.tsx` | **không có** (`app/` chỉ có `layout.tsx`, `page.tsx`, `globals.css`) |
+| Component > 400 dòng | **16** (lớn nhất: `ScriptBriefSettingsPanel.tsx` 901, `ContentEmpireStudio.tsx` 747, `AudioLabStudio.tsx` 686) |
+| `formatTimecode` bỏ qua `VideoProject.fps` | còn |
+| Validate runtime của response | còn — client vẫn `response.json() as Promise<T>` |
+| Dependency không dùng | `@radix-ui/react-dropdown-menu` (gỡ cần `npm install` để đồng bộ lockfile) |
 
 ---
 
@@ -27,8 +63,8 @@ Thứ tự đọc đề xuất: `01` ➔ `02` ➔ `03` ➔ `05` ➔ `04`.
 | Hạng mục | Giá trị |
 | :--- | :--- |
 | Frontend #1 — Vanilla JS (production, FastAPI phục vụ) | `app.js` 4.003 + `editor.js` 1.974 + `flow.js` 1.030 + `index.html` 2.411 + `style.css` 6.228 = **15.646 dòng** |
-| Frontend #2 — Next.js 14 (dev-only, cổng 3000) | `frontend/src/**` = **~11.000 dòng** |
-| Tổng | **~26.600 dòng frontend** cho cùng một tập tính năng |
+| Frontend #2 — Next.js 14 (dev-only, cổng 3000) | `frontend/src/**` = **17.726 dòng** trên 97 tệp |
+| Tổng | **~33.400 dòng frontend** cho cùng một tập tính năng |
 | Số "studio" trong bản Next | 11 studio + 8 modal toàn cục |
 | Số component > 400 dòng | 10 (`ScriptBriefSettingsPanel` 887, `ContentEmpireStudio` 741, `AudioLabStudio` 697, `VideoMotionFXStudio` 608, `DualMonitorPlayer` 541, ...) |
 | Số lần đúc `any` | 50 |
@@ -39,33 +75,24 @@ Thứ tự đọc đề xuất: `01` ➔ `02` ➔ `03` ➔ `05` ➔ `04`.
 | `next/dynamic` / code-splitting | **0 chỗ** |
 | `error.tsx` / `loading.tsx` / `not-found.tsx` | **không có** |
 
-### ⚠️ Cây làm việc đang có refactor dở dang (không phải do bộ tài liệu này)
+### Trạng thái cây làm việc: đã refactor xong (ghi chú cập nhật 18/09/2026)
 
-Tại thời điểm khảo sát, `git status` cho thấy có thay đổi **đang diễn ra** trong `frontend/src/types/` và `frontend/src/lib/` mà tài liệu này **không** tạo ra:
+Lúc khảo sát, cây làm việc có một refactor **đang chạy dở** trong `types/` và `lib/`: `types/api.ts` và `types/project.ts` đã bị xóa trong khi **13 tệp còn import chúng**, và `lib/api/client.ts` mới chưa được tệp nào dùng. Bản Next **không build được** và **chưa từng được build** — không có Node.js trên máy, nên 62 lỗi TypeScript tích tụ mà không ai thấy.
 
-| Trạng thái | Tệp |
+Refactor đó đã hoàn tất. Kết quả được ghi ở mục *Kết quả refactor* phía trên. Điều đáng giữ lại từ giai đoạn này là **bài học về quy trình**: một client 17.000 dòng không có typecheck, không có test và không có CI sẽ trôi rất xa mà không báo lỗi. Đó là lý do `scripts/frontend_imports.py` tồn tại và là lý do việc cài Node.js là điều kiện tiên quyết để làm việc trên frontend.
+
+**Ảnh hưởng của refactor tới các phát hiện trong bộ tài liệu:**
+
+| Phát hiện | Trạng thái sau refactor |
 | :--- | :--- |
-| Đã thêm (mới) | `lib/api/client.ts`, `types/agent.ts`, `types/campaign.ts`, `types/common.ts`, `types/external.ts`, `types/library.ts`, `types/research.ts`, `types/voice.ts`, `types/workflow.ts` |
-| Đã xóa | `types/api.ts`, `types/project.ts` |
-| Đã sửa | `types/script.ts`, `types/timeline.ts` |
-
-**Trạng thái hiện tại đang không build được.** `types/api.ts` và `types/project.ts` đã bị xóa khỏi đĩa nhưng vẫn còn **13 tệp import chúng** (`ScriptStudio.tsx`, `useProjects.ts`, `useQA.ts`, `useScriptEngine.ts`, `useThumbnails.ts`, `useAuditCost.ts`, `useAgentBridge.ts`, `useTimelineCommands.ts`, `useWorkflowDAG.ts`, `useProjectStore.ts`, `useTimelineStore.ts`, …). Song song đó, `lib/api/client.ts` mới đã có nhưng **chưa tệp nào import nó**. Nghĩa là bước di chuyển đã đi được nửa đường: hợp đồng mới đã dựng xong, điểm nối chưa được chuyển.
-
-> Tài liệu này **không** đánh giá hay sửa các tệp đó — chúng thuộc về luồng công việc khác. Ghi chú ở đây chỉ để tránh nhầm lẫn về nguồn gốc thay đổi.
-
-**Ảnh hưởng tới các phát hiện trong bộ tài liệu:**
-
-| Phát hiện | Ảnh hưởng | Hành động |
-| :--- | :--- | :--- |
-| `01`-3.10 (không validate runtime) | Refactor **chưa giải quyết**: client mới vẫn `response.json() as Promise<T>` — vẫn là ép kiểu mù | Giữ nguyên, đổi đường dẫn sang `lib/api/client.ts` |
-| `02`-L12 (`AbortSignal`) | **Đã cải thiện một nửa**: `RequestOptions extends Omit<RequestInit, ...>` nên `signal` đi qua được tới `fetch`; nhưng không hook nào truyền vào | Hạ nhẹ mức độ, sửa lại mô tả |
-| `02`-L13 (`any`) | Client mới VIẾT BẰNG TIẾNG ANH có kiểu đầy đủ, dùng `unknown` thay `any` — đúng hướng | Cập nhật: đây là mẫu tốt để noi theo |
-| `02`-L6 (timecode 30 fps) | **Trở nên dễ sửa hơn**: `VideoProject.fps` giờ đã có trong hợp đồng, nhưng `formatTimecode` vẫn bỏ qua nó | Giữ nguyên, bổ sung lưu ý |
-| `04`-F4 (xung đột `revision`) | **Được xác nhận**: `types/timeline.ts` ghi rõ `revision` để client phát hiện sửa đồng thời | Giữ nguyên |
-| `02`-L7 (không persist) | Một phần: `ProjectStatus` giờ có thêm `"failed"` — cần phản ánh ở store | Mở rộng |
-| `01`-3.9 (trùng lặp/dead code) | **Phát sinh thêm**: `lib/api-client.ts` cũ và `lib/api/client.ts` mới cùng tồn tại | Bổ sung vào danh sách dọn dẹp |
-
-**Khuyến nghị:** hoàn tất refactor đó trước, rồi chạy `npm run type-check` để xác nhận cây đã xanh. Mọi công việc theo bộ tài liệu này nên bắt đầu từ một baseline build được.
+| `01`-3.10 (không validate runtime) | **Còn** — `lib/api/client.ts` vẫn `response.json() as Promise<T>`; một lớp kiểm tra bằng zod vẫn là việc cần làm |
+| `02`-L12 (`AbortSignal`) | **Cải thiện một nửa** — `RequestOptions` cho `signal` đi qua tới `fetch`, nhưng không hook nào truyền vào |
+| `02`-L13 (`any`) | **Đã sửa** — 0 chỗ `any`; store dùng setter có khoá (`setDuckingParam<K extends DuckingParamKey>`) thay vì `(key: string, val: any)` |
+| `02`-L6 (timecode 30 fps) | **Còn** — `VideoProject.fps` đã có trong hợp đồng nhưng `formatTimecode` vẫn bỏ qua |
+| `04`-F4 (xung đột `revision`) | **Đúng như dự đoán** — `types/timeline.ts` ghi rõ `revision` cho việc phát hiện sửa đồng thời |
+| `02`-L7 (không persist) | **Còn** — `lib/api/*` chưa persist gì; xem thêm ghi chú “store trong bộ nhớ” ở `storage/README.md` |
+| `01`-3.9 (trùng lặp/dead code) | **Đã dọn** — `lib/api-client.ts` cũ và `Topbar.tsx` đều đã bị xóa |
+| Nhóm P0 “UI báo điều không xảy ra” | **Đã sửa** trên 6 màn hình: audit trail, SEO, media bin, thumbnail, kịch bản mặc định, re-cook |
 
 ### Phiên bản thư viện so với bản mới nhất
 

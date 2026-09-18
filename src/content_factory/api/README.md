@@ -6,32 +6,40 @@ The `src/content_factory/api` package exposes the complete backend surface throu
 
 ## Architecture & Router Hierarchy
 
-The application entry point is [`app.py`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/src/content_factory/api/app.py) (`create_app()`). Routes are partitioned into dedicated sub-routers under `routers/`:
+The application entry point is [`app.py`](app.py) (`create_app()`). Routes are partitioned into **19 feature routers** under `routers/`:
 
 ```text
 src/content_factory/api/
-├── __init__.py             # Exports create_app and default app instance
+├── __init__.py             # Exports create_app and the default app instance
 ├── app.py                  # FastAPI factory, exception handlers, static mounts
 ├── deps.py                 # Error-mapping guards (get_or_404, guard, guard_value)
-└── routers/                # 17 Feature-specific sub-routers
+└── routers/                # 19 feature-specific routers
     ├── health.py           # Health checks and provider availability status
-    ├── qa.py               # Platform compliance, brand kit, audit trail, Co-Pilot command
-    ├── projects.py         # Project CRUD, research trigger, script review, approvals
-    ├── styles.py           # Style presets listing, JSON/MD export, override management
-    ├── agents.py           # External agent catalog and Markdown contract briefs
-    ├── library.py          # Document index, BM25 text search, file ingest
-    ├── timeline.py         # NLE video-project timeline mutations and AI-assist polish
-    ├── workflow.py         # Visual DAG workflow orchestrator, checklist, background runner
-    ├── campaign.py         # Multi-short campaign generation and asset package export
-    ├── knowledge.py        # Curated knowledge base inspection and topic queries
+    ├── projects.py         # Project CRUD, research trigger, script save/review, approvals
+    ├── timeline.py         # NLE timeline mutations and AI-assist polish
+    ├── media.py            # Universal media library: upload, metadata, transcribe, re-cook, delete
     ├── studio_media.py     # Canvas audio/video streaming and asset serving
-    ├── media.py            # Universal media library upload, metadata, and deletion
-    ├── tools.py            # System toolcheck status and media CLI inspection
     ├── external.py         # External asset import (Kling, Suno, Runway) and links
+    ├── workflow.py         # Visual DAG orchestrator, checklist, background runner
+    ├── campaign.py         # Multi-short campaign generation and asset package export
+    ├── qa.py               # Platform/brand/copyright verdicts, audit trail, cost check, Co-Pilot command
+    ├── seo.py              # 70-signal scoring, optimiser, A/B plan, keyword mining
+    ├── styles.py           # Style preset listing, JSON/MD export, override management
+    ├── agents.py           # External agent catalogue and Markdown contract briefs
+    ├── library.py          # Document index, BM25 text search, file ingest
+    ├── knowledge.py        # Curated knowledge base inspection and topic queries
     ├── history.py          # Edit history and revision snapshots
     ├── graphics.py         # Poster and overlay graphic generators
-    └── index.py            # Studio SPA entry point (serves dashboard HTML)
+    ├── resources.py        # Hardware/compute discovery and admission state
+    ├── tools.py            # Agent tool registry: GET /tools, POST /tools/call
+    └── index.py            # Studio entry point — serves the vanilla dashboard at /
 ```
+
+> `tools.py` is **not** a system-inspection endpoint. `GET /tools` returns the
+> self-describing agent tool manifest and `POST /tools/call` executes one named
+> tool — that is the surface `docs/TOOLS-FOR-AGENTS.md` documents. `toolcheck`
+> style inspection of local media binaries lives in `scripts/toolcheck.py` and is
+> not exposed over HTTP.
 
 ---
 
@@ -54,7 +62,7 @@ by a second service-level parser. `caption_source` now round-trips through both.
 
 ## Common Error Handling & Guards
 
-Defined in [`deps.py`](file:///c:/Users/ADMIN/OneDrive/M%C3%A1y%20t%C3%ADnh/GitHub/ai-content-factory/src/content_factory/api/deps.py):
+Defined in [`deps.py`](deps.py):
 
 All guards share one mapper, `_http_error`, so the status-code policy exists in a single place: `NotFoundError` to 404, `StateConflictError` and `RightsNotConfirmedError` to 409.
 
@@ -69,6 +77,10 @@ All guards share one mapper, `_http_error`, so the status-code policy exists in 
 
 ## Static Mounts
 
-- `/uploads`: Mounted to `storage/uploads` for user-uploaded raw video, audio, and images.
-- `/assets`: Mounted to `frontend/` directory for CSS, JavaScript, and static media files.
-- `/`: Handled by `index.py` returning the studio Single Page Application dashboard.
+- `/uploads`: Mounted to `storage/uploads` for user-uploaded raw video, audio and images.
+- `/assets`: Mounted to the `frontend/` directory for CSS, JavaScript and static media files.
+- `/`: Handled by `index.py`, returning the **vanilla-JS studio dashboard** (`frontend/index.html`).
+
+> The Next.js client under `frontend/src/` is **not** mounted, proxied or served by
+> this application. It runs on its own dev server at `http://localhost:3000` and
+> forwards `/api/*` to port 8000. See the root `README.md` → “Two frontends”.

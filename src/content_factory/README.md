@@ -19,7 +19,7 @@ The `src/content_factory` package encapsulates the core business domain, data mo
 
 | Module | Purpose |
 | :--- | :--- |
-| [`services/`](services) | **Service layer**, split into cohesive mixins over a shared `ServiceContext`: `context` (settings, store, lifecycle, background worker), `projects`, `research`, `scripting`, `styles`, `knowledge`, `agents`, `timeline`, `voice`, `media`, `production`, `workflow`, `growth`, `history`. |
+| [`services/`](services) | **Service layer**, split into cohesive mixins over a shared `ServiceContext`: `context` (settings, store, lifecycle, background worker), `projects`, `research`, `scripting`, `styles`, `knowledge`, `agents`, `timeline`, `voice`, `media`, `media_tools`, `qa`, `seo`, `production`, `workflow`, `growth`, `history`, `resources`. |
 | [`services/errors.py`](services/errors.py) | Domain errors (`NotFoundError`, `StateConflictError`, `RightsNotConfirmedError`) that the HTTP layer maps onto status codes. |
 | [`service.py`](service.py) | **Compatibility facade** re-exporting `ContentFactoryService`, so existing imports keep working. New code should import `content_factory.services`. |
 
@@ -44,8 +44,37 @@ The `src/content_factory` package encapsulates the core business domain, data mo
 | [`compliance.py`](compliance.py), [`audit.py`](audit.py), [`cost_guard.py`](cost_guard.py), [`virality.py`](virality.py) | **Quality gates**: platform rules, brand kit and copyright checks, provenance audit trail, cost guard, virality scoring. |
 | [`perception.py`](perception.py), [`vision.py`](vision.py), [`thumbnail.py`](thumbnail.py) | **Perception layer**: audio/vision providers and thumbnail generation. |
 | [`agent_bridge.py`](agent_bridge.py), [`agent_tools.py`](agent_tools.py) | **External AI agents**: Markdown contract briefs and the self-describing tool registry (`GET /tools`, `POST /tools/call`). |
+| [`seo/`](seo) | **SEO engine**, split into focused modules: contracts, profiles, signals, scoring, optimisation, experiments, keywords and calibration. `from content_factory.seo import …` keeps working. |
+| [`photo_compositor.py`](photo_compositor.py), [`map_generator.py`](map_generator.py), [`on_this_day.py`](on_this_day.py) | **Documentary graphics**: photo compositing, procedural SVG route maps and casualty infographics, and the 12-month disaster calendar. |
+| [`perception.py`](perception.py) | **Audio perception**: `detect_silence_and_pace`, `classify_music_mood`, `check_audio_quality`. Implemented and tested, but **no router publishes it** — see *Unpublished engines* below. |
+| [`hardware.py`](hardware.py), [`compute.py`](compute.py), [`resources.py`](resources.py), [`cache.py`](cache.py), [`resilience.py`](resilience.py), [`sandbox.py`](sandbox.py) | **Runtime**: GPU discovery and admission control, content-addressed caching, retry/rate-limit policies, sandboxing. |
+| [`fusion_graph.py`](fusion_graph.py) | **Fusion compositor graph** (newest module; currently the largest source of type errors). |
 
 ---
+
+## Unpublished engines
+
+A few engines are implemented and covered by tests, but nothing exposes them over HTTP, so no client can call them. The Next.js studio now says so on-screen rather than displaying invented readings (`frontend/src/components/audio/AudioLabStudio.tsx`):
+
+| Module | Capability | Missing route |
+| :--- | :--- | :--- |
+| `perception.py` | Silence and pace detection, music-mood/BPM classification, loudness and true-peak measurement | e.g. `POST /audio/perception/*` |
+| `audio.py` | `duck_music_under_speech`, `duck_music` | e.g. `POST /audio/duck` (the mixing functions have no route; `qa.py`'s `render/duck` is a different path) |
+| — | Stem splitting (vocals/music/drums/bass) | e.g. `POST /audio/stems` |
+| `audio.py::ffmpeg_binary` | Resolving `ffmpeg` | It only checks `PATH`, so a bundled `imageio_ffmpeg` binary goes unused and 11 tests fail |
+
+---
+
+## Current gate status
+
+`mypy src` reports **43 errors across 7 files** out of 129 checked. They cluster in the newest modules:
+
+```text
+fusion_graph.py, photo_compositor.py, media_tools.py, hardware.py,
+models/audio.py, models/captions.py, models/export_qc.py
+```
+
+`ruff check` reports 242 findings. `tests/test_architecture.py` still passes — the module-line budget, disjoint-mixin and reachable-method guards are intact; the failures are type and style, not structure.
 
 ## Authoritative Lifecycle
 

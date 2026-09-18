@@ -304,16 +304,16 @@ export function ScriptBriefSettingsPanel({
             <div>
               <label className="block text-[11px] font-semibold text-gray-300 mb-1">Nền tảng xuất bản:</label>
               <div className="grid grid-cols-4 gap-1.5">
-                {[
+                {([
                   { id: "tiktok", label: "TikTok" },
                   { id: "shorts", label: "YT Shorts" },
                   { id: "reels", label: "Reels" },
                   { id: "youtube_long", label: "YouTube Dài" },
-                ].map((item) => (
+                ] as const).map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => onBriefChange({ ...brief, platform: item.id as any })}
+                    onClick={() => onBriefChange({ ...brief, platform: item.id })}
                     className={`p-1.5 rounded text-center border transition-all text-xs font-medium ${
                       brief.platform === item.id
                         ? "bg-amber-400/20 border-amber-400 text-amber-300 font-bold"
@@ -354,15 +354,15 @@ export function ScriptBriefSettingsPanel({
                   Tỷ lệ khung hình:
                 </label>
                 <div className="flex gap-1">
-                  {[
+                  {([
                     { id: "9:16", label: "9:16 Dọc" },
                     { id: "16:9", label: "16:9 Ngang" },
                     { id: "1:1", label: "1:1" },
-                  ].map((r) => (
+                  ] as const).map((r) => (
                     <button
                       key={r.id}
                       type="button"
-                      onClick={() => onBriefChange({ ...brief, aspectRatio: r.id as any })}
+                      onClick={() => onBriefChange({ ...brief, aspectRatio: r.id })}
                       className={`flex-1 py-1 rounded text-center border text-[11px] ${
                         brief.aspectRatio === r.id
                           ? "bg-nle-cyan text-black font-bold border-nle-cyan"
@@ -462,17 +462,17 @@ export function ScriptBriefSettingsPanel({
             <div>
               <label className="block text-[11px] font-semibold text-gray-300 mb-1">Mục tiêu chính:</label>
               <div className="grid grid-cols-3 gap-1">
-                {[
+                {([
                   { id: "education", label: "Giáo dục / Mẹo" },
                   { id: "entertainment", label: "Giải trí" },
                   { id: "conversion", label: "Bán hàng / Review" },
                   { id: "follow", label: "Tăng Follow" },
                   { id: "viral_debate", label: "Viral / Tranh cãi" },
-                ].map((g) => (
+                ] as const).map((g) => (
                   <button
                     key={g.id}
                     type="button"
-                    onClick={() => onBriefChange({ ...brief, videoGoal: g.id as any })}
+                    onClick={() => onBriefChange({ ...brief, videoGoal: g.id })}
                     className={`py-1 px-1 rounded text-center border text-[11px] font-medium truncate ${
                       brief.videoGoal === g.id
                         ? "bg-nle-violet/30 border-nle-violet text-white font-bold"
@@ -516,18 +516,18 @@ export function ScriptBriefSettingsPanel({
             <div>
               <label className="block text-[11px] font-semibold text-gray-300 mb-1">Tông giọng:</label>
               <div className="grid grid-cols-3 gap-1">
-                {[
+                {([
                   { id: "casual", label: "Thân mật bạn bè" },
                   { id: "humorous", label: "Hài hước / Meme" },
                   { id: "serious", label: "Nghiêm túc / Uy tín" },
                   { id: "dramatic", label: "Kịch tính / Ly kỳ" },
                   { id: "inspiring", label: "Truyền cảm hứng" },
                   { id: "provocative", label: "Kích thích tranh luận" },
-                ].map((t) => (
+                ] as const).map((t) => (
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => onBriefChange({ ...brief, tone: t.id as any })}
+                    onClick={() => onBriefChange({ ...brief, tone: t.id })}
                     className={`py-1 rounded text-center border text-[11px] ${
                       brief.tone === t.id
                         ? "bg-rose-500/30 border-rose-400 text-white font-bold"
@@ -582,16 +582,16 @@ export function ScriptBriefSettingsPanel({
                 Hook mở đầu (3 giây đầu cực quan trọng trên TikTok):
               </label>
               <div className="grid grid-cols-2 gap-1.5">
-                {[
+                {([
                   { id: "counter_intuitive", label: "Phản trực giác / Ngược đời" },
                   { id: "fatal_mistake", label: "Sai lầm chết người" },
                   { id: "curiosity_gap", label: "Khoảng trống tò mò (Why?)" },
                   { id: "shocking_stat", label: "Số liệu gây sốc" },
-                ].map((h) => (
+                ] as const).map((h) => (
                   <button
                     key={h.id}
                     type="button"
-                    onClick={() => onBriefChange({ ...brief, hookType: h.id as any })}
+                    onClick={() => onBriefChange({ ...brief, hookType: h.id })}
                     className={`p-1.5 rounded text-left border text-[11px] truncate ${
                       brief.hookType === h.id
                         ? "bg-sky-400/20 border-sky-400 text-sky-300 font-bold"
@@ -609,14 +609,14 @@ export function ScriptBriefSettingsPanel({
                 Cấu trúc phân đoạn:
               </label>
               <div className="grid grid-cols-2 gap-1.5">
-                {[
+                {([
                   { id: "hook_body_climax_cta", label: "Hook – Nội dung chính – Cao trào – CTA" },
                   { id: "problem_agitate_solution", label: "PAS: Vấn đề – Xoáy sâu – Giải pháp" },
-                ].map((s) => (
+                ] as const).map((s) => (
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => onBriefChange({ ...brief, structurePacing: s.id as any })}
+                    onClick={() => onBriefChange({ ...brief, structurePacing: s.id })}
                     className={`p-1 rounded text-left border text-[10px] truncate ${
                       brief.structurePacing === s.id
                         ? "bg-sky-400/20 border-sky-400 text-sky-300 font-bold"
@@ -659,17 +659,17 @@ export function ScriptBriefSettingsPanel({
           </CardHeader>
           <CardContent className="p-3 space-y-2 text-xs">
             <div className="grid grid-cols-2 gap-1.5">
-              {[
+              {([
                 { id: "talking_head", label: "Một người nói trực diện camera (On-cam)" },
                 { id: "voiceover_broll", label: "Voiceover + B-roll tư liệu" },
                 { id: "two_person_dialogue", label: "Hội thoại 2 người (Podcast/Q&A)" },
                 { id: "cinematic_storytelling", label: "Dạng storytelling / phim tài liệu" },
                 { id: "pov_demo", label: "Góc nhìn thứ nhất (POV/Thực hành)" },
-              ].map((fmt) => (
+              ] as const).map((fmt) => (
                 <button
                   key={fmt.id}
                   type="button"
-                  onClick={() => onBriefChange({ ...brief, formatType: fmt.id as any })}
+                  onClick={() => onBriefChange({ ...brief, formatType: fmt.id })}
                   className={`p-1.5 rounded text-left border text-[11px] truncate ${
                     brief.formatType === fmt.id
                       ? "bg-indigo-400/20 border-indigo-400 text-indigo-300 font-bold"
