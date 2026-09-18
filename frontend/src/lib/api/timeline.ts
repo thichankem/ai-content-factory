@@ -145,3 +145,141 @@ export function removeMarker(
     { method: "DELETE" }
   );
 }
+
+/** ``POST .../scenes/{scene_id}/speed``. */
+export function setSceneSpeed(
+  projectId: string,
+  sceneId: string,
+  speed: number
+): Promise<Project> {
+  return api.apiFetch<Project>(
+    `/projects/${projectId}/timeline/scenes/${sceneId}/speed`,
+    { method: "POST", body: { speed } }
+  );
+}
+
+/** ``POST .../scenes/{scene_id}/reverse``. */
+export function reverseScene(
+  projectId: string,
+  sceneId: string,
+  reverse = true
+): Promise<Project> {
+  return api.apiFetch<Project>(
+    `/projects/${projectId}/timeline/scenes/${sceneId}/reverse`,
+    { method: "POST", body: { reverse } }
+  );
+}
+
+/** ``POST .../scenes/{scene_id}/trim`` — clip in/out points on the source media. */
+export function trimScene(
+  projectId: string,
+  sceneId: string,
+  trim: { trim_start?: number | null; trim_end?: number | null }
+): Promise<Project> {
+  return api.apiFetch<Project>(
+    `/projects/${projectId}/timeline/scenes/${sceneId}/trim`,
+    { method: "POST", body: trim }
+  );
+}
+
+/** ``POST .../scenes/{scene_id}/audio`` — narration gain and ramps. */
+export function setSceneAudio(
+  projectId: string,
+  sceneId: string,
+  audio: {
+    volume?: number | null;
+    fade_in?: number | null;
+    fade_out?: number | null;
+  }
+): Promise<Project> {
+  return api.apiFetch<Project>(
+    `/projects/${projectId}/timeline/scenes/${sceneId}/audio`,
+    { method: "POST", body: audio }
+  );
+}
+
+/** ``POST .../scenes/{scene_id}/copy`` — snapshot a scene as a clip. */
+export function copyScene(
+  projectId: string,
+  sceneId: string
+): Promise<{ clip: Record<string, unknown> }> {
+  return api.apiFetch<{ clip: Record<string, unknown> }>(
+    `/projects/${projectId}/timeline/scenes/${sceneId}/copy`,
+    { method: "POST" }
+  );
+}
+
+/** ``POST .../timeline/scenes/paste``. */
+export function pasteScene(
+  projectId: string,
+  clip: Record<string, unknown>,
+  afterSceneId?: string
+): Promise<Project> {
+  return api.apiFetch<Project>(`/projects/${projectId}/timeline/scenes/paste`, {
+    method: "POST",
+    body: { clip, after_scene_id: afterSceneId ?? null },
+  });
+}
+
+/** ``POST /projects/{id}/video-project/ai-assist`` — fit, beat and re-time. */
+export function aiAssist(
+  projectId: string,
+  payload: { fit?: boolean; beat?: boolean; bpm?: number } = {}
+): Promise<Project> {
+  return api.apiFetch<Project>(`/projects/${projectId}/video-project/ai-assist`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+/** ``GET .../scenes/{scene_id}/suggest`` — an AI suggestion for one scene. */
+export function suggestScene(
+  projectId: string,
+  sceneId: string
+): Promise<Record<string, string>> {
+  return api.apiFetch<Record<string, string>>(
+    `/projects/${projectId}/video-project/scenes/${sceneId}/suggest`
+  );
+}
+
+/** ``POST .../scenes/{scene_id}/polish`` — rewrite one scene's text. */
+export function polishScene(projectId: string, sceneId: string): Promise<Project> {
+  return api.apiFetch<Project>(
+    `/projects/${projectId}/video-project/scenes/${sceneId}/polish`,
+    { method: "POST" }
+  );
+}
+
+/** ``POST /projects/{id}/video/upload`` — attach an exported file. */
+export function uploadVideo(projectId: string, file: File): Promise<Project> {
+  const form = new FormData();
+  form.append("file", file);
+  return api.apiFetch<Project>(`/projects/${projectId}/video/upload`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+/** ``POST /timeline/command`` — apply a natural-language edit instruction. */
+export function runTimelineCommand(
+  payload: TimelineCommandRequest
+): Promise<TimelineCommandResult> {
+  return api.apiFetch<TimelineCommandResult>("/timeline/command", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+/** ``POST /projects/{id}/timeline/extract`` — the chronological event chain. */
+export function extractTimeline(projectId: string): Promise<StructuredTimeline> {
+  return api.apiFetch<StructuredTimeline>(
+    `/projects/${projectId}/timeline/extract`,
+    { method: "POST" }
+  );
+}
+
+/** ``GET /projects/{id}/voiceover/{scene_id}`` — one narration clip's URL. */
+export function voiceoverUrl(projectId: string, sceneId: string): string {
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+  return `${base}/projects/${projectId}/voiceover/${sceneId}`;
+}
