@@ -33,7 +33,12 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from content_factory.config import get_settings  # noqa: E402
-from content_factory.media import MediaLibrary, probe_media, resolve_kind  # noqa: E402
+from content_factory.media import (  # noqa: E402
+    MediaKind,
+    MediaLibrary,
+    probe_media,
+    resolve_kind,
+)
 
 
 def main() -> int:
@@ -57,6 +62,8 @@ def main() -> int:
     library = MediaLibrary(args.media_dir or settings.media_dir)
     items = library.list_items()
     print(f"Re-probing {len(items)} item(s) in {args.media_dir or settings.media_dir}")
+    if args.prune and not args.apply:
+        print("--prune only takes effect together with --apply")
 
     corrected = 0
     broken: list[str] = []
@@ -66,9 +73,23 @@ def main() -> int:
             broken.append(item.id)
             print(f"  [missing] {item.id} {item.filename} ({item.kind.value})")
             continue
+        if item.kind is MediaKind.IMAGE and not _image_decodes(path):
+            # ffprobe reads a still image as a one-frame video stream, so a
+            # truncated PNG passes the probe and only fails when something tries
+            # to decode it. The audit found one such 108-byte "image".
+            broken.append(item.id)
+            print(f"  [undecodable] {item.id} {item.filename} ({item.kind.value})")
+            continue
         probe = probe_media(path)
         resolved = resolve_kind(item.filename, probe)
-        if probe and not (probe.get("has_video") or probe.get("has_audio")):
+        if not probe.get("streams_known"):
+            # ffprobe could not read it at all. For a file that claims to be
+            # media, that is a broken entry (the pre-fix download path wrote
+            # HTML pages named ``.mp4``), not a measurement we lack.
+            broken.append(item.id)
+            print(f"  [unreadable] {item.id} {item.filename} ({item.kind.value})")
+            continue
+        if not (probe.get("has_video") or probe.get("has_audio")):
             streams = "no audio or video stream"
         else:
             streams = "ok"
@@ -92,10 +113,22 @@ def main() -> int:
         print(f"Would correct: {corrected} kind(s). Re-run with --apply to write it.")
     if broken:
         print(
-            f"{len(broken)} entr(ies) have no file on disk"
+            f"{len(broken)} entr(ies) are missing or unreadable"
             + (" (removed with --prune)." if (args.apply and args.prune) else ".")
         )
     return 0
+
+
+def _image_decodes(path: Path) -> bool:
+    """Whether Pillow can actually open (and verify) an image file."""
+    try:
+        from PIL import Image
+
+        with Image.open(path) as image:
+            image.verify()
+        return True
+    except Exception:  # noqa: BLE001 - any failure means it does not decode
+        return False
 
 
 def _mime_for(kind, filename: str, current: str) -> str:

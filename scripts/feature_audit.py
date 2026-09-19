@@ -418,8 +418,12 @@ def group_vision(ctx: dict[str, Any]) -> list[Probe]:
             "describe_media",
             {"ref": ctx["local_video_ref"], "include": ["vision"]},
             needs="provider+ffmpeg",
-            note="Vision pass over a real video's keyframes",
-            digest=("kind", "vision", "summary"),
+            # ``vision`` is not a describe section. Asking for it used to return
+            # the default report with no warning (a caller thinks it got a
+            # vision pass); it is now refused, naming the valid sections.
+            expect=(422,),
+            note="Unknown section 'vision' must be refused, not silently ignored",
+            digest=("detail",),
         ),
         tool(
             "vision",
@@ -450,8 +454,9 @@ def group_vision(ctx: dict[str, Any]) -> list[Probe]:
             "describe_media",
             {"ref": ctx["image_ref"], "include": ["vision"]},
             needs="provider",
-            note="Vision over a still image held in the media library",
-            digest=("kind", "vision"),
+            expect=(422,),
+            note="Unknown section over a still image — same refusal",
+            digest=("detail",),
         ),
         tool(
             "vision",
@@ -587,8 +592,13 @@ def group_image(ctx: dict[str, Any]) -> list[Probe]:
                 ],
                 "format": "png",
             },
-            note="Composite: base + overlay with alpha",
-            digest=("asset_id", "url", "width", "height"),
+            # ``base`` takes a *ref*. Passing base64 used to answer
+            # "Nothing named 'iVBORw0KGgo…'" — 300 characters of the payload
+            # echoed back and no hint about what to do instead. It now names the
+            # mistake and the tools that do take bytes.
+            expect=(422,),
+            note="base64 passed as a ref must be explained, not echoed",
+            digest=("detail",),
         ),
         tool(
             "image",
@@ -978,8 +988,13 @@ def group_media(ctx: dict[str, Any]) -> list[Probe]:
             "inspect_media",
             {"ref": ctx["video_ref"]},
             needs="ffprobe",
-            note="Probe a *library* video — the index says video, the file says audio",
-            digest=("kind", "has_video", "has_audio", "duration_seconds"),
+            # A media library accumulates what earlier versions wrote into it —
+            # including HTML pages saved as ``.mp4`` by the pre-fix download
+            # path. Probing one must answer 422 ("cannot read this file"), not
+            # 500, and must not pretend the item is fine.
+            note="Probe a *library* item: audio-only kind mismatch, or unreadable",
+            expect=(200, 404, 422),
+            digest=("kind", "has_video", "has_audio", "duration_seconds", "detail"),
         ),
         tool(
             "media",

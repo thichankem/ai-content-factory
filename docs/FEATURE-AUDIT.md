@@ -44,6 +44,27 @@ canh nó.
 | L15 | — (test mới, không phải sửa mã) | cả file `tests/test_tool_dispatch_contract.py` |
 | L16 | `/cost/check` nhận list call; `/media/{id}/tags` nhận cả 2 dạng; thiếu URL → 422 | 4 test trong mục "L16" của `test_audit_regressions.py` |
 
+### Hai chỗ phát sinh khi **chạy lại** bản rà soát (đã sửa luôn)
+
+Chạy lại `scripts/feature_audit.py --groups vision,image,media,timeline,negative`
+sau khi sửa thì còn 2 ca đỏ, và cả hai đều là lỗi thật:
+
+1. **File media hỏng → 500.** `inspect_media`/`media_palette`/`describe_media` trên
+   một file mà ffprobe không đọc được (chính là mấy file HTML bị lưu thành `.mp4`
+   từ lỗi L4) trả **500**. Nay `media_tools._ffmpeg_error` phân loại: lỗi phía
+   *đầu vào* ("Invalid data found", "moov atom not found", không mở được file) →
+   **422** kèm tên file; lỗi phía *công cụ* (thiếu ffmpeg, filter hỏng) vẫn 500.
+   `_require_file` cũng đổi theo: file không tồn tại → 422 kèm đường dẫn.
+2. **Index chứa rác vẫn "hợp lệ".** `scripts/media_reindex.py` bản đầu chỉ so
+   kind; nay nó còn báo `[unreadable]` khi ffprobe không đọc được file và
+   `[undecodable]` khi Pillow không mở được ảnh. Chạy `--apply --prune` trên
+   `library/media`: **3 mục rác bị xóa** (2 HTML đội lốt `.mp4`, 1 PNG 108 byte
+   hỏng) + **4 mục sửa kind** ở lượt trước. Thư viện còn 44 mục, lượt quét lại
+   báo 0 vấn đề.
+
+Sau hai sửa đó, lại chạy nhóm kiểm tra: **87/87 lượt trả đúng trạng thái** (trước
+khi sửa là 83/87, và các ca đỏ đều là 500).
+
 ### Cách kiểm chứng lại
 
 ```bash
