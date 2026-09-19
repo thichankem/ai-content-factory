@@ -898,6 +898,9 @@ def group_audio(ctx: dict[str, Any]) -> list[Probe]:
                 "lang": "vi",
             },
             needs="provider+ml-adapter",
+            # No adapter is registered, so 503 with the adapter message is the
+            # correct answer, not a 200 and not a bodyless error.
+            expect=(200, 503),
             note="Dubbing: transcribe → translate → re-voice",
         ),
         tool(
@@ -905,6 +908,7 @@ def group_audio(ctx: dict[str, Any]) -> list[Probe]:
             "voice_clone",
             {"audio_b64": voice, "ref_voice": voice},
             needs="provider+ml-adapter",
+            expect=(200, 503),
             note="Voice cloning — ref_voice is documented as base64, no XTTS installed",
         ),
         upload(
@@ -1314,13 +1318,28 @@ def group_production(ctx: dict[str, Any]) -> list[Probe]:
         ),
         tool(
             "production",
+            "approve_stage",
+            {"project_id": pid, "stage": "video", "verdict": "approved"},
+            expect=(200, 409),
+            note="Gate 2 after the render settles, so publish can follow",
+            digest=("status", "stage"),
+        ),
+        tool(
+            "production",
             "publish_project",
             {"project_id": pid, "platforms": ["youtube"]},
             digest=("status", "platforms", "published"),
         ),
-        http("production", "POST", f"/projects/{pid}/render", {}),
+        # The tool publish above already moved the project to 'published', so the
+        # HTTP surface here is exercised against a terminal state: 409 with a
+        # message (a second render/publish is correctly refused).
+        http("production", "POST", f"/projects/{pid}/render", {}, expect=(200, 409)),
         http(
-            "production", "POST", f"/projects/{pid}/publish", {"platforms": ["youtube"]}
+            "production",
+            "POST",
+            f"/projects/{pid}/publish",
+            {"platforms": ["youtube"]},
+            expect=(200, 409),
         ),
         http("production", "GET", f"/projects/{pid}/thumbnail"),
         http("production", "POST", f"/projects/{pid}/sensitivity/audit", {}),
@@ -1446,6 +1465,10 @@ def group_http(ctx: dict[str, Any]) -> list[Probe]:
         http("http", "GET", "/"),
         http("http", "GET", "/health"),
         http("http", "GET", "/tools"),
+        http("http", "GET", "/tools?detail=index&limit=5"),
+        http("http", "GET", "/tools/audio_mix"),
+        http("http", "GET", "/skills"),
+        http("http", "GET", "/skills/topic-to-published-video"),
         http("http", "GET", "/projects"),
         http("http", "GET", f"/projects/{pid}"),
         http("http", "GET", f"/projects/{pid}/video-project"),
@@ -1483,7 +1506,7 @@ def group_http(ctx: dict[str, Any]) -> list[Probe]:
             "POST",
             f"/projects/{pid}/external/import",
             {
-                "asset_type": "text",
+                "asset_type": "research_dossier",
                 "raw_content": "Nội dung tham chiếu",
                 "label": "ref",
             },
@@ -1499,6 +1522,9 @@ def group_http(ctx: dict[str, Any]) -> list[Probe]:
                 "year": 2005,
                 "source": "audit",
             },
+            # A document with no pdf_url/landing_url is a 422 naming the missing
+            # field (it used to be a 502 "Download failed").
+            expect=(201, 422),
         ),
         http("http", "GET", f"/projects/{pid}/facts/reconcile", expect=(200, 405)),
         http("http", "POST", f"/projects/{pid}/facts/reconcile", {}),
@@ -1513,14 +1539,16 @@ def group_http(ctx: dict[str, Any]) -> list[Probe]:
             f"/media/{ctx['media_id']}/transcribe",
             {},
             needs="faster-whisper",
-            expect=(200, 202, 400, 422),
+            # 503 when the optional engine is not installed (a capability gap),
+            # 422 for a bad request, 200 when transcription actually runs.
+            expect=(200, 202, 400, 422, 503),
         ),
         http("http", "GET", "/media/search?q=audit"),
         http("http", "GET", "/library"),
         http("http", "GET", "/library/search?q=tsunami"),
         http("http", "GET", "/resources"),
         http("http", "GET", "/resources/kinds"),
-        http("http", "GET", "/resources/explain"),
+        http("http", "GET", "/resources/explain?kind=render"),
         http(
             "http",
             "POST",
@@ -1550,14 +1578,8 @@ def group_http(ctx: dict[str, Any]) -> list[Probe]:
             "POST",
             "/subtitles/simplify",
             {
-                "captions": [
-                    {
-                        "start": 0.0,
-                        "end": 1.4,
-                        "text": "Đại dương rút lui trước khi cơn sóng thần ập tới.",
-                    }
-                ],
-                "level": "easy",
+                "captions": ["Đại dương rút lui trước khi cơn sóng thần ập tới."],
+                "level": "basic",
             },
         ),
         http("http", "GET", "/agents"),

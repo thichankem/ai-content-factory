@@ -8,6 +8,60 @@
   <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body class="studio-body">
+  <!-- ==================== MODULE LOADING ==================== -->
+  <!-- API Client & Core Utilities -->
+  <script type="module" src="/assets/modules/api-client.js"></script>
+
+  <!-- Project Management & Pipeline -->
+  <script type="module" src="/assets/modules/projects.js"></script>
+
+  <!-- Inspector & Gate Panels -->
+  <script type="module" src="/assets/modules/inspector.js"></script>
+
+  <!-- Script Editor, Analysis, Sources -->
+  <script type="module" src="/assets/modules/script.js"></script>
+
+  <!-- Style Presets & Agents -->
+  <script type="module" src="/assets/modules/styles-agents.js"></script>
+
+  <!-- External Agent Bridge Modal -->
+  <script type="module" src="/assets/modules/bridge-modal.js"></script>
+
+  <!-- Document & Library Search -->
+  <script type="module" src="/assets/modules/search.js"></script>
+
+  <!-- Workflow DAG (kept as separate module) -->
+  <script type="module" src="/assets/modules/workflow.js"></script>
+
+  <!-- Main Application Controller -->
+  <script type="module" src="/assets/modules/app-controller.js"></script>
+
+  <!-- ==================== VIDEO EDITOR ==================== -->
+  <!-- Editor State & Lifecycle -->
+  <script type="module" src="/assets/modules/editor/state.js"></script>
+
+  <!-- Canvas Rendering Engine -->
+  <script type="module" src="/assets/modules/editor/canvas.js"></script>
+
+  <!-- Audio Engine & SFX -->
+  <script type="module" src="/assets/modules/editor/audio.js"></script>
+
+  <!-- Timeline & Scene Management -->
+  <script type="module" src="/assets/modules/editor/timeline.js"></script>
+
+  <!-- Undo/Redo History -->
+  <script type="module" src="/assets/modules/editor/history.js"></script>
+
+  <!-- Professional Report -->
+  <script type="module" src="/assets/modules/editor/pro-report.js"></script>
+
+  <!-- Main Editor Controller -->
+  <script type="module" src="/assets/modules/editor/editor-controller.js"></script>
+
+  <!-- ==================== WORKFLOW DAG ==================== -->
+  <script type="module" src="/assets/modules/flow.js"></script>
+</body>
+</html>
   <!-- STUDIO APPLICATION MENU BAR -->
   <div class="adobe-app-bar" id="adobe-app-bar">
     <div class="adobe-badges-row">

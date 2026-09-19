@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
 from typing import BinaryIO
 
 import pytest
@@ -88,13 +89,27 @@ def test_upload_video_probes_metadata(library: MediaLibrary) -> None:
     assert item.width == 320 and item.height == 240
 
 
-def test_probe_media_returns_metadata() -> None:
-    import shutil
+def test_probe_media_on_a_missing_file_returns_nothing() -> None:
+    # No probe binary has to exist for this: an unreadable path is not a crash.
+    assert probe_media(Path("/nonexistent/x.webm")) == {}
 
-    if shutil.which("ffprobe") is None:
-        pytest.skip("ffprobe not available")
-    # probe_media on a nonexistent file returns {} without crashing.
-    assert probe_media(__import__("pathlib").Path("/nonexistent/x.webm")) == {}
+
+def test_upload_image_records_its_pixel_size(library: MediaLibrary) -> None:
+    """An image is probed like any other media, so the index has its size."""
+    from PIL import Image
+
+    source = library._dir / "files" / "pixel_size.png"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (321, 200), (10, 20, 30)).save(source)
+    if not probe_media(source).get("width"):
+        pytest.skip("no ffprobe/ffmpeg available to measure the file")
+
+    item = library.upload("photo.png", source.read_bytes(), language="en")
+
+    assert item.kind == MediaKind.IMAGE
+    assert (item.width, item.height) == (321, 200)
+    # A still has no duration; a zero would make it look like a 0-second clip.
+    assert item.duration_seconds is None
 
 
 def test_delete_removes_item(library: MediaLibrary) -> None:

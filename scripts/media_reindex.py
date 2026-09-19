@@ -66,6 +66,7 @@ def main() -> int:
         print("--prune only takes effect together with --apply")
 
     corrected = 0
+    sized = 0
     broken: list[str] = []
     for item in items:
         path = library.path_for(item)
@@ -89,6 +90,24 @@ def main() -> int:
             broken.append(item.id)
             print(f"  [unreadable] {item.id} {item.filename} ({item.kind.value})")
             continue
+        if item.width is None and probe.get("width"):
+            # Entries written before images were probed at all — and any upload
+            # made where no ffprobe existed — carry null width/height. Audio has
+            # no width, so its duration is the number worth restoring.
+            filled = f"{probe['width']}x{probe['height']}"
+        else:
+            filled = ""
+        if item.duration_seconds is None and probe.get("duration_seconds"):
+            filled = f"{filled} {probe['duration_seconds']}s".strip()
+        if filled:
+            sized += 1
+            print(f"  [meta]    {item.id} {item.filename}: {filled}")
+            if args.apply:
+                item.width = item.width or probe.get("width")
+                item.height = item.height or probe.get("height")
+                item.duration_seconds = (
+                    item.duration_seconds or probe.get("duration_seconds")
+                )
         if not (probe.get("has_video") or probe.get("has_audio")):
             streams = "no audio or video stream"
         else:
@@ -108,9 +127,12 @@ def main() -> int:
 
     if args.apply:
         _write_back(library, items, prune=args.prune, broken=broken)
-        print(f"Applied: {corrected} kind correction(s)")
+        print(f"Applied: {corrected} kind correction(s), {sized} size(s)")
     else:
-        print(f"Would correct: {corrected} kind(s). Re-run with --apply to write it.")
+        print(
+            f"Would correct: {corrected} kind(s), fill {sized} size(s). "
+            "Re-run with --apply to write it."
+        )
     if broken:
         print(
             f"{len(broken)} entr(ies) are missing or unreadable"

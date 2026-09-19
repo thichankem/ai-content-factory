@@ -34,7 +34,7 @@ from fastapi.responses import JSONResponse
 
 from ..ai_audio import AiAudioError
 from ..image_engine import ImageSessionNotFoundError
-from ..media import UploadTooLargeError
+from ..media import TranscriptionUnavailableError, UploadTooLargeError
 from ..media_tools import MediaToolArgumentError, MediaToolError
 from ..providers import ProviderError, ProviderUnavailableError
 from ..render import RenderError
@@ -55,7 +55,13 @@ from ..workflow import (
 #: The thing named does not exist.
 _NOT_FOUND = (NotFoundError, ImageSessionNotFoundError, KeyError, FileNotFoundError)
 #: A capability is missing rather than the request being wrong.
-_UNAVAILABLE = (AiAudioError, ProviderUnavailableError, CircuitOpenError, ProviderError)
+_UNAVAILABLE = (
+    AiAudioError,
+    ProviderUnavailableError,
+    CircuitOpenError,
+    ProviderError,
+    TranscriptionUnavailableError,
+)
 #: Well-formed request, wrong state for it.
 _CONFLICT = (
     StateConflictError,

@@ -2,13 +2,14 @@
 
 The two "ask the machine before committing to a long job" tools live here so
 ``agent_tools.py`` stays under its line budget while the registry still exposes
-them through the same manifest at the same position. ``compute_tool_specs()``
-builds the specs lazily to avoid a circular import with ``agent_tools``.
+them through the same manifest at the same position.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+from .agent_schema import ToolSpec, _p
 
 
 def _h_resource_status(service: Any, args: Any) -> Any:
@@ -26,9 +27,7 @@ def _h_resource_explain(service: Any, args: Any) -> Any:
 
 
 def compute_tool_specs() -> list[Any]:
-    """Build the compute tool specs (lazy import to avoid a cycle)."""
-    from .agent_tools import ToolSpec, _p
-
+    """Build the compute tool specs."""
     return [
         ToolSpec(
             "resource_status",

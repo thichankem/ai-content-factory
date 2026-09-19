@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .agent_schema import ToolSpec, _p
+
 
 def _h_youtube_search(service: Any, args: Any) -> Any:
     """Search YouTube for videos matching a query (metadata only)."""
@@ -33,9 +35,7 @@ def _h_youtube_transcript(service: Any, args: Any) -> Any:
 
 
 def youtube_tool_specs() -> list[Any]:
-    """Build the two YouTube tool specs (lazy import to avoid a cycle)."""
-    from .agent_tools import ToolSpec, _p
-
+    """Build the two YouTube tool specs."""
     return [
         ToolSpec(
             "youtube_search",

@@ -9,7 +9,48 @@ hai endpoint. Không cần đọc source — manifest tự mô tả.
 | Endpoint | Mục đích |
 |---|---|
 | `GET /tools` | Manifest: danh sách tool, mô tả, schema args, ghi chú cách dùng |
+| `GET /tools/{name}` | Schema đầy đủ của **một** tool |
+| `GET /skills` | Index skill (tên, mục đích, tool, số bước) |
+| `GET /skills/{name}` | Công thức đầy đủ: bước, tham số, cổng người, guardrails |
 | `POST /tools/call` | Thực thi 1 tool: `{"tool": "<name>", "args": {...}}` |
+
+## Tìm tool và skill (đừng nạp cả catalog vào context)
+
+Một việc cần ba tool không đáng phải trả giá bằng toàn bộ manifest:
+
+| Cách | Dùng khi nào |
+|---|---|
+| `GET /tools?q=duck+music&limit=5` | có một câu mô tả công việc, cần biết tool nào làm |
+| `GET /tools?detail=index` | cần nhìn toàn cảnh, mỗi tool một dòng |
+| `GET /tools?category=seo` | chỉ quan tâm một nhóm |
+| tool `search_tools` | như trên nhưng qua `POST /tools/call` (agent chỉ có MCP) |
+| tool `list_skills` / `read_skill` | công thức nhiều bước, hai mức như skill của Claude |
+
+Mọi câu trả lời đều có `total` và `has_more`, nên một trang ngắn không bị hiểu nhầm
+thành cả catalog. Tìm kiếm khớp theo tên tool trước, rồi tới bảng từ khóa
+(`keywords` trong manifest — "storyboard", "lower the music", "how loud"...),
+rồi mới tới mô tả; từ ngắn (≤3 ký tự) chỉ khớp trọn từ, để "one" không kéo về
+`voice_clone`.
+
+### Skill được kiểm chứng bằng test
+
+Skill là **tài liệu mà agent thực thi**, nên nó được test như code
+(`tests/test_agent_skills.py`): mọi bước phải trỏ tới tool có thật, điền đủ tham số
+`required`, không bịa tham số nào, và mọi skill có `approve_stage` phải khai báo
+cổng người. Đổi tên tool hay siết schema mà quên skill là test đỏ ngay — không phải
+lỗi hiện ra giữa log của một agent lúc 2 giờ sáng.
+
+Bảy công thức hiện có:
+
+| Skill | Việc nó làm |
+|---|---|
+| `topic-to-published-video` | từ chủ đề tới publish, dừng ở cả hai cổng duyệt |
+| `read-a-clip-without-eyes` | biến clip/ảnh thành text để agent suy luận |
+| `cut-on-the-beat` | đọc tempo, cắt theo beat, duck nhạc dưới lời |
+| `narration-over-music` | mix voice + nhạc tới mức loudness đo được |
+| `repair-a-timeline` | sửa đúng thứ timeline_report phàn nàn |
+| `qc-before-approval` | gom bằng chứng cho người duyệt |
+| `seo-launch-pack` | chấm, viết lại, lên kế hoạch A/B, rồi đo thật |
 
 ## Ví dụ nhanh (curl)
 
@@ -86,16 +127,18 @@ Skill cho Claude Code:
 
 Hỗ trợ MCP Server (Model Context Protocol):
 - Chạy qua stdio hoặc SSE (`python mcp_server.py`)
-- Expose 23+ core tools kèm `factory_list_tools` & `factory_call_tool` gọi trực tiếp cả 61 tools.
+- Expose 23+ core tools kèm `factory_list_tools` & `factory_call_tool` gọi trực tiếp mọi tool trong registry.
 
 ---
 
-## Bộ tool đọc/cắt/ghép media (61 tool, JSON Schema)
+## Bộ tool đọc/cắt/ghép media (JSON Schema)
 
 `GET /tools` giờ trả về **input_schema thật** (JSON Schema draft-07 subset) cho từng
-tool, nên mọi lớp tool-calling của model đọc được mà không cần người dịch. Chín nhóm:
-`discovery`, `research`, `script`, `timeline`, `media`, `audio`, `image`, `voice`,
-`production`.
+tool, nên mọi lớp tool-calling của model đọc được mà không cần người dịch. Số tool
+lấy từ `count` của manifest (đừng chép số vào tài liệu — nó đã lệch một lần rồi).
+Mười nhóm: `discovery` (kể cả 3 tool registry: `search_tools`, `list_skills`,
+`read_skill`), `research`, `script`, `timeline`, `media`, `audio`, `image`, `voice`,
+`seo`, `production`.
 
 ### Đọc media mà không cần vision
 

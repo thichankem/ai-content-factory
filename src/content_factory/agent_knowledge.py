@@ -2,14 +2,14 @@
 
 The two NotebookLM-style tools (``kb_ask``, ``kb_ingest_url``) live here so
 ``agent_tools.py`` stays under its line budget while the registry still exposes
-them through the same manifest. ``knowledge_tool_specs()`` builds the specs
-lazily to avoid a circular import with ``agent_tools``.
+them through the same manifest.
 """
 
 from __future__ import annotations
 
 from typing import Any, Literal
 
+from .agent_schema import ToolSpec, _p
 from .models import KBAskRequest, KBIngestUrl, KBTurn
 from .workflow import _run_sync
 
@@ -45,9 +45,7 @@ def _h_kb_ingest_url(service: Any, args: Any) -> Any:
 
 
 def knowledge_tool_specs() -> list[Any]:
-    """Build the two knowledge tool specs (lazy import to avoid a cycle)."""
-    from .agent_tools import ToolSpec, _p
-
+    """Build the two knowledge tool specs."""
     return [
         ToolSpec(
             "kb_ask",

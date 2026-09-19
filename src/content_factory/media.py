@@ -1,11 +1,7 @@
 """Universal media library: upload anything, probe it, and let AI read it.
 
-Supports video, audio, image, and document upload. Every item is probed with
-ffprobe for duration/resolution, and video/audio can be transcribed with
-faster-whisper so AI agents can read and re-cook the content. Documents are
-extracted to plain text with pypdf. A small royalty-free music-bed generator is
-included so a re-cooked cut can change its soundtrack without any external
-asset.
+Supports video, audio, image and document upload; items are probed and can be
+transcribed (faster-whisper) or text-extracted (pypdf) so agents can read them.
 """
 
 from __future__ import annotations
@@ -34,7 +30,9 @@ from .downloads import (
     require_media_file,
     require_media_payload,
 )
-from .hardware import require_ffmpeg, resolve_ffprobe
+from .hardware import require_ffmpeg
+from .media_probe import MediaToolError
+from .media_probe import probe as probe_file
 from .models import (
     MediaItem,
     MediaKind,
@@ -53,6 +51,10 @@ _DOC_EXT = {".pdf", ".txt", ".md", ".csv", ".json", ".srt", ".vtt"}
 
 class UploadTooLargeError(ValueError):
     pass
+
+
+class TranscriptionUnavailableError(RuntimeError):
+    """No transcription engine is installed; the API answers 503, not 500."""
 
 
 def copy_upload_stream(
@@ -136,53 +138,36 @@ def _safe_name(filename: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", filename).strip("_") or "file"
 
 
-def probe_media(path: Path) -> dict:
-    """Return duration/width/height/streams for a media file using ffprobe.
+#: Kinds whose files carry streams worth measuring — a PDF or an archive does not.
+PROBED_KINDS: frozenset[MediaKind] = frozenset(
+    {MediaKind.VIDEO, MediaKind.AUDIO, MediaKind.IMAGE}
+)
 
-    ``streams_known`` is the honest part: it is ``True`` only when ffprobe ran
-    and understood the file, so a caller can tell "this really is audio-only"
-    apart from "nobody could measure this" — see :func:`resolve_kind`.
+
+def probe_media(path: Path) -> dict:
+    """Return duration/width/height/streams for a media file.
+
+    ``streams_known`` is the honest part: it is ``True`` only when a probe
+    really read the file, so a caller can tell "this really is audio-only"
+    apart from "nobody could measure this" — see :func:`resolve_kind`. The
+    measurement itself lives in :mod:`.media_probe`, which prefers ffprobe and
+    falls back to reading ``ffmpeg -i`` when the machine has no ffprobe, so an
+    ffmpeg-only install still records real metadata instead of nulls.
     """
-    binary = resolve_ffprobe()
-    if binary is None:
-        return {}
-    proc = subprocess.run(
-        [
-            binary,
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration:stream=codec_type,width,height",
-            "-of",
-            "json",
-            str(path),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        return {}
     try:
-        data = json.loads(proc.stdout)
-    except json.JSONDecodeError:
+        data = probe_file(path)
+    except (MediaToolError, OSError):
         return {}
-    result: dict = {"streams_known": True, "has_video": False, "has_audio": False}
-    fmt = data.get("format") or {}
-    try:
-        result["duration_seconds"] = float(fmt.get("duration", 0) or 0) or None
-    except (TypeError, ValueError):
-        result["duration_seconds"] = None
-    for stream in data.get("streams") or []:
-        codec_type = stream.get("codec_type")
-        if codec_type == "video":
-            result["has_video"] = True
-            if result.get("width") is None:
-                result["width"] = stream.get("width")
-                result["height"] = stream.get("height")
-        elif codec_type == "audio":
-            result["has_audio"] = True
-    return result
+    if not data.get("streams_known"):
+        return {}
+    return {
+        "streams_known": True,
+        "has_video": bool(data.get("has_video")),
+        "has_audio": bool(data.get("has_audio")),
+        "width": data.get("width"),
+        "height": data.get("height"),
+        "duration_seconds": data.get("duration_seconds"),
+    }
 
 
 #: Target formats the media library can convert to (ffmpeg args + output kind).
@@ -375,9 +360,7 @@ class MediaLibrary:
                 stream, dest, chunk_bytes=self._chunk_bytes, max_bytes=self._max_bytes
             )
             mime = mimetypes.guess_type(clean)[0] or "application/octet-stream"
-            meta = (
-                probe_media(dest) if kind in (MediaKind.VIDEO, MediaKind.AUDIO) else {}
-            )
+            meta = probe_media(dest) if kind in PROBED_KINDS else {}
             kind = resolve_kind(clean, meta)
             item = MediaItem(
                 id=item_id,
@@ -889,11 +872,7 @@ class MediaLibrary:
         convert_file(src, dest, fmt)
 
         mime = mimetypes.guess_type(dest.name)[0] or "application/octet-stream"
-        meta = (
-            probe_media(dest)
-            if spec["kind"] in (MediaKind.VIDEO, MediaKind.AUDIO)
-            else {}
-        )
+        meta = probe_media(dest) if spec["kind"] in PROBED_KINDS else {}
         converted = MediaItem(
             id=converted_id,
             filename=out_name,
@@ -987,7 +966,7 @@ class MediaLibrary:
         try:
             from faster_whisper import WhisperModel
         except ImportError as exc:  # pragma: no cover - depends on optional tool
-            raise RuntimeError(
+            raise TranscriptionUnavailableError(
                 "faster-whisper is not installed; run `pip install faster-whisper` "
                 "to enable transcription."
             ) from exc

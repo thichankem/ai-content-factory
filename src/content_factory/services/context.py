@@ -14,8 +14,9 @@ from __future__ import annotations
 import contextlib
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar, cast
 
 from .. import script_engine
 from ..config import Settings
@@ -49,6 +50,8 @@ from .errors import (
     NotFoundError,
     StateConflictError,
 )
+
+_T = TypeVar("_T")
 
 
 class ServiceContext:
@@ -101,51 +104,60 @@ class ServiceContext:
     # Built on first access (double-checked locking), so background threads —
     # the generation worker and voiceover synthesis — can reach them safely.
 
+    def _build_once(self, cache: str, factory: Callable[[], _T]) -> _T:
+        """Return a lazily-built engine, constructing it once under a lock.
+
+        Double-checked locking: the fast path is a plain attribute read; the
+        slow path takes ``_init_lock`` and re-checks, so two threads racing on
+        the first access build the engine once, not twice. ``cache`` names the
+        ``_*_cache`` attribute the built engine is stored in.
+        """
+        built = getattr(self, cache)
+        if built is None:
+            with self._init_lock:
+                built = getattr(self, cache)
+                if built is None:
+                    built = factory()
+                    setattr(self, cache, built)
+        return cast(_T, built)
+
     @property
     def _research(self) -> ResearchEngine:
-        if self._research_cache is None:
-            with self._init_lock:
-                if self._research_cache is None:
-                    self._research_cache = ResearchEngine(
-                        max_sources=self._settings.research_max_sources
-                    )
-        return self._research_cache
+        return self._build_once(
+            "_research_cache",
+            lambda: ResearchEngine(max_sources=self._settings.research_max_sources),
+        )
 
     @property
     def _searcher(self) -> FederatedSearcher:
-        if self._searcher_cache is None:
-            with self._init_lock:
-                if self._searcher_cache is None:
-                    self._searcher_cache = FederatedSearcher(
-                        build_providers(self._settings)
-                    )
-        return self._searcher_cache
+        return self._build_once(
+            "_searcher_cache",
+            lambda: FederatedSearcher(build_providers(self._settings)),
+        )
 
     @property
     def _library(self) -> DocumentLibrary:
-        if self._library_cache is None:
-            with self._init_lock:
-                if self._library_cache is None:
-                    self._library_cache = DocumentLibrary(
-                        self._settings.library_dir, self._settings.library_db_path
-                    )
-        return self._library_cache
+        return self._build_once(
+            "_library_cache",
+            lambda: DocumentLibrary(
+                self._settings.library_dir, self._settings.library_db_path
+            ),
+        )
 
     @property
     def _media(self) -> MediaLibrary:
-        if self._media_cache is None:
-            with self._init_lock:
-                if self._media_cache is None:
-                    self._media_cache = MediaLibrary(
-                        self._settings.media_dir,
-                        chunk_bytes=self._settings.stream_chunk_bytes,
-                        max_bytes=self._settings.upload_max_bytes,
-                        governor=self._governor,
-                        transcribe_model=self._settings.transcribe_model,
-                        transcribe_device=self._settings.transcribe_device,
-                        storage=self._build_media_storage(),
-                    )
-        return self._media_cache
+        return self._build_once(
+            "_media_cache",
+            lambda: MediaLibrary(
+                self._settings.media_dir,
+                chunk_bytes=self._settings.stream_chunk_bytes,
+                max_bytes=self._settings.upload_max_bytes,
+                governor=self._governor,
+                transcribe_model=self._settings.transcribe_model,
+                transcribe_device=self._settings.transcribe_device,
+                storage=self._build_media_storage(),
+            ),
+        )
 
     def _build_media_storage(self) -> Any:
         """Pick the media storage backend from settings (S3 when configured)."""
@@ -163,35 +175,25 @@ class ServiceContext:
 
     @property
     def _recook(self) -> RecookPipeline:
-        if self._recook_cache is None:
-            with self._init_lock:
-                if self._recook_cache is None:
-                    self._recook_cache = RecookPipeline(self._settings, self._media)
-        return self._recook_cache
+        return self._build_once(
+            "_recook_cache", lambda: RecookPipeline(self._settings, self._media)
+        )
 
     @property
     def _tts(self) -> TTSEngine:
-        if self._tts_cache is None:
-            with self._init_lock:
-                if self._tts_cache is None:
-                    self._tts_cache = TTSEngine(self._settings)
-        return self._tts_cache
+        return self._build_once("_tts_cache", lambda: TTSEngine(self._settings))
 
     @property
     def _studio(self) -> ImageVoiceStudio:
-        if self._studio_cache is None:
-            with self._init_lock:
-                if self._studio_cache is None:
-                    self._studio_cache = ImageVoiceStudio(self._settings.library_dir)
-        return self._studio_cache
+        return self._build_once(
+            "_studio_cache", lambda: ImageVoiceStudio(self._settings.library_dir)
+        )
 
     @property
     def _presets(self) -> PresetLibrary:
-        if self._presets_cache is None:
-            with self._init_lock:
-                if self._presets_cache is None:
-                    self._presets_cache = PresetLibrary(self._settings.presets_dir)
-        return self._presets_cache
+        return self._build_once(
+            "_presets_cache", lambda: PresetLibrary(self._settings.presets_dir)
+        )
 
     @property
     def governor(self) -> ResourceGovernor:

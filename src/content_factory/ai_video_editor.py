@@ -37,6 +37,8 @@ from typing import Protocol
 import cv2
 import numpy as np
 
+from .hardware import require_ffmpeg, resolve_ffprobe
+
 #: Working width for analysis/tracking (frames are downscaled to keep it fast).
 _WORK_WIDTH = 480
 #: Fraction of the frame width the inserted image should occupy.
@@ -512,28 +514,37 @@ def _apply_cuts(frames: list[np.ndarray], cuts: list[CutRange]) -> list[np.ndarr
 
 
 def extract_audio(video_path: Path, out: Path) -> Path | None:
-    """Extract the audio track of a video to a temp file, if it has one."""
-    proc = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-select_streams",
-            "a",
-            "-show_entries",
-            "stream=index",
-            "-of",
-            "csv",
-            str(video_path),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if proc.returncode != 0 or not proc.stdout.strip():
-        return None
+    """Extract the audio track of a video to a temp file, if it has one.
+
+    Both binaries take the app's resolution path: an install that only ships
+    the bundled ``imageio-ffmpeg`` build (no ffprobe on ``PATH``) used to die
+    here with ``FileNotFoundError``. When ffprobe is absent the audio check is
+    skipped and ffmpeg decides — an audio-less input simply yields no file.
+    """
+    ffprobe = resolve_ffprobe()
+    if ffprobe is not None:
+        proc = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-select_streams",
+                "a",
+                "-show_entries",
+                "stream=index",
+                "-of",
+                "csv",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0 or not proc.stdout.strip():
+            return None
+    binary = require_ffmpeg(purpose="the AI video editor's audio extraction")
     subprocess.run(
-        ["ffmpeg", "-y", "-i", str(video_path), "-vn", "-c:a", "aac", str(out)],
+        [binary, "-y", "-i", str(video_path), "-vn", "-c:a", "aac", str(out)],
         capture_output=True,
         text=True,
         check=False,

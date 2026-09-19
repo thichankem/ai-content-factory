@@ -30,6 +30,7 @@ from .routers import (
     build_qa_router,
     build_resources_router,
     build_seo_router,
+    build_skills_router,
     build_studio_media_router,
     build_styles_router,
     build_timeline_router,
@@ -91,6 +92,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(build_studio_media_router(service))
     app.include_router(build_media_router(service))
     app.include_router(build_tools_router(service))
+    app.include_router(build_skills_router(service))
     app.include_router(build_external_router(service))
     app.include_router(build_history_router(service))
     app.include_router(build_graphics_router(service))

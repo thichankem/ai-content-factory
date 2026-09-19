@@ -10,6 +10,8 @@ from __future__ import annotations
 import base64 as _base64
 from typing import Any
 
+from .agent_schema import ToolSpec, _p
+
 
 def _h_analyze_image(service: Any, args: Any) -> Any:
     return service.analyze_image(args.base64("image_b64"))
@@ -68,9 +70,7 @@ def _h_image_session_state(service: Any, args: Any) -> Any:
 
 
 def photo_tool_specs() -> list[Any]:
-    """Build the photo tool specs (lazy import to avoid a cycle)."""
-    from .agent_tools import ToolSpec, _p
-
+    """Build the photo tool specs."""
     return [
         ToolSpec(
             "analyze_image",

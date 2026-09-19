@@ -25,14 +25,13 @@ REEXPORT_MODULES = {"__init__.py"}
 #: A single module above this is a sign the domain should be split again.
 MODULE_LINE_BUDGET = 1100
 
-#: Declarative registries get a higher ceiling, and must declare it here: the
-#: shape is one readable entry per capability (tool name, description, JSON
-#: schema, handler), which is documentation rather than logic. The ceiling is
-#: still enforced, so a registry cannot grow without bound either.
-REGISTRY_MODULES = {
-    "agent_tools.py": 1900,
-    "media_tools.py": 1400,
-}
+#: Declarative registries may opt into a higher ceiling by declaring it here,
+#: with a comment explaining why the domain cannot be split further. Empty on
+#: purpose: the two modules that once needed it — ``agent_tools.py`` (the tool
+#: registry) and ``media_tools.py`` (the ffmpeg engine) — were split into
+#: per-domain / per-concern modules and now live well under the default budget.
+#: A future registry that genuinely cannot be split can re-add itself here.
+REGISTRY_MODULES: dict[str, int] = {}
 
 #: Helpers that were duplicated across the media engines before they were
 #: single-sourced. An engine may still bind one to its own exception type, but
@@ -83,9 +82,12 @@ def test_no_module_exceeds_the_line_budget() -> None:
     assert oversized == {}, f"split these modules: {oversized}"
 
 
-def test_registry_budgets_are_path_specific() -> None:
-    assert _line_budget(SRC / "agent_tools.py") == 1900
-    assert _line_budget(SRC / "services" / "agent_tools.py") == MODULE_LINE_BUDGET
+def test_no_module_is_grandfathered_over_the_default_budget() -> None:
+    # ``agent_tools.py`` and ``media_tools.py`` were the only two grandfathered
+    # registries. Both are now split, so every module earns the default budget.
+    assert REGISTRY_MODULES == {}
+    assert _line_budget(SRC / "agent_tools.py") == MODULE_LINE_BUDGET
+    assert _line_budget(SRC / "media_tools.py") == MODULE_LINE_BUDGET
     assert _line_budget(SRC / "seo" / "signals.py") == MODULE_LINE_BUDGET
 
 

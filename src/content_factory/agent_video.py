@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .agent_schema import ToolSpec, _p
+
 
 def _h_video_effect_catalog(service: Any, args: Any) -> Any:
     return service.video_effect_catalog()
@@ -123,9 +125,7 @@ def _h_separate_audio_stems(service: Any, args: Any) -> Any:
 
 
 def video_tool_specs() -> list[Any]:
-    """Build the video/audio tool specs (lazy import to avoid a cycle)."""
-    from .agent_tools import ToolSpec, _p
-
+    """Build the video/audio tool specs."""
     return [
         ToolSpec(
             "video_effect_catalog",

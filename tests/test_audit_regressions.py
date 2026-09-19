@@ -508,3 +508,22 @@ def test_a_document_without_a_url_is_a_422_not_a_502(client) -> None:
     assert response.status_code == 422
     detail = response.json()["detail"]
     assert "pdf_url" in detail and "landing_url" in detail
+
+
+# --- a missing optional engine is a capability gap, not a 500 ---------------
+
+
+def test_missing_transcription_engine_answers_503() -> None:
+    """faster-whisper is optional; asking to transcribe without it is 503.
+
+    It used to surface as a bare ``RuntimeError`` → 500, which reads as a
+    server crash. 503 ("not available") with the install hint is the honest
+    answer, and the message must reach the client either way.
+    """
+    from content_factory.api.errors import status_for
+    from content_factory.media import TranscriptionUnavailableError
+
+    exc = TranscriptionUnavailableError(
+        "faster-whisper is not installed; run `pip install faster-whisper`"
+    )
+    assert status_for(exc) == 503

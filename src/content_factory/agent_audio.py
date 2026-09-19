@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .agent_schema import ToolSpec, _p
+
 
 def _h_audio_denoise(service: Any, args: Any) -> Any:
     """Remove background noise from an audio asset via spectral gating."""
@@ -31,9 +33,7 @@ def _h_download_audio_clip(service: Any, args: Any) -> Any:
 
 
 def audio_tool_specs() -> list[Any]:
-    """Build the audio tool specs (lazy import to avoid a cycle)."""
-    from .agent_tools import ToolSpec, _p
-
+    """Build the audio tool specs."""
     return [
         ToolSpec(
             "audio_denoise",
