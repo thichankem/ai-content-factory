@@ -8,8 +8,8 @@ The pytest suite for the **AI Content Factory**. It covers state-machine adheren
 
 | | |
 | :--- | :--- |
-| Test modules | **67** — 66 `test_*.py` plus `conftest.py` |
-| Tests collected | **1 087** |
+| Test modules | **69** — 68 `test_*.py` plus `conftest.py` |
+| Tests collected | **1 123** (1 122 pass, 1 skips when `ffprobe` is absent) |
 | Result | **All pass** — the full run exits 0 |
 | Command | `python -m pytest` |
 
@@ -55,6 +55,8 @@ A test must not silently skip on a missing binary when it can instead be pointed
 | [`test_api.py`](test_api.py) | FastAPI endpoint contracts, status codes, payload validation, negative paths |
 | [`test_frontend_contract.py`](test_frontend_contract.py) | **The executable definition of "the backend serves the frontend"** — drives the real pipeline over HTTP with the exact payloads the clients send and asserts the exact fields they read. Field drift here is silent in production (a `NaN` width, a script editor silently falling back to its placeholder), which is why it is pinned verbatim |
 | [`test_architecture.py`](test_architecture.py) | Structural guards: module line budget, disjoint mixins, reachable mixin methods, the model/service re-export surface, and **no engine re-implementing a shared `params`/`pixels`/`catalog` helper**. Also pins the behaviour of those three modules (coercion, error types, RGB maths, catalogue grouping), so the shared surface cannot drift silently |
+| [`test_tool_dispatch_contract.py`](test_tool_dispatch_contract.py) | **Dispatches all 110 agent tools** with a minimal argument set and asserts a failure is always a declared domain error and a success is always JSON-serializable. Two tools were dead for the life of the project (an un-awaited coroutine, a wrong-arity call) while the suite stayed green, because no test ever called them |
+| [`test_audit_regressions.py`](test_audit_regressions.py) | One test per finding of [`docs/FEATURE-AUDIT.md`](../docs/FEATURE-AUDIT.md), named after the id it locks: download validation, kind from real streams, scene-id stability, render waiting for the pipeline, base64-as-ref, stem counts, describe sections, caption timings, the cached resource profile, GET for read-only endpoints, and the request shapes |
 | [`test_domain.py`](test_domain.py) | Core domain models and invariants |
 | [`test_config.py`](test_config.py) | Settings loading, env prefix behaviour, defaults |
 | [`test_store.py`](test_store.py) | Store concurrency, compare-and-save, conflict detection |
@@ -161,7 +163,7 @@ python scripts/smoke.py --port 8016
 | `ruff check src tests` | **0 findings** |
 | `ruff format --check src tests` | **220 files already formatted** |
 | `mypy src` | **0 issues in 149 source files** |
-| `pytest` | **1 087 tests, all pass** (exit 0) |
+| `pytest` | **1 122 passed, 1 skipped** (exit 0) |
 | `scripts/smoke.py` | **64 / 64 checks pass** |
 | `ruff check scripts` | 253 findings — `scripts/` is deliberately outside the CI job for now |
 

@@ -140,7 +140,7 @@ def install_handlers(app: FastAPI) -> None:
         )
 
     for error_type in (*HANDLED_ERRORS, Exception):
-        app.add_exception_handler(error_type, handle)  # type: ignore[arg-type]
+        app.add_exception_handler(error_type, handle)
 
 
 __all__ = [

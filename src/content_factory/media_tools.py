@@ -85,18 +85,45 @@ def _binary(name: str) -> str:
     return path
 
 
+#: ffmpeg's wording when the *input* is the problem rather than the server.
+#: These are the caller's to fix (a corrupt file, an HTML page named .mp4, a
+#: container ffmpeg cannot open), so they answer 422; everything else — a
+#: missing binary, a broken filter — stays a 500, because retrying the request
+#: as written would not help.
+_INPUT_FAILURE_MARKERS = (
+    "invalid data found",
+    "moov atom not found",
+    "could not find codec parameters",
+    "no such file",
+    "error opening input",
+    "end of file",
+    "not a valid",
+)
+
+
+def _ffmpeg_error(detail: str, fallback: str) -> MediaToolError:
+    """Classify an ffmpeg/ffprobe failure: unreadable input, or a broken tool."""
+    message = detail or fallback
+    lowered = message.lower()
+    if any(marker in lowered for marker in _INPUT_FAILURE_MARKERS):
+        return MediaToolArgumentError(f"cannot read this media file: {message}")
+    return MediaToolError(message)
+
+
 def _run(command: list[str]) -> subprocess.CompletedProcess[bytes]:
     proc = subprocess.run(command, capture_output=True, check=False)
     if proc.returncode != 0:
-        detail = proc.stderr.decode("utf-8", "replace").strip().splitlines()
-        raise MediaToolError(detail[-1] if detail else f"{command[0]} failed")
+        lines = proc.stderr.decode("utf-8", "replace").strip().splitlines()
+        raise _ffmpeg_error(lines[-1] if lines else "", f"{command[0]} failed")
     return proc
 
 
 def _require_file(path: str | Path) -> Path:
     resolved = Path(path)
     if not resolved.is_file():
-        raise MediaToolError(f"media file not found: '{resolved}'")
+        # The caller named a file that is not there: a request problem, not a
+        # server one. ``MediaToolArgumentError`` answers 422 with the path.
+        raise MediaToolArgumentError(f"media file not found: '{resolved}'")
     return resolved
 
 

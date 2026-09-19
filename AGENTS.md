@@ -91,6 +91,9 @@ no build. `docs/frontend/` audits both.
     `remap`.
   - `catalog.py` — the `{name, description, params}` entry shape and the
     grouped catalogue the accessibility layers return.
+  - `subtitles.py` — WebVTT parsing (caption text *and* cue timings).
+  - `downloads.py` — "is this download really media?" verification.
+  - `api/errors.py` — the domain-error to HTTP-status table.
 
   An engine may still bind a shared helper to its own exception type, but only
   by delegating to the shared implementation (see `audio_effects._num`).
@@ -98,13 +101,27 @@ no build. `docs/frontend/` audits both.
   reachable from the composed service, a module line budget, the
   `models`/`services` re-export surface, and that no engine re-implements a
   shared helper. Run it after any structural change.
-- `agent_tools.py` sits close to its 1900-line registry ceiling (~1890). Adding
+- `agent_tools.py` sits close to its 1900-line registry ceiling (~1884). Adding
   a tool means first moving a whole handler *family* into a sibling module, the
-  way `agent_audio.py` and `agent_video.py` were. It cannot be split by spec
-  list alone: `_DISCOVERY` borrows `_h_list_media`/`_h_get_media`, `_TIMELINE`
-  borrows `_h_auto_cut_to_beat`, and `_IMAGE` borrows
+  way `agent_audio.py`, `agent_video.py` and `agent_compute.py` were. It cannot
+  be split by spec list alone: `_DISCOVERY` borrows `_h_list_media`/`_h_get_media`,
+  `_TIMELINE` borrows `_h_auto_cut_to_beat`, and `_IMAGE` borrows
   `_h_compose_images`/`_h_collage_images`, so those handlers must move with the
   lists that use them or the manifest order changes.
+- A sibling module builds its specs through a `*_tool_specs()` function that
+  imports `ToolSpec`/`_p` lazily from `agent_tools`, and the parent splices it in
+  at the *same* position in `TOOL_SPECS`, so the published manifest order never
+  moves.
+- An engine raises a `ValueError` subclass (or `MediaToolArgumentError`) for a
+  request it cannot serve: `api/errors.py` turns that into a 4xx **with the
+  message** app-wide. Raising a bare `Exception` (or letting a `TypeError`
+  escape) hands the caller an empty 500, which is what the audit's L3 was about.
+  New error families go in the table in `api/errors.py`, not in a router's
+  `except` clause.
+- New tools must be reachable: `tests/test_tool_dispatch_contract.py` dispatches
+  **every** tool in the manifest with a minimal argument set and fails on any
+  undeclared failure. Two tools were dead for the life of the project because
+  nothing ever called them.
 - A required text field that two kinds of caller spell two different ways uses
   `models.common.TwinSpelling`: declare `PRIMARY` and `ALIAS`, expose whichever
   accessor name the callers already use, and let the base class own the

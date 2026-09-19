@@ -1,9 +1,22 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
 
 from .common import TwinSpelling
 from .timeline import VideoProject
+
+#: The call kinds :class:`~content_factory.cost_guard.CostGuard` has unit costs
+#: for. A plan that names anything else cannot be priced, and pricing it as
+#: $0.00 would hide the omission.
+PRICED_CALL_KINDS: tuple[str, ...] = (
+    "vision",
+    "audio_llm",
+    "tts",
+    "stt",
+    "embedding",
+)
 
 
 class PlatformCheckRequest(BaseModel):
@@ -70,16 +83,63 @@ class CostCheckRequest(BaseModel):
     two are merged, because a client that sends the spelling we do not read gets
     a silent $0.00 estimate rather than an error — the most expensive kind of
     contract drift.
+
+    Either field also accepts the shape an *agent* writes when it describes a
+    plan call by call (``[{"kind": "tts", "model": "...", "count": 2}]``), which
+    is aggregated into the same counts. A call whose kind cannot be priced is
+    rejected instead of priced at zero: an estimate that quietly omits half a
+    plan is worse than no estimate.
     """
 
-    calls: dict[str, int] = Field(default_factory=dict)
-    estimated_usage: dict[str, int] = Field(default_factory=dict)
+    calls: dict[str, int] | list[dict[str, Any]] = Field(default_factory=dict)
+    estimated_usage: dict[str, int] | list[dict[str, Any]] = Field(default_factory=dict)
+
+    @field_validator("calls", "estimated_usage", mode="before")
+    @classmethod
+    def _normalize_usage(cls, value: Any) -> Any:
+        """Turn a list of call descriptors into counts, or leave a mapping alone.
+
+        The count-map spelling deliberately tolerates keys the guard has no unit
+        cost for (a client that adds a new kind is not blocked, and the estimate
+        simply omits it). A *list* cannot make that trade: it carries no counts
+        at all, so an entry without a recognizable kind would price the whole
+        plan at $0.00 and look like a successful answer. Such a list is refused
+        with the accepted kinds named instead.
+        """
+        if not isinstance(value, list):
+            return value
+        counts: dict[str, int] = {}
+        unpriced: list[str] = []
+        for entry in value:
+            if not isinstance(entry, dict):
+                raise ValueError(
+                    "each entry must be an object like {'kind': 'tts', 'count': 2}"
+                )
+            kind = str(entry.get("kind") or entry.get("type") or "").strip().lower()
+            if kind not in PRICED_CALL_KINDS:
+                unpriced.append(kind or repr(entry))
+                continue
+            counts[kind] = counts.get(kind, 0) + max(1, int(entry.get("count", 1)))
+        if unpriced and not counts:
+            raise ValueError(
+                f"cannot price these call(s): {unpriced}; priced kinds are "
+                f"{list(PRICED_CALL_KINDS)}. Send a count map instead, e.g. "
+                '{"tts": 2, "vision": 1}.'
+            )
+        return counts
 
     @property
     def usage(self) -> dict[str, int]:
-        """Every priced call, whichever field carried it."""
-        merged = dict(self.estimated_usage)
-        merged.update(self.calls)
+        """Every priced call, whichever field carried it.
+
+        Both fields are normalized to counts during validation, so the list
+        spelling is already gone by the time this runs; the isinstance guard is
+        the type checker's view of that fact.
+        """
+        merged: dict[str, int] = {}
+        for source in (self.estimated_usage, self.calls):
+            if isinstance(source, dict):
+                merged.update(source)
         return merged
 
 

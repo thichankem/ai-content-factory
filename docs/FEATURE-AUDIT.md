@@ -19,6 +19,70 @@ thời gian + mã HTTP. Fixture nằm trong `storage/uploads/feature-audit/`
 (gitignore) — không sửa gì khác trong cây nguồn. Log stderr của server:
 `storage/feature-audit-server.log` (đây là nơi đọc traceback của mọi lỗi 500).
 
+## 0. Đã sửa — phiên tiếp theo (2026-09-19)
+
+Toàn bộ 15 lỗi có thể sửa trong mã nguồn **đã được sửa**, mỗi lỗi kèm một test hồi
+quy để nó không quay lại. Bảng dưới là hợp đồng bàn giao: `L…` → sửa ở đâu → ai
+canh nó.
+
+| # | Sửa ở đâu | Test canh |
+| :--- | :--- | :--- |
+| L1 | `agent_tools._h_research_project` chạy qua `_run_sync`; `_serialize_result` tự chạy nốt mọi awaitable | `test_tool_dispatch_contract.py::test_every_tool_dispatches_without_an_undeclared_failure` |
+| L2 | `_h_ground_project` dựng `GroundRequest`; schema có thêm `query`/`top_k` | như trên + `test_required_arguments_are_always_described` |
+| L3 | `api/errors.py`: bảng `status_for`/`detail_for` + `install_handlers(app)` | `test_bad_input_never_answers_500`, `test_studio_and_tools_agree_on_the_status_code` |
+| L4 | `downloads.py`: `require_media_payload`, `require_media_file` | `test_download_rejects_an_html_page` |
+| L5 | `ServiceContext.wait_for_workers` + `render_settle_seconds` trong `render_video` | `test_render_waits_for_the_generation_worker` |
+| L6 | `scenes.build_video_project(previous=…)` qua `_rebuild_video_project` | 3 test scene-id trong `test_audit_regressions.py` |
+| L7 | `media.resolve_kind` (kind từ luồng thật) + `scripts/media_reindex.py` | `test_resolve_kind_*`, `test_probe_media_reports_stream_presence` |
+| L8 | `services/media_tools._reject_encoded_ref` → `MediaToolArgumentError` | `test_resolve_media_ref_explains_base64` |
+| L9 | `audio_separation._SUPPORTED_STEM_COUNTS` | `test_stem_count_out_of_range_is_refused` |
+| L10 | `media_tools.DESCRIBE_SECTIONS` | `test_describe_rejects_an_unknown_section` |
+| L11 | `image_engine.ImageSessionNotFoundError` → 404 | `test_unknown_session_is_a_404` |
+| L12 | `subtitles.py` (VTT → segment) + `has_timestamps` | `test_vtt_segments_carry_cue_timings`, `test_transcript_reports_whether_timings_exist` |
+| L13 | `ResourceGovernor.snapshot(refresh=False)` đọc cache TTL; `?refresh=true` khi cần sống | `test_resource_snapshot_uses_the_cached_profile` |
+| L14 | `GET` cho 3 endpoint describe-op (POST giữ nguyên) | `test_read_only_studio_endpoints_answer_to_get`, `test_get_and_post_describe_agree` |
+| L15 | — (test mới, không phải sửa mã) | cả file `tests/test_tool_dispatch_contract.py` |
+| L16 | `/cost/check` nhận list call; `/media/{id}/tags` nhận cả 2 dạng; thiếu URL → 422 | 4 test trong mục "L16" của `test_audit_regressions.py` |
+
+### Cách kiểm chứng lại
+
+```bash
+python -m pytest -q            # 1122 passed, 1 skipped
+python -m ruff check src tests # All checks passed
+python -m mypy src             # no issues in 153 source files
+python scripts/smoke.py        # SMOKE TEST PASSED - 64 checks
+python scripts/media_reindex.py --media-dir library/media   # 0 mục lệch sau khi sửa
+```
+
+**Thư viện ảnh/hồ sơ đã được dọn thật:** `scripts/media_reindex.py --apply` sửa 4
+mục `.webm` từ `video` → `audio` (đúng như L7 mô tả).
+
+### Mã mới trong phiên này
+
+| File | Vai trò |
+| :--- | :--- |
+| `api/errors.py` | ánh xạ mọi lỗi nghiệp vụ → 4xx/5xx **có thông báo**, cài ở cấp app |
+| `downloads.py` | kiểm chứng dữ liệu tải về là media thật (không phải HTML) |
+| `subtitles.py` | đọc WebVTT: chữ **và** mốc thời gian |
+| `agent_compute.py` | 2 tool compute tách khỏi `agent_tools.py` (giữ đúng thứ tự manifest) |
+| `scripts/media_reindex.py` | dọn `library/media/index.json` theo luồng thật |
+| `tests/test_tool_dispatch_contract.py` | gọi đủ **110 tool** bằng tham số tối thiểu + hợp đồng lỗi 4xx |
+| `tests/test_audit_regressions.py` | 26 test hồi quy, mỗi test mang tên lỗi nó canh |
+
+### Điều chỉnh so với khuyến nghị ban đầu
+
+1. **L3** — thay vì chỉ vá `tools_call`, ánh xạ được cài ở cấp **app**. Vá một chỗ
+   thì endpoint tiếp theo lại quên; đây là một bảng duy nhất cho cả 19 router.
+2. **L16 (cost)** — từ chối *mọi* kind lạ sẽ phá hợp đồng mà
+   `tests/test_qa_service.py` đang canh (kind lạ phải được bỏ qua, không chặn cả
+   kế hoạch). Giữ nguyên leniency đó cho dạng *map*, nhưng dạng *list* mà không có
+   `kind` nào nhận ra được thì bị từ chối, vì nó sẽ báo $0.00 như một câu trả lời
+   thành công.
+3. **L5** — chọn *chờ* (tối đa `render_settle_seconds`) thay vì trả 409 kèm
+   `Retry-After`: mất cả công render là cái giá đắt hơn nhiều so với chờ vài giây.
+
+---
+
 ## 1. Tóm tắt điều hành
 
 | Chỉ số | Số đo |
@@ -255,6 +319,7 @@ Mức độ: **P0** = không dùng được / mất dữ liệu, **P1** = chặn
 **P2** = sai lệch/khó dùng, **P3** = vệ sinh.
 
 ### L1 — `research_project` chết 100 % (P0) ✅ đã tái hiện, có traceback
+**Trạng thái: ✅ đã sửa** — cầu async dùng chung (`_run_sync`) + lưới an toàn trong `_serialize_result` (mọi awaitable được chạy nốt).
 `agent_tools.py:355` `_h_research_project` (hàm **sync**) gọi `service.research(...)` là
 `async def` (`services/research.py:20`) ⇒ trả *coroutine* ⇒
 `PydanticSerializationError: Unable to serialize unknown type: <class 'coroutine'>` → 500.
@@ -263,12 +328,14 @@ Mức độ: **P0** = không dùng được / mất dữ liệu, **P1** = chặn
 **Sửa:** cho tool chạy qua cầu async (như router đã làm) hoặc thêm bản sync trong service.
 
 ### L2 — `ground_project` chết 100 % (P0) ✅ đã tái hiện
+**Trạng thái: ✅ đã sửa** — dựng `GroundRequest` từ `args`; schema tool bổ sung `query`, `top_k`.
 `agent_tools.py:369` gọi `service.ground_project(project_id)`; chữ ký thật là
 `knowledge.py:359` `ground_project(self, project_id: str, data: GroundRequest)` ⇒
 `TypeError: missing 1 required positional argument: 'data'` → 500.
 **Sửa:** dựng `GroundRequest()` từ `args` (schema tool nên bổ sung `query`, `top_k`).
 
 ### L3 — Mọi lỗi nghiệp vụ thành HTTP 500 rỗng (P1, lan rộng nhất)
+**Trạng thái: ✅ đã sửa** — bảng ánh xạ lỗi ở `api/errors.py`, cài như exception handler của app — mọi router hưởng chung.
 `api/routers/tools.py` chỉ bắt `ToolError / NotFoundError / StateConflictError /
 RightsNotConfirmedError`. Còn `ImageError`, `AudioEffectError`, `SfxError`,
 `VideoEffectError`, `VoiceError` (đều là `ValueError`) và `MediaToolError`,
@@ -281,6 +348,7 @@ RightsNotConfirmedError`. Còn `ImageError`, `AudioEffectError`, `SfxError`,
 định 4 nhóm đầu vào sai phải trả 4xx.
 
 ### L4 — `youtube_download` / `download_audio_clip` lưu HTML thành "video" và báo 200 (P0, dữ liệu rác)
+**Trạng thái: ✅ đã sửa** — `downloads.require_media_file`/`require_media_payload`: từ chối HTML, JSON và file không có luồng.
 `media.py:367` `download_from_url`: khi yt-dlp lỗi (`except Exception: target_file = None`),
 code **fallback tải thô URL bằng urllib** rồi lưu vào file `.mp4`.
 Đo thật: `youtube_download` → 200 trong 2,6 s, tạo bản ghi `53c167418d6e`,
@@ -291,6 +359,7 @@ code **fallback tải thô URL bằng urllib** rồi lưu vào file `.mp4`.
 lỗi thì trả lỗi có thông báo thay vì tải HTML; ghi `kind` từ luồng thật.
 
 ### L5 — `render_video` bị 409 khi pipeline còn chạy, mất cả công đã render (P1)
+**Trạng thái: ✅ đã sửa** — `wait_for_workers()` + `render_settle_seconds` (mặc định 60 s): render chờ pipeline lắng rồi mới chụp snapshot.
 Khi `start_generation` chạy nền (10 bước × 0,3 s), render bắt đầu rồi bị
 *"Project changed during rendering; export discarded."* — **sau 6,2 s** công render.
 Hết nền (status ổn định) thì render 3,8 s thành công. Cả tool và `POST /render` đều vậy.
@@ -298,12 +367,14 @@ Hết nền (status ổn định) thì render 3,8 s thành công. Cả tool và 
 *"generation đang chạy, thử lại sau ~3 s"* kèm `Retry-After`.
 
 ### L6 — Scene id bị đổi khi rebuild/pipeline tiến (P1 với agent)
+**Trạng thái: ✅ đã sửa** — `build_video_project(previous=...)` giữ id theo vị trí; mọi lần rebuild đi qua `_rebuild_video_project`.
 `build_video_project` sinh lại scene id; pipeline nền cũng dựng lại. Agent cache id →
 12 lượt sửa liên tiếp trả 404 *"No scene '…' in the video project."*
 **Sửa:** giữ id ổn định (nguồn gốc là chỉ số cảnh), hoặc trả `scenes[]` mới kèm cảnh báo
 trong chính response sửa.
 
 ### L7 — `library/` lệch giữa index và file thật (P1)
+**Trạng thái: ✅ đã sửa** — `resolve_kind` lấy kind từ luồng thật + `scripts/media_reindex.py` (đã chạy thật: sửa 4 mục).
 Quét toàn bộ 45 mục: **40 tốt, 5 hỏng** — 4 "video" chỉ có luồng audio
 (`accd19bb7dea`, `7369070b7083`, `654c5e38567e`, `7b4571949798`) và 1 "image" 108 byte
 không giải mã được (`86c3ceddef9c`). Nguyên nhân gốc: `detect_kind` (`media.py:86`) phân
@@ -313,35 +384,42 @@ Hệ quả: `cut_media` (re-encode) trên mục đó → 500; `media_palette`/`c
 **Sửa:** lấy `kind` từ luồng ffprobe thật (đã có `probe_media`), thêm script dọn index.
 
 ### L8 — `compose_images` trả 404 kèm ~300 ký tự base64 (P2)
+**Trạng thái: ✅ đã sửa** — `MediaToolArgumentError` khi ref trông như base64/`data:` — 422 kèm gợi ý dùng tool nào.
 `base` nhận **ref** (đúng như tài liệu), nhưng khi người gọi đưa base64 thì thông báo là
 `Nothing named 'iVBORw0KGgo…'` — dài, khó hiểu, không nói "tham số này cần ref, dùng
 `edit_image` nếu có base64".
 **Sửa:** nhận diện chuỗi trông như base64/`data:` và trả 422 kèm gợi ý.
 
 ### L9 — `separate_audio_stems` nhận `num` ngoài dải mà không báo (P2)
+**Trạng thái: ✅ đã sửa** — `_SUPPORTED_STEM_COUNTS` — `num` ngoài {2, 3} bị từ chối thay vì trả 3 dải.
 `num=9` → **200**, trả 3 dải low/mid/high (tài liệu chỉ nói 2 hoặc 3).
 **Sửa:** 422 kèm `{2,3}` khi `num` khác.
 
 ### L10 — `describe_media` bỏ qua section không hợp lệ (P2)
+**Trạng thái: ✅ đã sửa** — `DESCRIBE_SECTIONS` — section lạ bị nêu tên trong lỗi, không còn bị bỏ qua.
 `include=["vision"]` (không có trong tài liệu) → 200, trả báo cáo mặc định, không cảnh báo.
 **Sửa:** 422 liệt kê section hợp lệ.
 
 ### L11 — Session id sai → 500 thay vì 404 (P2)
+**Trạng thái: ✅ đã sửa** — `ImageSessionNotFoundError` → 404 kèm id và cách tạo session.
 `edit_image_session`/`undo_image_session` với id lạ → 500 (cùng nhóm L3, nhưng nên là 404
 "session không tồn tại hoặc đã hết hạn").
 
 ### L12 — `youtube_transcript` trả `segments=0` kèm `text` (P2)
+**Trạng thái: ✅ đã sửa** — `subtitles.vtt_to_segments` giữ mốc thời gian + cờ `has_timestamps` trong kết quả.
 Đo trên video có phụ đề: `segments=0`, `text="[♪♪♪] ♪ We're no strangers to love ♪ …"` —
 có text nhưng không có mốc thời gian ⇒ không dùng được cho phụ đề/canh nhịp.
 **Sửa:** nếu chỉ lấy được text không timestamp thì đặt cờ `has_timestamps: false`.
 
 ### L13 — `resource_status` tốn ~1,5–2 s cho một truy vấn trạng thái (P3)
+**Trạng thái: ✅ đã sửa** — profile phần cứng lấy từ cache TTL; `?refresh=true` (cả tool `resource_status`) khi cần sống.
 Đo 4 lần liên tiếp trên cùng server: 6,49 / 1,97 / 1,35 / 1,77 s; trong lượt audit 3,93 s;
 `GET /resources` 2,5–4,6 s. Có phần giảm sau lần đầu nhưng vẫn không rẻ cho dữ liệu gần
 như tĩnh (phần cứng, encoder khả dụng).
 **Sửa:** cache TTL (10–30 s) và/hoặc chỉ mở thử encoder khi thật sự chuẩn bị render.
 
 ### L14 — Hai hợp đồng song song cho cùng chức năng (P2, dễ gây lỗi tích hợp)
+**Trạng thái: ✅ đã sửa** — 3 endpoint describe-op chỉ-đọc nhận cả GET (POST giữ nguyên); dùng chung một helper nên không thể lệch.
 `/tools/call` nhận **base64 trong JSON**; `/studio/*` nhận **multipart** (`file=`, `ops` là
 **chuỗi JSON**). Ngoài ra method không nhất quán cho thao tác chỉ-đọc:
 `GET /studio/image/ops` nhưng `POST /studio/video/describe-op`; `GET /studio/audio/effects`
@@ -357,6 +435,7 @@ manifest, không `dispatch` chúng.
 "không được trả 500" (smoke kiểu này sẽ bắt ngay L1, L2, L3).
 
 ### L16 — Những chỗ tôi không kết luận được (cần người quyết)
+**Trạng thái: ✅ đã sửa** — `/cost/check` nhận cả list call, `/projects/{id}/documents` thiếu URL → 422 (không còn 502), `/media/{id}/tags` nhận cả `{"tags": [...]}`.
 1. `/cost/check` (`calls` phải là **dict**), `/media/{id}/tags` (body phải là **list**
    trần, không phải `{"tags": ...}`), `/subtitles/simplify` (`captions` là **list[str]**),
    `/resources/explain` (cần `?kind=`) — OpenAPI mô tả không khớp body thực.

@@ -27,6 +27,8 @@
 | [`toolcheck.py`](toolcheck.py) | **Local toolchain inspector.** Reports which optional media/AI binaries are present (`ffmpeg`, `ffprobe`, `piper`, `whisper`, `magick`, `yt-dlp`) and their versions. Run this first when a media test fails |
 | [`mcp_healthcheck.py`](mcp_healthcheck.py) | Health-check the MCP server and validate its tool-schema contract |
 | [`live_tools_test.py`](live_tools_test.py) | Live end-to-end exercise of the `/tools` agent API against a running server |
+| [`feature_audit.py`](feature_audit.py) | **Calls every agent tool and the main HTTP routes for real**, in groups, and writes a JSON/Markdown log with timings and status codes. This is what produced [`docs/FEATURE-AUDIT.md`](../docs/FEATURE-AUDIT.md) — the suite cannot see a dead tool that nothing calls |
+| [`media_reindex.py`](media_reindex.py) | Re-probe the media library and repair an index written before `kind` came from the real streams: `--apply` writes the corrections, `--prune` drops entries whose file is gone. Read-only by default |
 
 ## Benchmarks and media inspection
 

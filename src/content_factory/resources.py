@@ -374,14 +374,19 @@ class ResourceGovernor:
         with self._lock:
             self._stats.last_encoder = encoder
 
-    def explain(self, kind: JobKind) -> dict[str, Any]:
+    def explain(self, kind: JobKind, *, refresh: bool = False) -> dict[str, Any]:
         """What would happen to this job right now — without starting it.
 
         An agent can ask before committing to a long job, and an operator can see
         whether a GPU is actually free instead of guessing from a slow render.
+
+        ``refresh`` decides whether the answer re-probes the machine. A status
+        question answers from the cached profile (``profile_ttl_seconds``); the
+        *admission path* (:meth:`begin`) always re-probes, because it is the one
+        that must not act on a stale temperature.
         """
         need = _VRAM_MB.get(kind, 0)
-        blocker = self._gpu_blocker(need)
+        blocker = self._gpu_blocker(need, refresh=refresh)
         return {
             "kind": str(kind),
             "admission": str(Admission.CPU if blocker else Admission.GPU),
@@ -429,11 +434,11 @@ class ResourceGovernor:
             )
         return ""
 
-    def _gpu_blocker(self, vram_mb: int) -> str:
+    def _gpu_blocker(self, vram_mb: int, *, refresh: bool = True) -> str:
         """Why the GPU is not usable right now, or an empty string when it is."""
         if not self.gpu_allowed:
             return "policy"
-        profile = self.profile(refresh=True)
+        profile = self.profile(refresh=refresh)
         gpu = profile.gpu
         if gpu is None:
             return "no_gpu"
@@ -637,6 +642,9 @@ class ResourceGovernor:
             "hardware": profile.to_dict(),
             "stats": stats,
             "last_decision": last,
+            # One profile read covers the whole report: it was just refreshed
+            # (or read from cache) above, so the per-kind answers reuse it
+            # instead of re-probing the machine once per job kind.
             "admission_now": {str(kind): self.explain(kind) for kind in JobKind},
             "advice": self._advice(
                 stats["last_encoder"], profile, encoder_status, resolved

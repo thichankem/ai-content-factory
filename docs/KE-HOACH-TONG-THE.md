@@ -2560,4 +2560,67 @@ Người vận hành yêu cầu thiết kế lại Bước 1 trong phần fronte
   → L7 (kind từ ffprobe + dọn library) → L5/L6 (render/rebuild ổn định) → L15
   (test “mọi tool không được trả 500”).
 
+## 2026-09-19 — Sửa toàn bộ 15 lỗi của bản rà soát chức năng
+
+**Mục tiêu**
+- Chủ dự án yêu cầu: “fix tất cả lỗi đó” — tức toàn bộ danh sách L1–L16 trong
+  [`FEATURE-AUDIT.md`](FEATURE-AUDIT.md), không chỉ các lỗi nặng.
+
+**Đã làm**
+
+1. **L1/L2 — hai tool chết 100 %.** `research_project` gọi hàm async mà không
+   await (nay đi qua cầu `_run_sync`, và `_serialize_result` tự chạy nốt mọi
+   awaitable nên không handler nào lặp lại được lỗi này); `ground_project` gọi
+   thiếu tham số `data` (nay dựng `GroundRequest` từ `args`, schema có thêm
+   `query`/`top_k`).
+2. **L3/L11 — lớp biên HTTP.** Thêm `api/errors.py`: một bảng
+   `(nhóm lỗi → status)` + `detail_for`, cài làm exception handler **của app**.
+   16/18 ca đầu vào sai trước đây trả 500 rỗng, nay trả 4xx kèm thông báo;
+   session ảnh không tồn tại trả 404 (loại lỗi mới `ImageSessionNotFoundError`).
+3. **L4/L7 — dữ liệu vào.** `downloads.py` kiểm chứng nội dung tải về là media
+   thật (HTML/JSON bị từ chối thay vì lưu thành “video”); `resolve_kind` lấy
+   `kind` từ luồng ffprobe thật; thêm `scripts/media_reindex.py` và **đã chạy
+   thật** để dọn index: 4 mục `.webm` chuyển `video` → `audio`.
+4. **L5/L6 — vòng đời render/timeline.** `wait_for_workers()` +
+   `render_settle_seconds`: render chờ pipeline lắng rồi mới chụp snapshot (hết
+   cảnh mất 6,2 s công render vì 409); `build_video_project(previous=…)` giữ id
+   cảnh theo vị trí nên id mà agent/UI đang giữ không còn biến thành 404.
+5. **L8/L9/L10/L12 — hợp đồng tham số.** Ref trông như base64 → 422 kèm gợi ý
+   dùng tool nào; `num` của tách stem phải ∈ {2, 3}; `include` của
+   `describe_media` chỉ nhận section đã khai báo; `subtitles.py` giữ **mốc thời
+   gian** của phụ đề và trả cờ `has_timestamps`.
+6. **L13/L14/L16 — chi phí và hình dạng request.** `resource_status` đọc từ
+   cache TTL (`?refresh=true` khi cần sống): 1,4–2 s → ~0; 3 endpoint
+   `describe-op` chỉ-đọc nhận cả GET; `/cost/check` nhận cả danh sách call;
+   `/media/{id}/tags` nhận cả hai dạng; documents thiếu URL → 422 (không còn 502).
+7. **L15 — lá chắn.** `tests/test_tool_dispatch_contract.py` gọi **đủ 110 tool**
+   bằng tham số tối thiểu và chỉ chấp nhận lỗi đã khai báo; thêm
+   `tests/test_audit_regressions.py` với 26 test, mỗi test mang tên lỗi nó canh.
+
+**Kiểm chứng**
+- `pytest -q`: **1 122 passed, 1 skipped** (trước: 1 087) — 157 s.
+- `ruff check src tests`: sạch. `ruff format --check`: 226 file đã đúng.
+  `mypy src`: 0 lỗi trong 153 file.
+- `scripts/smoke.py`: **SMOKE TEST PASSED — 64 checks**.
+- Chạy thật qua HTTP: `research_project` 200, `ground_project` 409 kèm lời giải
+  thích, `apply_audio_effect` sai tên → 422 kèm lý do, session lạ → 404,
+  `separate_audio_stems num=9` → 422, `/cost/check` dạng list → 200 có giá.
+
+**Quyết định**
+- Giữ nguyên hợp đồng “kind lạ thì bỏ qua” của `/cost/check` dạng *map* (có test
+  canh), chỉ từ chối dạng *list* không nhận ra kind nào — vì dạng đó sẽ trả
+  $0,00 như một câu trả lời thành công.
+- Render **chờ** pipeline thay vì trả 409 + `Retry-After`: mất cả công render
+  đắt hơn nhiều so với chờ vài giây.
+- Tách `agent_compute.py` khỏi `agent_tools.py` (1884/1900 dòng) và tách
+  `subtitles.py` + `downloads.py` khỏi `media.py` (1100/1100) — cả hai đều do
+  `tests/test_architecture.py` bắt buộc, và việc tách giữ đúng thứ tự manifest
+  110 tool.
+
+**Việc tiếp theo**
+- `scripts/` (34 file) vẫn nằm ngoài CI: `scripts/feature_audit.py` và
+  `scripts/media_reindex.py` mới đều không có cổng nào chặn.
+- Chưa có đường AI vision thật (mục §2 của báo cáo vẫn đúng): muốn có thì phải
+  viết lớp multimodal + đăng ký vào `vision_scorer`.
+- 97 endpoint còn lại trong báo cáo vẫn chưa được chạy từng cái bằng tay.
 

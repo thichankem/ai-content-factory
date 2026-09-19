@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import (
     APIRouter,
+    Body,
     File,
     Form,
     HTTPException,
@@ -22,6 +23,7 @@ from ...models import (
     MediaItem,
     ReCookRequest,
     ReCookResult,
+    TagsUpdate,
     YouTubeDownloadRequest,
     YouTubeSearchResponse,
     YouTubeTranscriptRequest,
@@ -196,9 +198,16 @@ def build_router(service: ContentFactoryService) -> APIRouter:
         return service.media_all_tags()
 
     @router.post("/media/{media_id}/tags", response_model=MediaItem)
-    def media_set_tags(media_id: str, tags: list[str]) -> MediaItem:
+    def media_set_tags(
+        media_id: str,
+        tags: list[str] | TagsUpdate = Body(  # noqa: B008
+            ...,
+            description='A bare list of tags, or {"tags": [...]}.',
+        ),
+    ) -> MediaItem:
         """Replace an item's tags."""
-        return guard_value(lambda: service.media_set_tags(media_id, tags))
+        resolved = tags.tags if isinstance(tags, TagsUpdate) else tags
+        return guard_value(lambda: service.media_set_tags(media_id, resolved))
 
     @router.post("/media/{media_id}/tags/{tag}", response_model=MediaItem)
     def media_add_tag(media_id: str, tag: str) -> MediaItem:

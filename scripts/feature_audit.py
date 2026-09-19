@@ -1625,14 +1625,21 @@ def group_negative(ctx: dict[str, Any]) -> list[Probe]:
         ("missing required arg", "seo_score", {}),
         ("bad ref", "inspect_media", {"ref": "no/such/file.mp4"}),
     ]
+    # A missing *capability* is not a malformed request: ``dub_audio`` and
+    # ``voice_clone`` have no ML adapter installed, so 503 ("not available") with
+    # the message naming the adapter is the honest answer, and the point of the
+    # case is that the client *sees* that message instead of an empty 500.
+    unavailable = {"dub_audio", "voice_clone"}
     return [
         tool(
             "negative",
             target,
             args,
             label=f"{label} [{target}]",
-            expect=(400, 404, 409, 415, 422),
-            note="a 4xx with a message is the correct answer here",
+            expect=(400, 404, 409, 415, 422, 503)
+            if target in unavailable
+            else (400, 404, 409, 415, 422),
+            note="a 4xx/503 with a message is the correct answer here",
         )
         for label, target, args in cases
     ]

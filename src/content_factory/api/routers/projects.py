@@ -26,7 +26,7 @@ from ...models import (
 )
 from ...providers import ProviderUnavailableError
 from ...service import ContentFactoryService
-from ..deps import get_or_404, guard, guard_value, render_thumbnail
+from ..deps import get_or_404, guard, guard_await, guard_value, render_thumbnail
 
 
 def build_router(service: ContentFactoryService) -> APIRouter:
@@ -81,10 +81,28 @@ def build_router(service: ContentFactoryService) -> APIRouter:
 
     @router.post("/projects/{project_id}/documents", response_model=Project)
     async def add_document(project_id: str, result: DocumentResult) -> Project:
+        """Download a document into the library and attach it to the project.
+
+        A document with no URL to fetch is the *caller's* request being
+        incomplete, so it answers 422 naming the missing field — not 502, which
+        claims the upstream gateway failed and sends the caller looking for a
+        problem that is not there. Only a genuine transport failure is a 502.
+        """
         get_or_404(service, project_id)
+        if not (result.pdf_url or result.landing_url):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "A document needs 'pdf_url' or 'landing_url' to download "
+                    f"from; got only the title {result.title!r}."
+                ),
+            )
         try:
-            return await service.add_document(project_id, result)
-        except Exception as exc:
+            # ``guard_await`` maps the domain errors (404/409) itself.
+            return await guard_await(service.add_document(project_id, result))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except Exception as exc:  # an unreachable URL is a gateway failure, not a bug
             raise HTTPException(
                 status_code=502, detail=f"Download failed: {exc}"
             ) from exc

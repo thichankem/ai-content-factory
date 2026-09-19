@@ -18,7 +18,7 @@ Every number below came from a command run in this workspace. The command is nam
 | `ruff check src tests` | **Clean** | 0 findings |
 | `ruff format --check src tests` | **Clean** | 220 files already formatted |
 | `mypy src` | **Clean** | 0 issues in 149 source files |
-| `pytest` | **All pass** | 1 087 tests across 66 modules; full run exits 0 |
+| `pytest` | **All pass** | 1 122 tests across 68 modules (+1 skipped without `ffprobe`); full run exits 0 |
 | `ruff check scripts` | **253 findings** | Mostly `E501`; `scripts/` is **not** in the CI job |
 | `scripts/smoke.py` | **64 / 64 checks** | Measured against a fresh server on a free port |
 | Vanilla studio (`frontend/*.js`) | Served at `/` | 17 209 lines across `index.html`, `style.css`, `app.js`, `editor.js`, `flow.js` |
@@ -85,6 +85,39 @@ Each engine may still bind a shared helper to its own exception type, but only b
 - `tests/test_production.py` — `require_ffmpeg` prefers `PATH`, falls back to a bundled build, and still raises when neither exists.
 
 Verified end to end: with `PATH` emptied, `resolve_ffmpeg()` returns `None` while `require_ffmpeg()` returns the bundled `imageio-ffmpeg` binary and a real MP3 encode/decode round-trip succeeds. Over HTTP, `POST /studio/audio/effect`, `/studio/audio/stems` and `/studio/audio/analyze` all return 200 and persist an asset.
+
+---
+
+## Fixed in this pass — every finding of the feature audit
+
+[`docs/FEATURE-AUDIT.md`](docs/FEATURE-AUDIT.md) measured the backend by calling it
+for real (229 requests, 110 tools) instead of trusting the suite. It found 15
+defects, two of them fatal. All 15 are now fixed, each with a regression test.
+Short version, worst first:
+
+| # | Defect | Symptom | Fix |
+| :--- | :--- | :--- | :--- |
+| L1 | `_h_research_project` (sync) called the **async** `service.research` without bridging it | The tool returned a coroutine; the response failed to serialize as an opaque `500`. It had never worked | Runs through the shared `_run_sync` bridge; `_serialize_result` additionally drives *any* awaitable to completion |
+| L2 | `_h_ground_project` called `service.ground_project(project_id)`, which needs a `GroundRequest` | `TypeError` → 500, 100 % of the time | Builds the request from `args`; the schema now declares `query`/`top_k` |
+| L3 | Only four service-level error types were translated at the HTTP boundary | **16 of 18** malformed calls came back as `500 Internal Server Error` with an empty body — including "no adapter configured", which is a *clear* message the client never saw | `api/errors.py` maps every domain error family to 404/409/413/422/503/500 **with its message**, installed app-wide |
+| L4 | `download_from_url` fell back to `urllib` when the extractor failed | A blocked YouTube request stored a 795 KB HTML page as `kind=video, mime=video/mp4` and reported success | `downloads.require_media_payload` / `require_media_file` refuse HTML, JSON and files with no stream |
+| L5 | `render_video` snapshotted the project while the generation worker was still rewriting it | The compare-and-save rejected the export *after* it finished: 6.2 s of real render thrown away with `409` | `wait_for_workers()` (bounded by `render_settle_seconds`) settles the pipeline first, then snapshots |
+| L6 | Every rebuild minted new random scene ids | An id handed to a client turned into a 404 on the next call (12 consecutive edit failures in the audit) | `build_video_project(previous=…)` keeps ids by position; new scenes still get new ids |
+| L7 | `detect_kind` classified by file extension | 4 of 45 library items were "video" with only an audio stream; a 108-byte `.png` was "image" | `resolve_kind` trusts the probed streams; `scripts/media_reindex.py` repairs an existing index (run: 4 corrections) |
+| L8 | A base64 payload passed as a `ref` produced `Nothing named 'iVBORw0KGgo…'` | ~300 characters of base64 in the error, no hint about which tool takes bytes | 422 that names the mistake and the tools that *do* take base64 |
+| L9 | `separate_stems` accepted any `num` | `num=9` returned the 3-band split as if honoured | `num` must be 2 or 3 |
+| L10 | `describe(include=[...])` ignored unknown sections | `include=["vision"]` returned the default report with no warning | 422 naming the unknown section and the valid ones |
+| L11 | An unknown edit-session id raised `ImageError` | 500 instead of 404 | `ImageSessionNotFoundError` → 404, with the id and how to create a session |
+| L12 | The caption path returned `text` with `segments: []` | No usable timings for subtitle burn-in or beat-aligned cuts | `subtitles.py` parses the cues; the result carries `has_timestamps` |
+| L13 | `resource_snapshot` re-probed the hardware on every call | 1.4–2 s per status query for near-static data | Served from the profile cache; `?refresh=true` (and the tool's `refresh`) gets a live read |
+| L14 | Read-only `describe-op` endpoints were POST-only, next to GET siblings | Two methods for one kind of lookup, and a client cannot guess which | GET added (POST kept), both served by one helper so they cannot disagree |
+| L15 | **55 of 110 tools appeared in no test or script at all** | Two dead tools, found by hand | `tests/test_tool_dispatch_contract.py` dispatches all 110 and asserts failures are declared domain errors |
+| L16 | Documented request shapes did not match the models | `/cost/check` with a list of calls priced at **$0.00**; a document without a URL answered `502 Download failed`; `/media/{id}/tags` rejected `{"tags": [...]}` | List-of-calls accepted; a missing URL is 422 naming the field; both tag shapes accepted |
+
+New modules from this pass: `api/errors.py` (the error table), `downloads.py`
+(payload verification), `subtitles.py` (WebVTT cues), `agent_compute.py` (the two
+compute tools, moved to keep `agent_tools.py` inside its line budget without
+reordering the manifest).
 
 ---
 
@@ -230,8 +263,9 @@ Direct bridge from best-of-breed creative AI tools into project timelines:
 ├── scripts/                     # 34 development, verification & benchmark scripts
 ├── storage/                     # Runtime artifacts: uploads/, cache/, audit/
 ├── library/                     # Media library, edited assets, renders, music
-├── src/content_factory/         # Core application package (149 files, 72 modules)
-│   ├── api/                     # FastAPI app, guards, 19 routers, 185 endpoints
+├── src/content_factory/         # Core application package (153 files, 76 modules)
+│   ├── api/                     # FastAPI app, guards, 19 routers, 188 endpoints
+│   │                            #   errors.py = domain error -> HTTP table
 │   ├── models/                  # 22 Pydantic contract modules, one per domain
 │   ├── services/                # 21 domain mixins over a shared ServiceContext
 │   │                            # studio.py = image/voice/audio facade,
@@ -239,6 +273,8 @@ Direct bridge from best-of-breed creative AI tools into project timelines:
 │   ├── params.py                # shared parameter coercion (number/flag/seed)
 │   ├── pixels.py                # shared pixel maths (RGB, luminance, remap)
 │   ├── catalog.py               # shared accessibility-catalogue shape
+│   ├── downloads.py             # "is this download really media?" verification
+│   ├── subtitles.py             # WebVTT parsing: caption text + cue timings
 │   ├── text.py                  # shared tokenizers, slugs, title keys
 │   ├── seo/                     # SEO engine: contracts, signals, scoring, experiments
 │   ├── state.py                 # Authoritative lifecycle state machine
@@ -259,7 +295,7 @@ Direct bridge from best-of-breed creative AI tools into project timelines:
 │   ├── workflow.py              # DAG runner & pre-save checklist
 │   └── …                        # research, rag, providers, campaign, recook,
 │                                # perception, vision, hardware, cost_guard, …
-└── tests/                       # pytest suite — 66 modules, 1 087 tests
+└── tests/                       # pytest suite — 68 modules, 1 122 tests
 ```
 
 ---
@@ -434,7 +470,7 @@ The largest router: the Photoshop / Audition / Premiere-style surface.
 
 ## Agent Tools — 110 by name
 
-`GET /tools` returns the whole manifest; `POST /tools/call` runs one. Registration is split so no single module grows unbounded: `agent_tools.py` holds the core registry and the per-domain handlers live in `agent_audio.py`, `agent_video.py`, `agent_photo.py`, `agent_knowledge.py`, `agent_youtube.py`.
+`GET /tools` returns the whole manifest; `POST /tools/call` runs one. Registration is split so no single module grows unbounded: `agent_tools.py` holds the core registry and the per-domain handlers live in `agent_audio.py`, `agent_video.py`, `agent_photo.py`, `agent_knowledge.py`, `agent_youtube.py`, `agent_compute.py`.
 
 | Category | Count | Examples |
 | :--- | :--- | :--- |

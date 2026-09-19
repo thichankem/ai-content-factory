@@ -22,12 +22,14 @@ Design goals:
 from __future__ import annotations
 
 import base64 as _base64
+import inspect
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 from .agent_audio import audio_tool_specs
+from .agent_compute import compute_tool_specs
 from .agent_knowledge import knowledge_tool_specs
 from .agent_photo import photo_tool_specs
 from .agent_video import video_tool_specs
@@ -763,19 +765,6 @@ def _h_auto_cut_to_beat(service: Any, args: Args) -> Any:
         "beat_count": len(grid.get("beats", [])),
         "timeline": service.timeline_report(project_id),
     }
-
-
-# --- Compute: what will this machine actually do with the job -----------------
-
-
-def _h_resource_status(service: Any, args: Args) -> Any:
-    """Hardware, limits, live admission per job kind, and governor counters."""
-    return service.resource_snapshot(refresh=args.boolean("refresh", False))
-
-
-def _h_resource_explain(service: Any, args: Args) -> Any:
-    """Whether a job would use the GPU, the CPU, or wait — before starting it."""
-    return service.resource_explain(args.string("kind", "render"))
 
 
 # --- SEO: score it, fix it, and prove the fix ---------------------------------
@@ -1647,39 +1636,6 @@ _PRODUCTION: list[ToolSpec] = [
     ),
 ]
 
-_COMPUTE: list[ToolSpec] = [
-    ToolSpec(
-        "resource_status",
-        "What this machine has (CPU, RAM, GPU, VRAM, temperature, hardware "
-        "encoders, CUDA) and how the governor is behaving: live admission per job "
-        "kind, jobs serialized, jobs degraded to CPU, encoder fallbacks.",
-        "discovery",
-        "resource_snapshot",
-        _h_resource_status,
-        {
-            "refresh": _p(
-                "boolean", "Re-probe the hardware instead of using the cache."
-            ),
-        },
-    ),
-    ToolSpec(
-        "resource_explain",
-        "Ask before committing to a long job: would this run on the GPU or the "
-        "CPU, and what is blocking it (busy, hot, VRAM, policy)?",
-        "discovery",
-        "resource_explain",
-        _h_resource_explain,
-        {
-            "kind": _p(
-                "string",
-                "Job kind to test.",
-                enum=["render", "transcribe", "ocr", "vision"],
-                default="render",
-            )
-        },
-    ),
-]
-
 _SEO: list[ToolSpec] = [
     ToolSpec(
         "seo_rules",
@@ -1814,7 +1770,7 @@ _SEO: list[ToolSpec] = [
 #: Every tool, in the order agents should discover them.
 TOOL_SPECS: list[ToolSpec] = [
     *_DISCOVERY,
-    *_COMPUTE,
+    *compute_tool_specs(),
     *_RESEARCH,
     *knowledge_tool_specs(),
     *youtube_tool_specs(),
@@ -1907,7 +1863,16 @@ def dispatch_tool(service: Any, name: str, args: dict[str, Any] | None = None) -
 
 
 def _serialize_result(value: Any) -> Any:
-    """Convert service models nested in lists and mappings to JSON data."""
+    """Convert service models nested in lists and mappings to JSON data.
+
+    An awaitable is driven to completion first: a sync handler that calls an
+    async service method returns a bare coroutine unless it bridges the two,
+    and that used to reach the response layer and fail there as an opaque 500
+    (``research_project`` did exactly that, for months). Handlers still bridge
+    their own coroutines — this is the safety net under the last one.
+    """
+    if inspect.isawaitable(value):
+        return _serialize_result(_run_sync(value))
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
     if isinstance(value, list):

@@ -22,6 +22,18 @@ class MediaKind(enum.StrEnum):
     OTHER = "other"
 
 
+class TagsUpdate(BaseModel):
+    """Tags sent wrapped in an object rather than as a bare JSON list.
+
+    ``POST /media/{id}/tags`` documents a bare ``list[str]``, which is what both
+    web clients send and what the type says — but a client following the
+    generated OpenAPI page naturally posts ``{"tags": [...]}`` and used to get a
+    422 for a request that is semantically exact. Both shapes are accepted.
+    """
+
+    tags: list[str] = Field(default_factory=list)
+
+
 class TranscriptSegment(BaseModel):
     """One timed segment of a transcription."""
 

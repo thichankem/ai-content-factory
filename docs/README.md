@@ -10,7 +10,7 @@ All links below are relative, so they resolve wherever the repository is cloned.
 
 | File | Lines | Purpose |
 | :--- | :--- | :--- |
-| [`FEATURE-AUDIT.md`](FEATURE-AUDIT.md) | 446 | **Measured feature audit: every agent tool and 88 HTTP routes called for real, with timings.** Lists the 4 dead paths (2 tools returning a coroutine/missing argument), the 500-with-no-body error mapping, and the 55 tools no test names. Raw data in [`FEATURE-AUDIT-LOG.md`](FEATURE-AUDIT-LOG.md) / [`FEATURE-AUDIT-LOG.json`](FEATURE-AUDIT-LOG.json), reproducible with `scripts/feature_audit.py`. **Vietnamese.** |
+| [`FEATURE-AUDIT.md`](FEATURE-AUDIT.md) | 529 | **Measured feature audit: every agent tool and 88 HTTP routes called for real, with timings.** Lists the dead paths (2 tools returning a coroutine/missing argument), the 500-with-no-body error mapping, and the 55 tools no test named. §0 records the fix pass: all 15 findings fixed, each with the regression test that locks it. Raw data in [`FEATURE-AUDIT-LOG.md`](FEATURE-AUDIT-LOG.md) / [`FEATURE-AUDIT-LOG.json`](FEATURE-AUDIT-LOG.json), reproducible with `scripts/feature_audit.py`. **Vietnamese.** |
 | [`KE-HOACH-TONG-THE.md`](KE-HOACH-TONG-THE.md) | 2,563 | **The operator's master plan and change log.** Roadmap, requirements, architectural decisions, technical-debt registry, and a dated change history. Section 9 (*Nhật ký thay đổi*) is the running log. **Vietnamese**, by operator convention. |
 
 ## Architecture and engines
