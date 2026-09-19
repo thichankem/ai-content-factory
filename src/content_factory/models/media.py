@@ -164,4 +164,8 @@ class YouTubeTranscriptResult(BaseModel):
     source: str = "subtitles"
     text: str = ""
     segments: list[TranscriptSegment] = Field(default_factory=list)
+    #: Whether ``segments`` carries real cue timings. A transcript can be text
+    #: only (no cues parsed), and a caller that needs timings for subtitles or
+    #: beat-aligned cuts must be able to tell without discovering it later.
+    has_timestamps: bool = False
     media_id: str | None = None

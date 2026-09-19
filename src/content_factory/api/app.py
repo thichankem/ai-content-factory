@@ -14,6 +14,7 @@ from .. import __version__
 from ..config import Settings, get_settings
 from ..service import ContentFactoryService
 from .deps import FRONTEND_DIR
+from .errors import install_handlers
 from .routers import (
     build_agents_router,
     build_campaign_router,
@@ -62,6 +63,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     service = ContentFactoryService(settings)
 
     app = FastAPI(title="AI Content Factory", version=__version__)
+
+    # Domain errors from every engine become their own 4xx with a message
+    # instead of an empty 500. Installed before the routers so the mapping is
+    # in place for all of them.
+    install_handlers(app)
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(

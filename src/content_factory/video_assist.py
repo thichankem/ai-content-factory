@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import audio_effects, video_effects
+from .catalog import detail, grouped_catalog
 from .models import VideoProject
 
 __all__ = [
@@ -19,6 +20,20 @@ __all__ = [
     "describe_operation",
     "describe_timeline",
     "suggest_edits",
+]
+
+
+#: The order categories appear in the catalogue; every one always appears, so a
+#: client can render a stable menu even when a category is momentarily empty.
+CATEGORY_ORDER = [
+    "editing",
+    "image",
+    "effects",
+    "text",
+    "audio",
+    "media",
+    "motion",
+    "export",
 ]
 
 
@@ -302,26 +317,7 @@ def _merge_effect_docs() -> dict[str, dict[str, Any]]:
 
 def catalog() -> dict[str, Any]:
     """Every video/audio operation grouped by category, with descriptions."""
-    docs = _merge_effect_docs()
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for name, doc in docs.items():
-        groups.setdefault(doc["category"], []).append(
-            {"name": name, "description": doc["description"], "params": doc["params"]}
-        )
-    order = [
-        "editing",
-        "image",
-        "effects",
-        "text",
-        "audio",
-        "media",
-        "motion",
-        "export",
-    ]
-    ordered = {cat: groups.get(cat, []) for cat in order}
-    for cat in sorted(set(groups) - set(order)):
-        ordered[cat] = groups[cat]
-    return {"categories": list(ordered.keys()), "ops": ordered}
+    return grouped_catalog(_merge_effect_docs(), CATEGORY_ORDER)
 
 
 def describe_operation(name: str) -> dict[str, Any]:
@@ -330,13 +326,7 @@ def describe_operation(name: str) -> dict[str, Any]:
     docs = _merge_effect_docs()
     if name not in docs:
         raise ValueError(f"Unknown operation '{name}'.")
-    doc = docs[name]
-    return {
-        "name": name,
-        "category": doc["category"],
-        "description": doc["description"],
-        "params": doc["params"],
-    }
+    return detail(name, docs[name])
 
 
 def describe_timeline(project: VideoProject) -> dict[str, Any]:

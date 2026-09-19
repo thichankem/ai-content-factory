@@ -22,6 +22,7 @@ from typing import Any
 from PIL import Image, ImageFilter, ImageStat
 
 from . import image_engine
+from .catalog import detail, grouped_catalog
 
 __all__ = [
     "OP_DOCS",
@@ -481,23 +482,19 @@ CATEGORY_ORDER = [
 
 
 def catalog() -> dict[str, Any]:
-    """Return the full op catalogue grouped by category, with descriptions."""
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for name in image_engine.KNOWN_OPS:
-        doc = OP_DOCS.get(name)
-        if doc is None:
-            doc = {"category": "other", "description": name, "params": {}}
-        groups.setdefault(doc["category"], []).append(
-            {"name": name, "description": doc["description"], "params": doc["params"]}
+    """Return the full op catalogue grouped by category, with descriptions.
+
+    Driven by the engine's registered ops rather than by ``OP_DOCS``: an op that
+    exists but is not documented yet still appears, under ``other``, instead of
+    silently vanishing from the catalogue an agent plans against.
+    """
+    docs = {
+        name: OP_DOCS.get(
+            name, {"category": "other", "description": name, "params": {}}
         )
-    ordered = {cat: groups.get(cat, []) for cat in CATEGORY_ORDER}
-    for cat in sorted(set(groups) - set(CATEGORY_ORDER)):
-        ordered[cat] = groups[cat]
-    return {
-        "categories": list(ordered.keys()),
-        "ops": ordered,
-        "presets": sorted(image_voice_presets()),
+        for name in image_engine.KNOWN_OPS
     }
+    return grouped_catalog(docs, CATEGORY_ORDER, presets=image_voice_presets())
 
 
 def image_voice_presets() -> list[str]:
@@ -656,13 +653,7 @@ def describe_op(name: str, params: dict[str, Any] | None = None) -> dict[str, An
     for key in doc.get("params", {}):
         if params and key in params:
             values[key] = params[key]
-    return {
-        "name": name,
-        "category": doc["category"],
-        "description": doc["description"],
-        "params": doc["params"],
-        "current_values": values,
-    }
+    return {**detail(name, doc), "current_values": values}
 
 
 def suggest_edits(img: Image.Image) -> dict[str, Any]:

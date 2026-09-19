@@ -42,6 +42,7 @@ __all__ = [
     "probe_encoder",
     "require_ffmpeg",
     "resolve_ffmpeg",
+    "resolve_ffprobe",
 ]
 
 #: Extra builds to look for when the primary ffmpeg cannot start an encoder.
@@ -372,14 +373,53 @@ def resolve_ffmpeg(
     return explicit or which("ffmpeg")
 
 
+def resolve_ffprobe(
+    explicit: str | None = None,
+    *,
+    which: Callable[[str], str | None] = shutil.which,
+    ffmpeg: str | None = None,
+) -> str | None:
+    """The ffprobe binary to use, or ``None`` when the machine has none.
+
+    ``ffprobe`` ships beside ``ffmpeg`` in every build, so when it is not on
+    ``PATH`` the sibling of the resolved ``ffmpeg`` is tried before giving up.
+    Probing consulted ``PATH`` alone before this, which meant a virtualenv that
+    carried its own ffmpeg still measured every media file as unreadable — and
+    a library can only classify what it can read. Returning ``None`` keeps the
+    failure honest: callers degrade to the file extension instead of raising.
+    """
+    if explicit:
+        return explicit
+    found = which("ffprobe")
+    if found:
+        return found
+    candidate = ffmpeg or resolve_ffmpeg(which=which)
+    if candidate:
+        stem = Path(candidate).stem.replace("ffmpeg", "ffprobe")
+        sibling = Path(candidate).with_name(stem)
+        for guess in (sibling, sibling.with_suffix(Path(candidate).suffix)):
+            if guess.is_file():
+                return str(guess)
+    return None
+
+
 def require_ffmpeg(
     explicit: str | None = None,
     *,
     purpose: str,
     error: type[Exception] = RuntimeError,
     which: Callable[[str], str | None] = shutil.which,
+    bundled: Callable[[], tuple[str, ...]] = _bundled_ffmpeg_candidates,
 ) -> str:
     """Resolve ffmpeg, or fail with a message naming what needed it.
+
+    Resolution order: the operator's explicit path, then ``PATH``, then a
+    binary bundled inside an installed package (``imageio-ffmpeg``). Only the
+    first two were consulted before, so a virtualenv that shipped a perfectly
+    good ffmpeg still made every ffmpeg-backed feature refuse to run — the
+    failure recorded in ``tests/README.md``. Callers that merely *report* on
+    the machine's capabilities use :func:`resolve_ffmpeg` and stay honest about
+    what is on ``PATH``.
 
     ``error`` is the exception type the caller's layer already speaks
     (:class:`~content_factory.render.RenderError`, ``VoiceError``), so a missing
@@ -388,7 +428,13 @@ def require_ffmpeg(
     """
     binary = resolve_ffmpeg(explicit, which=which)
     if binary is None:
-        raise error(f"ffmpeg is required for {purpose}.")
+        binary = next(iter(bundled()), None)
+    if binary is None:
+        raise error(
+            f"ffmpeg is required for {purpose}. Install it, set "
+            "CONTENT_FACTORY_FFMPEG_BINARY to a build, or install the "
+            "imageio-ffmpeg package to use its bundled binary."
+        )
     return binary
 
 

@@ -29,6 +29,13 @@ from typing import Any, NoReturn
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
+from .params import ParamError, number
+from .params import clamp01 as _clamp01
+from .pixels import luminance as _luminance
+from .pixels import remap as _remap
+from .pixels import rgb_array
+from .pixels import to_image as _to_img
+
 try:  # pragma: no cover - numpy is a hard dependency of the project
     import numpy as np
 except ImportError:  # pragma: no cover
@@ -43,18 +50,16 @@ def _fail(message: str) -> NoReturn:
 
 
 def _num(op: Any, key: str, default: float) -> float:
+    """Coerce an op parameter, reporting failure as this module's error type.
+
+    The coercion is shared (:mod:`content_factory.params`); only the exception
+    class is local, and it is resolved lazily on failure because importing
+    ``image_engine`` at module load would close an import cycle.
+    """
     try:
-        return float(op.params.get(key, default))
-    except (TypeError, ValueError):
-        _fail(f"'{key}' must be a number.")
-
-
-def _flag(op: Any, key: str, default: bool) -> bool:
-    return bool(op.params.get(key, default))
-
-
-def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, value))
+        return number(op, key, default)
+    except ParamError as exc:
+        _fail(str(exc))
 
 
 # --- numpy helpers -----------------------------------------------------------
@@ -64,20 +69,7 @@ def _rgb(img: Image.Image) -> np.ndarray:
     """Image -> float RGB array in [0, 1]."""
     if np is None:
         _fail("NumPy is required for this operation.")
-    return np.asarray(img.convert("RGB"), dtype=np.float32) / 255.0
-
-
-def _to_img(arr: np.ndarray, img: Image.Image) -> Image.Image:
-    """Float RGB array in [0, 1] -> RGBA image preserving the original alpha."""
-    out = Image.fromarray((np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8))
-    out = out.convert("RGBA")
-    out.putalpha(img.getchannel("A"))
-    return out
-
-
-def _luminance(rgb: np.ndarray) -> np.ndarray:
-    """Rec.709 luminance of a float RGB array."""
-    return 0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2]
+    return rgb_array(img)
 
 
 # --- Light -------------------------------------------------------------------
@@ -582,26 +574,6 @@ def _op_liquify(img: Image.Image, op: Any) -> Image.Image:
     out = Image.fromarray(warped).convert("RGBA")
     out.putalpha(img.getchannel("A"))
     return out
-
-
-def _remap(src: np.ndarray, map_x: np.ndarray, map_y: np.ndarray) -> np.ndarray:
-    """Bilinear remap of a uint8 HxWxC array using OpenCV, else nearest-neighbour."""
-    try:
-        import cv2
-    except ImportError:
-        cv2 = None  # type: ignore[assignment]
-    if cv2 is not None:
-        return cv2.remap(
-            src,
-            map_x.astype(np.float32),
-            map_y.astype(np.float32),
-            cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_REPLICATE,
-        )
-    # Nearest-neighbour fallback (no OpenCV).
-    ix = np.clip(np.round(map_x).astype(int), 0, src.shape[1] - 1)
-    iy = np.clip(np.round(map_y).astype(int), 0, src.shape[0] - 1)
-    return src[iy, ix]
 
 
 def _op_dodge_burn(img: Image.Image, op: Any) -> Image.Image:

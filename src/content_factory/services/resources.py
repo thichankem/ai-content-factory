@@ -19,9 +19,12 @@ __all__ = ["ResourcesMixin"]
 class ResourcesMixin(ServiceContext):
     """Hardware and scheduling introspection."""
 
-    def resource_snapshot(self) -> dict[str, Any]:
-        """Hardware profile, governor limits, live admission and counters."""
-        return self._governor.snapshot()
+    def resource_snapshot(self, *, refresh: bool = False) -> dict[str, Any]:
+        """Hardware profile, governor limits, live admission and counters.
+
+        The profile is cached; ``refresh=True`` re-probes the machine.
+        """
+        return self._governor.snapshot(refresh=refresh)
 
     def resource_explain(self, kind: str) -> dict[str, Any]:
         """What would happen to one job kind right now, without starting it."""

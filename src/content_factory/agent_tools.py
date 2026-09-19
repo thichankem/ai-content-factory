@@ -38,11 +38,13 @@ from .models import (
     ApprovalCreate,
     ApprovalStage,
     ApprovalVerdict,
+    GroundRequest,
     ProjectCreate,
     PublishCreate,
     ScriptAnalyzeRequest,
     ScriptUpdate,
 )
+from .workflow import _run_sync
 
 __all__ = [
     "TOOL_MANIFEST",
@@ -353,8 +355,17 @@ def _h_create_project(service: Any, args: Args) -> Any:
 
 
 def _h_research_project(service: Any, args: Args) -> Any:
-    return service.research(
-        args.ident("project_id"), include_web=args.boolean("include_web", True)
+    """Run a research pass.
+
+    ``ServiceMixin.research`` is async (the federated searcher is), and a tool
+    handler is sync, so the coroutine is driven to completion through the same
+    bridge the other async tools use. Without it the handler returns a bare
+    coroutine and the response fails to serialize.
+    """
+    return _run_sync(
+        service.research(
+            args.ident("project_id"), include_web=args.boolean("include_web", True)
+        )
     )
 
 
@@ -367,7 +378,14 @@ def _h_attach_kb(service: Any, args: Args) -> Any:
 
 
 def _h_ground_project(service: Any, args: Args) -> Any:
-    return service.ground_project(args.ident("project_id"))
+    """Retrieve knowledge for the topic and bind citations to the script."""
+    return service.ground_project(
+        args.ident("project_id"),
+        GroundRequest(
+            query=args.optional_string("query"),
+            top_k=args.integer("top_k", 6),
+        ),
+    )
 
 
 def _h_export_brief(service: Any, args: Args) -> Any:
@@ -752,7 +770,7 @@ def _h_auto_cut_to_beat(service: Any, args: Args) -> Any:
 
 def _h_resource_status(service: Any, args: Args) -> Any:
     """Hardware, limits, live admission per job kind, and governor counters."""
-    return service.resource_snapshot()
+    return service.resource_snapshot(refresh=args.boolean("refresh", False))
 
 
 def _h_resource_explain(service: Any, args: Args) -> Any:
@@ -958,7 +976,11 @@ _RESEARCH: list[ToolSpec] = [
         "research",
         "ground_project",
         _h_ground_project,
-        {"project_id": PROJECT},
+        {
+            "project_id": PROJECT,
+            "query": _p("string", "Optional retrieval query (defaults to the topic)."),
+            "top_k": _p("integer", "How many chunks to retrieve (1-50)."),
+        },
         ("project_id",),
     ),
 ]
@@ -1634,6 +1656,11 @@ _COMPUTE: list[ToolSpec] = [
         "discovery",
         "resource_snapshot",
         _h_resource_status,
+        {
+            "refresh": _p(
+                "boolean", "Re-probe the hardware instead of using the cache."
+            ),
+        },
     ),
     ToolSpec(
         "resource_explain",

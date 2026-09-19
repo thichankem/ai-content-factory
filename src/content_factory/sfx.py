@@ -14,6 +14,9 @@ from typing import Any
 
 import numpy as np
 
+from .params import number
+from .params import seed as _seed
+
 __all__ = [
     "SFX",
     "sfx_catalog",
@@ -23,13 +26,6 @@ __all__ = [
 
 class SfxError(ValueError):
     """Raised when an SFX cannot be synthesised."""
-
-
-def _seed(params: dict[str, Any]) -> int:
-    try:
-        return int(params.get("seed", 0))
-    except (TypeError, ValueError):
-        return 0
 
 
 def _t(sr: int, duration: float) -> np.ndarray:
@@ -127,10 +123,8 @@ def _gen_ui_click(sr: int, params: dict[str, Any]) -> np.ndarray:
 
 
 def _num(params: dict[str, Any], key: str, default: float) -> float:
-    try:
-        return float(params.get(key, default))
-    except (TypeError, ValueError) as exc:
-        raise SfxError(f"'{key}' must be a number.") from exc
+    """Local spelling of :func:`params.number` that keeps this module's error type."""
+    return number(params, key, default, error=SfxError)
 
 
 SFX: dict[str, Any] = {

@@ -2,8 +2,8 @@
 
 These tests do not check features; they protect the shape of the codebase so a
 future refactor cannot quietly re-introduce a god object, duplicate a mixin
-method, or break the model/service re-export surface that the rest of the
-project imports from.
+method, hand every engine its own copy of the same helper, or break the
+model/service re-export surface that the rest of the project imports from.
 """
 
 from __future__ import annotations
@@ -11,9 +11,10 @@ from __future__ import annotations
 import ast
 import pathlib
 
+import numpy as np
 import pytest
 
-from content_factory import models, services, text
+from content_factory import models, params, pixels, services, text
 from content_factory.service import ContentFactoryService
 
 SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / "content_factory"
@@ -32,6 +33,23 @@ REGISTRY_MODULES = {
     "agent_tools.py": 1900,
     "media_tools.py": 1400,
 }
+
+#: Helpers that were duplicated across the media engines before they were
+#: single-sourced. An engine may still bind one to its own exception type, but
+#: it must do so by importing the shared implementation: a module that defines
+#: one of these names *without* importing the corresponding function has
+#: re-grown the copy this map exists to prevent.
+SHARED_MEDIA_HELPERS = {
+    "_clamp01": ("params", "clamp01"),
+    "_luminance": ("pixels", "luminance"),
+    "_num": ("params", "number"),
+    "_remap": ("pixels", "remap"),
+    "_seed": ("params", "seed"),
+    "_to_uint8": ("pixels", "to_uint8"),
+}
+
+#: The modules that own the shared implementations, and so may define them.
+SHARED_HELPER_HOMES = {"params.py", "pixels.py"}
 
 
 def _module_files() -> list[pathlib.Path]:
@@ -144,6 +162,118 @@ def test_models_package_reexports_the_whole_domain() -> None:
         assert getattr(models, name, None) is not None, name
     # The domain is split by concern, not dumped in one module.
     assert len(list((SRC / "models").glob("*.py"))) >= 10
+
+
+def _shared_imports(tree: ast.Module) -> set[str]:
+    """Names a module imports from the shared ``params``/``pixels`` modules."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.ImportFrom)
+            and node.level == 1
+            and node.module in {"params", "pixels"}
+        ):
+            names.update(alias.name for alias in node.names)
+    return names
+
+
+def test_shared_media_helpers_are_never_reimplemented() -> None:
+    """``params``/``pixels`` own the coercion and pixel maths, once.
+
+    The engines each carried a private ``_num``/``_seed``/``_luminance``/``_remap``
+    copy of the same code. A module that defines one of those names again —
+    without importing the shared implementation — has re-grown the drift this
+    catches.
+    """
+    reimplemented = []
+    for path in _module_files():
+        if path.name in SHARED_HELPER_HOMES:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        imported = _shared_imports(tree)
+        for node in tree.body:
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            shared = SHARED_MEDIA_HELPERS.get(node.name)
+            if shared is None or shared[1] in imported:
+                continue
+            reimplemented.append(
+                f"{path.relative_to(SRC).as_posix()}:{node.name} "
+                f"-> {shared[0]}.{shared[1]}"
+            )
+    assert reimplemented == []
+
+
+def test_params_helpers_are_shared_and_stable() -> None:
+    assert params.number({"freq": "250"}, "freq", 80.0) == 250.0
+    assert params.number({}, "freq", 80.0) == 80.0
+    with pytest.raises(params.ParamError, match="'freq' must be a number"):
+        params.number({"freq": "loud"}, "freq", 80.0)
+    with pytest.raises(RuntimeError, match="must be a number"):
+        params.number({"freq": None}, "freq", 80.0, error=RuntimeError)
+    assert params.flag({}, "on", True) is True
+    assert params.flag({"on": 0}, "on", True) is False
+    assert params.seed({}) == 0
+    assert params.seed({"seed": "not-a-number"}) == 0
+    assert params.seed({"seed": "7"}) == 7
+    assert params.clamp01(1.7) == 1.0 and params.clamp01(-0.4) == 0.0
+
+    class _Op:
+        """The shape :mod:`params` must also accept: something carrying `.params`."""
+
+        def __init__(self, **fields: float) -> None:
+            self.params = fields
+
+    assert params.number(_Op(amount=0.25), "amount", 0.0) == 0.25
+    assert params.params_of(_Op(amount=0.25)) == {"amount": 0.25}
+
+
+def test_pixels_helpers_are_shared_and_stable() -> None:
+    white = np.ones((2, 2, 3), dtype=np.float32)
+    assert pixels.luminance(white).shape == (2, 2)
+    assert float(pixels.luminance(white).max()) == pytest.approx(1.0, abs=1e-6)
+    assert pixels.to_uint8(np.array([0.0, 0.5, 1.0], dtype=np.float32)).tolist() == [
+        0,
+        127,
+        255,
+    ]
+    assert pixels.as_rgb(np.zeros((2, 2, 3), dtype=np.uint8)).shape == (2, 2, 3)
+    with pytest.raises(pixels.PixelError, match="HxWx3"):
+        pixels.as_rgb(np.zeros((2, 2), dtype=np.uint8))
+
+    from PIL import Image
+
+    image = Image.new("RGB", (2, 2), (10, 20, 30))
+    assert pixels.rgb_array(image).shape == (2, 2, 3)
+    round_tripped = pixels.to_image(pixels.rgb_array(image))
+    assert round_tripped.size == (2, 2)
+    # A remap that maps every output pixel to itself must be a no-op.
+    yy, xx = np.mgrid[0:2, 0:2]
+    straight = pixels.remap(
+        np.zeros((2, 2, 3), dtype=np.uint8),
+        xx.astype(np.float32),
+        yy.astype(np.float32),
+    )
+    assert straight.shape == (2, 2, 3)
+
+
+def test_catalogues_share_the_grouping_helper() -> None:
+    from content_factory import catalog
+
+    docs = {
+        "b_op": {"category": "second", "description": "B", "params": {}},
+        "a_op": {"category": "first", "description": "A", "params": {}},
+        "c_op": {"category": "extra", "description": "C", "params": {}},
+    }
+    grouped = catalog.grouped_catalog(docs, ["first", "second", "empty"], presets=["p"])
+    # Declared categories always appear, in order, even when empty...
+    assert grouped["categories"] == ["first", "second", "empty", "extra"]
+    assert grouped["ops"]["empty"] == []
+    # ...and a row carries what an agent calls and how to tune it.
+    assert grouped["ops"]["first"] == [
+        {"name": "a_op", "description": "A", "params": {}}
+    ]
+    assert grouped["presets"] == ["p"]
 
 
 def test_text_helpers_are_shared_and_stable() -> None:

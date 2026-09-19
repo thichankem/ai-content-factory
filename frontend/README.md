@@ -4,8 +4,8 @@ This directory holds **two independent frontends**. Knowing which one you are ed
 
 | | Vanilla studio | Next.js studio |
 | :--- | :--- | :--- |
-| **Files** | `index.html`, `style.css`, `app.js`, `editor.js`, `flow.js` | `src/**` — 97 `.ts`/`.tsx` files |
-| **Size** | 15,650 lines | 17,726 lines |
+| **Files** | `index.html`, `style.css`, `app.js`, `editor.js`, `flow.js` | `src/**` — 98 `.ts`/`.tsx` files |
+| **Size** | 17,209 lines | 18,255 lines |
 | **Served at** | `/` — `src/content_factory/api/routers/index.py` returns `index.html` | Nothing. FastAPI does not mount or proxy it |
 | **Runs via** | No build step | `npm run dev` → `http://localhost:3000` |
 | **Language** | Plain ES2020 + hand-written DOM | TypeScript (strict), React 18, Next 14 App Router |
@@ -42,8 +42,8 @@ Measured on this checkout, with dependencies installed:
 | Command | Result |
 | :--- | :--- |
 | `npx tsc --noEmit` | **0 errors** |
-| `npx next build` | **✓ compiled successfully** — `/` = 154 kB route, 259 kB first load |
-| `python scripts/frontend_imports.py` | **clean** across 97 files (structural import/export check) |
+| `npx next build` | **✓ compiled successfully** — `/` = 158 kB route, 264 kB first load (Next.js 14.2.35, Node 22) |
+| `python scripts/frontend_imports.py` | **clean** across 98 files (structural import/export check) |
 | `npm run lint` | **does not run** — ESLint is not installed and no config exists |
 
 The build passing is recent history, not a given: before the data-layer refactor the project had **62 TypeScript errors** and had never once been compiled, because Node.js is not installed on the development machine by default. Every claim in this file is a claim about a build that has actually been run.

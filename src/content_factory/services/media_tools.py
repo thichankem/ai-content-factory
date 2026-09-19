@@ -10,6 +10,7 @@ by ``asset_id`` alone.
 
 from __future__ import annotations
 
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -17,11 +18,15 @@ from typing import Any
 
 from .. import media_tools as engine
 from .. import voice_engine
+from ..media_tools import MediaToolArgumentError
 from ..sandbox import Sandbox, SandboxError
 from .errors import NotFoundError
 from .media import MediaMixin
 
 __all__ = ["MediaToolsMixin"]
+
+#: A long run of base64 alphabet: an id or a filename never looks like this.
+_BASE64_REF = re.compile(r"^[A-Za-z0-9+/]{40,}={0,2}$")
 
 
 class MediaToolsMixin(MediaMixin):
@@ -50,27 +55,65 @@ class MediaToolsMixin(MediaMixin):
         )
 
     def resolve_media_ref(self, ref: str) -> Path:
-        """Resolve a media id, an edited asset id, or a sandboxed file path.
+        """Resolve whatever an agent or the UI called this asset.
 
         Accepts the bare ``asset_id`` this module returns, the ``/edited/name``
         URL it reports, a media-library id, or a path inside the media roots —
         so an agent can chain calls with whichever identifier it still holds.
+        The order is id, then edited asset, then sandboxed path: a bare id that
+        happens to look like a filename is far more likely to be something this
+        service produced than a stray file in a media root.
         """
+        self._reject_encoded_ref(ref)
+        by_id = self._library_path(ref)
+        if by_id is not None:
+            return by_id
+        by_name = self._edited_asset_path(ref)
+        if by_name is not None:
+            return by_name
+        return self._sandboxed_path(ref)
+
+    @staticmethod
+    def _reject_encoded_ref(ref: str) -> None:
+        """Refuse a ref that is really base64 payload, and say so.
+
+        A ref is an asset id, an ``/edited/...`` URL or a path. Passing raw
+        bytes used to come back as ``Nothing named 'iVBORw0KGgoAAAANSUh…'`` —
+        technically true, unreadable, and long enough to flood a log. Naming
+        the mistake points the caller at the tool that *does* take bytes.
+        """
+        candidate = ref.strip()
+        if candidate.startswith("data:") or _BASE64_REF.match(candidate) is not None:
+            msg = (
+                "That looks like base64 data, not a ref. Tools that read a media "
+                "file take an asset_id, an /edited/... URL or a path; tools that "
+                "edit bytes (edit_image, apply_audio_effect, ...) take them in "
+                "their own base64 argument."
+            )
+            raise MediaToolArgumentError(msg)
+
+    def _library_path(self, ref: str) -> Path | None:
+        """The file behind a media-library id, or ``None`` if it is not one."""
         item = self._media.get(ref)
-        if item is not None:
-            path = self._media.path_for(item)
-            if path is None:
-                raise NotFoundError(f"Media '{ref}' has no file on disk.")
-            return path
+        if item is None:
+            return None
+        path = self._media.path_for(item)
+        if path is None:
+            raise NotFoundError(f"Media '{ref}' has no file on disk.")
+        return path
+
+    def _edited_asset_path(self, ref: str) -> Path | None:
+        """An edited asset by bare id, by ``/edited/name`` URL, or by id prefix."""
         name = ref.rsplit("/", 1)[-1]
-        edited_dir = self._edited_dir
         if name != ref or "." in name:
-            candidate = edited_dir / name
+            candidate = self._edited_dir / name
             if candidate.is_file():
                 return candidate
-        matches = sorted(edited_dir.glob(f"{name}.*"))
-        if matches:
-            return matches[0]
+        matches = sorted(self._edited_dir.glob(f"{name}.*"))
+        return matches[0] if matches else None
+
+    def _sandboxed_path(self, ref: str) -> Path:
+        """A path inside the media roots, or a :class:`NotFoundError`."""
         try:
             resolved = self._asset_sandbox.resolve(ref)
         except (SandboxError, ValueError) as exc:

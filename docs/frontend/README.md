@@ -29,14 +29,14 @@ Toàn bộ phần còn lại của bộ tài liệu được viết khi bản Ne
 | Chỉ số | Trước | Sau |
 | :--- | :--- | :--- |
 | `tsc --noEmit` | **62 lỗi** | **0 lỗi** |
-| `next build` | chưa từng chạy | ✓ biên dịch thành công, `/` = 259 kB first load |
+| `next build` | chưa từng chạy | ✓ biên dịch thành công, `/` = 158 kB route / 264 kB first load (đo lại 19/09/2026) |
 | Số chỗ `any` | 50 | **0** |
 | `alert()` báo việc chưa làm | 10 | **0** |
 | Dữ liệu bịa trong UI (audit, SEO, media bin, thumbnail, kịch bản mặc định, re-cook) | 6 màn hình | **0** |
 | Gate 1 | không thể vượt qua từ bản Next | đã nối: `PUT /projects/{id}/script` lưu kịch bản + ghi nhận xác nhận bản quyền |
 | `Topbar.tsx` (197 dòng, không ai import) | còn | đã xóa |
 | `lib/api-client.ts` (client cũ) | còn, 13 tệp import | đã xóa cùng refactor |
-| Tệp `.ts/.tsx` / số dòng | 96 / ~11.000 | **97 / 17.726** |
+| Tệp `.ts/.tsx` / số dòng | 96 / ~11.000 | **98 / 18.255** |
 
 Chi tiết và bằng chứng: ghi chú thay đổi ngày 18/09/2026 ở mục 9 của `docs/KE-HOACH-TONG-THE.md`.
 
@@ -63,7 +63,7 @@ Chi tiết và bằng chứng: ghi chú thay đổi ngày 18/09/2026 ở mục 9
 | Hạng mục | Giá trị |
 | :--- | :--- |
 | Frontend #1 — Vanilla JS (production, FastAPI phục vụ) | `app.js` 4.003 + `editor.js` 1.974 + `flow.js` 1.030 + `index.html` 2.411 + `style.css` 6.228 = **15.646 dòng** |
-| Frontend #2 — Next.js 14 (dev-only, cổng 3000) | `frontend/src/**` = **17.726 dòng** trên 97 tệp |
+| Frontend #2 — Next.js 14 (dev-only, cổng 3000) | `frontend/src/**` = **18.255 dòng** trên 98 tệp |
 | Tổng | **~33.400 dòng frontend** cho cùng một tập tính năng |
 | Số "studio" trong bản Next | 11 studio + 8 modal toàn cục |
 | Số component > 400 dòng | 10 (`ScriptBriefSettingsPanel` 887, `ContentEmpireStudio` 741, `AudioLabStudio` 697, `VideoMotionFXStudio` 608, `DualMonitorPlayer` 541, ...) |

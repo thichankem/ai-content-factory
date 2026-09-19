@@ -13,7 +13,6 @@ from ..models import (
     ScriptStyle,
     utcnow,
 )
-from ..scenes import build_video_project
 from .errors import (
     StateConflictError,
 )
@@ -127,11 +126,7 @@ class AgentsMixin(ScriptingMixin):
         if project.video_project is None:
             if not project.script:
                 return
-            project.video_project = build_video_project(
-                project.script,
-                project.duration_target_seconds,
-                project.target_language,
-            )
+            project.video_project = self._rebuild_video_project(project)
         existing = project.video_project.scenes
         for index, incoming in enumerate(scenes):
             if index >= len(existing):

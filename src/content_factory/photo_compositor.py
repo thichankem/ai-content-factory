@@ -18,6 +18,8 @@ from collections.abc import Callable
 import numpy as np
 from PIL import Image
 
+from .pixels import luminance
+
 __all__ = [
     "BLEND_MODES",
     "PhotoCompositorError",
@@ -34,15 +36,18 @@ class PhotoCompositorError(ValueError):
     """Raised when a document cannot be composited."""
 
 
-def _clamp01(values: np.ndarray) -> np.ndarray:
+def _clamp01_array(values: np.ndarray) -> np.ndarray:
+    """Clamp an array to [0, 1].
+
+    Named distinctly from :func:`content_factory.params.clamp01`, which clamps
+    a scalar: the two would otherwise read as the same helper.
+    """
     return np.clip(values, 0.0, 1.0)
 
 
 def _luminosity(rgb: np.ndarray) -> np.ndarray:
-    """Rec.709 luma, used by the component blending modes."""
-    return (0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2])[
-        ..., None
-    ]
+    """Rec.709 luma with a trailing axis, used by the component blend modes."""
+    return luminance(rgb)[..., None]
 
 
 def _saturation_of(rgb: np.ndarray) -> np.ndarray:
@@ -74,7 +79,7 @@ def _vivid_light(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def _linear_light(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    return _clamp01(a + 2.0 * b - 1.0)
+    return _clamp01_array(a + 2.0 * b - 1.0)
 
 
 def _pin_light(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -110,7 +115,7 @@ def blend_images(
     top_rgb = np.asarray(top_rgba, dtype=np.float32)[..., :3] / 255.0
     top_alpha = np.asarray(top_rgba, dtype=np.float32)[..., 3:4] / 255.0
 
-    blended = _clamp01(BLEND_MODES[mode](base_rgb, top_rgb))
+    blended = _clamp01_array(BLEND_MODES[mode](base_rgb, top_rgb))
     if mode in {"hue", "saturation", "color", "luminosity"}:
         blended = _component_blend(base_rgb, top_rgb, mode)
 
@@ -131,13 +136,13 @@ def _component_blend(base: np.ndarray, top: np.ndarray, mode: str) -> np.ndarray
     if mode == "hue":
         # Recolour the base towards the top's hue while keeping the base's own
         # luminance — an approximation good enough for previews.
-        return _clamp01(base_luma + (top - top_luma) * 0.5)
+        return _clamp01_array(base_luma + (top - top_luma) * 0.5)
     if mode == "saturation":
         scale = top_sat / (base_sat + 1e-6)
-        return _clamp01(base_luma + (base - base_luma) * scale)
+        return _clamp01_array(base_luma + (base - base_luma) * scale)
     if mode == "color":
-        return _clamp01(base_luma + (top - top_luma))
-    return _clamp01(base + (top_luma - base_luma))  # luminosity
+        return _clamp01_array(base_luma + (top - top_luma))
+    return _clamp01_array(base + (top_luma - base_luma))  # luminosity
 
 
 def apply_tone_curve(img: Image.Image, points: list[tuple[int, int]]) -> Image.Image:
@@ -153,7 +158,7 @@ def apply_tone_curve(img: Image.Image, points: list[tuple[int, int]]) -> Image.I
     luma = _luminosity(rgb / 255.0)[..., 0] * 255.0
     mapped = np.interp(luma, xs, ys)
     scale = mapped / (luma + 1e-6)
-    out_rgb = _clamp01(rgb * scale[..., None]) * 255.0
+    out_rgb = _clamp01_array(rgb * scale[..., None]) * 255.0
     result = np.dstack([out_rgb, alpha]).astype(np.uint8)
     return Image.fromarray(result, "RGBA")
 
@@ -171,10 +176,12 @@ def apply_levels(
         raise PhotoCompositorError("Levels: input white must exceed input black.")
     rgba = np.asarray(img.convert("RGBA"), dtype=np.float32)
     rgb, alpha = rgba[..., :3], rgba[..., 3:]
-    normalised = _clamp01((rgb - in_black) / (in_white - in_black))
+    normalised = _clamp01_array((rgb - in_black) / (in_white - in_black))
     shaped = np.power(normalised, 1.0 / max(0.1, min(9.9, gamma)))
     stretched = out_black + shaped * (out_white - out_black)
-    result = np.dstack([_clamp01(stretched / 255.0) * 255.0, alpha]).astype(np.uint8)
+    result = np.dstack([_clamp01_array(stretched / 255.0) * 255.0, alpha]).astype(
+        np.uint8
+    )
     return Image.fromarray(result, "RGBA")
 
 
@@ -212,11 +219,11 @@ def _hard_mix(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def _color_burn(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    return _clamp01(1.0 - (1.0 - a) / (b + 1e-6))
+    return _clamp01_array(1.0 - (1.0 - a) / (b + 1e-6))
 
 
 def _color_dodge(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    return _clamp01(a / (1.0 - b + 1e-6))
+    return _clamp01_array(a / (1.0 - b + 1e-6))
 
 
 #: mode name -> normalised-space blend of (base, top).
@@ -225,12 +232,12 @@ BLEND_MODES: dict[str, Callable[[np.ndarray, np.ndarray], np.ndarray]] = {
     "darken": np.minimum,
     "multiply": lambda a, b: a * b,
     "color-burn": _color_burn,
-    "linear-burn": lambda a, b: _clamp01(a + b - 1.0),
+    "linear-burn": lambda a, b: _clamp01_array(a + b - 1.0),
     "darker-color": lambda a, b: np.where(_luminosity(a) <= _luminosity(b), a, b),
     "lighten": np.maximum,
     "screen": _screen,
     "color-dodge": _color_dodge,
-    "linear-dodge": lambda a, b: _clamp01(a + b),
+    "linear-dodge": lambda a, b: _clamp01_array(a + b),
     "lighter-color": lambda a, b: np.where(_luminosity(a) > _luminosity(b), a, b),
     "overlay": _overlay,
     "soft-light": _soft_light,
@@ -241,8 +248,8 @@ BLEND_MODES: dict[str, Callable[[np.ndarray, np.ndarray], np.ndarray]] = {
     "hard-mix": _hard_mix,
     "difference": lambda a, b: np.abs(a - b),
     "exclusion": lambda a, b: a + b - 2.0 * a * b,
-    "subtract": lambda a, b: _clamp01(a - b),
-    "divide": lambda a, b: _clamp01(a / (b + 1e-6)),
+    "subtract": lambda a, b: _clamp01_array(a - b),
+    "divide": lambda a, b: _clamp01_array(a / (b + 1e-6)),
     # Component modes are resolved separately in `_component_blend`; they are
     # registered here so the vocabulary is complete and one lookup can accept all.
     "hue": lambda a, b: b,

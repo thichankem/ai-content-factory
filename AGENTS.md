@@ -70,6 +70,10 @@ no build. `docs/frontend/` audits both.
   method calls another layer, add that layer to the mixin's base list rather
   than reaching across the composition. `service.py` is only a compatibility
   facade.
+- Within it, `studio.py` is the image/voice/audio surface and `production.py`
+  (`ProductionMixin(StudioMixin)`) owns the video pipeline and the ffmpeg
+  export. A new photo or audio operation goes in `studio.py`; a new render or
+  publish step goes in `production.py`.
 - Compute policy is split the same way, read vs decide:
   `compute.py` holds the value types (`JobKind`, `HardwareProfile`,
   `FfmpegBuild`, `CodecChoice`, `Decision`), `hardware.py` contains only
@@ -77,12 +81,30 @@ no build. `docs/frontend/` audits both.
   (`ResourceGovernor`). An encoder is a *(binary, encoder)* pair, never a name —
   builds target different NVENC APIs, so `resolve_hardware_encoder()` opens every
   candidate for real before believing it. See `docs/COMPUTE-RESOURCES.md`.
-- Shared helpers go in `src/content_factory/text.py` (or the module that owns
-  the concept) — never copy a tokenizer, slug or error mapper into a second
-  place.
+- Shared helpers live in one module (or the module that owns the concept) —
+  never copy a tokenizer, slug, coercer or pixel helper into a second place.
+  The shared homes are:
+  - `text.py` — tokenizers, slugs, title keys.
+  - `params.py` — reading numbers, flags and RNG seeds out of an untyped
+    parameter mapping (a dict *or* an object with `.params`).
+  - `pixels.py` — `as_rgb`, `rgb_array`, `to_image`, `to_uint8`, `luminance`,
+    `remap`.
+  - `catalog.py` — the `{name, description, params}` entry shape and the
+    grouped catalogue the accessibility layers return.
+
+  An engine may still bind a shared helper to its own exception type, but only
+  by delegating to the shared implementation (see `audio_effects._num`).
 - `tests/test_architecture.py` enforces these rules: disjoint mixins, methods
-  reachable from the composed service, a module line budget, and the
-  `models`/`services` re-export surface. Run it after any structural change.
+  reachable from the composed service, a module line budget, the
+  `models`/`services` re-export surface, and that no engine re-implements a
+  shared helper. Run it after any structural change.
+- `agent_tools.py` sits close to its 1900-line registry ceiling (~1890). Adding
+  a tool means first moving a whole handler *family* into a sibling module, the
+  way `agent_audio.py` and `agent_video.py` were. It cannot be split by spec
+  list alone: `_DISCOVERY` borrows `_h_list_media`/`_h_get_media`, `_TIMELINE`
+  borrows `_h_auto_cut_to_beat`, and `_IMAGE` borrows
+  `_h_compose_images`/`_h_collage_images`, so those handlers must move with the
+  lists that use them or the manifest order changes.
 - A required text field that two kinds of caller spell two different ways uses
   `models.common.TwinSpelling`: declare `PRIMARY` and `ALIAS`, expose whichever
   accessor name the callers already use, and let the base class own the

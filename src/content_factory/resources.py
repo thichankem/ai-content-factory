@@ -594,9 +594,17 @@ class ResourceGovernor:
                 break
         return notes
 
-    def snapshot(self) -> dict[str, Any]:
-        """Everything an operator or an agent needs to explain current behaviour."""
-        profile = self.profile(refresh=True)
+    def snapshot(self, *, refresh: bool = False) -> dict[str, Any]:
+        """Everything an operator or an agent needs to explain current behaviour.
+
+        The hardware profile is served from cache (``profile_ttl_seconds``)
+        unless ``refresh`` is asked for. Re-probing on *every* call made a
+        status query cost 1.5–2 s of subprocess work for data that is
+        effectively static — an agent that asks the machine whether it is free
+        before every job paid that per job. Counters, admission and the last
+        decision are always live; only the measured profile is cached.
+        """
+        profile = self.profile(refresh=refresh)
         with self._lock:
             stats = self._stats.to_dict()
             gpu_active = self._gpu_active

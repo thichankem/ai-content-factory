@@ -8,11 +8,13 @@ whole audio pipeline without hearing a clip.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
 
 from . import audio_analysis, audio_effects, sfx, voice_engine
+from .catalog import detail, grouped_catalog
 
 __all__ = [
     "catalog",
@@ -21,6 +23,19 @@ __all__ = [
     "suggest_mastering_chain",
 ]
 
+
+#: The order categories appear in the catalogue; every one always appears, so a
+#: client can render a stable menu even when a category is momentarily empty.
+CATEGORY_ORDER = [
+    "edit",
+    "loudness",
+    "mix",
+    "rhythm",
+    "cleanup",
+    "effects",
+    "sfx",
+    "analysis",
+]
 
 #: Plain-language docs for the audio operations surfaced to agents and the UI.
 OP_DOCS: dict[str, dict[str, Any]] = {
@@ -97,87 +112,84 @@ OP_DOCS: dict[str, dict[str, Any]] = {
 
 
 def catalog() -> dict[str, Any]:
-    """Every audio operation grouped by category, with descriptions."""
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for name, doc in OP_DOCS.items():
-        groups.setdefault(doc["category"], []).append(
-            {"name": name, "description": doc["description"], "params": doc["params"]}
-        )
-    # Fold in the DSP effects and SFX.
-    for entry in audio_effects.audio_effect_catalog()["effects"]:
-        groups.setdefault("effects", []).append(
-            {
-                "name": f"effect_{entry['name']}",
-                "description": entry["description"],
-                "params": entry["params"],
-            }
-        )
-    for entry in sfx.sfx_catalog()["sfx"]:
-        groups.setdefault("sfx", []).append(
-            {
-                "name": f"sfx_{entry['name']}",
-                "description": entry["description"],
-                "params": {},
-            }
-        )
-    order = [
-        "edit",
-        "loudness",
-        "mix",
-        "rhythm",
-        "cleanup",
-        "effects",
-        "sfx",
-        "analysis",
-    ]
-    ordered = {cat: groups.get(cat, []) for cat in order}
-    for cat in sorted(set(groups) - set(order)):
-        ordered[cat] = groups[cat]
-    return {"categories": list(ordered.keys()), "ops": ordered}
+    """Every audio operation grouped by category, with descriptions.
+
+    The hand-written operations are folded together with the DSP effects and
+    the synthesised SFX, which is why the entries are prefixed
+    (``effect_*`` / ``sfx_*``) rather than folded into ``OP_DOCS``: the prefix
+    is what lets :func:`describe_operation` route a name back to its engine.
+    """
+    docs: dict[str, dict[str, Any]] = dict(OP_DOCS)
+    for effect in audio_effects.audio_effect_catalog()["effects"]:
+        docs[f"effect_{effect['name']}"] = {
+            "category": "effects",
+            "description": effect["description"],
+            "params": effect["params"],
+        }
+    for sound in sfx.sfx_catalog()["sfx"]:
+        docs[f"sfx_{sound['name']}"] = {
+            "category": "sfx",
+            "description": sound["description"],
+            "params": {},
+        }
+    return grouped_catalog(docs, CATEGORY_ORDER)
 
 
 def describe_operation(name: str) -> dict[str, Any]:
     """Explain one audio operation in plain language."""
     name = name.lower()
-    if name in OP_DOCS:
-        doc = OP_DOCS[name]
-        return {
-            "name": name,
-            "category": doc["category"],
-            "description": doc["description"],
-            "params": doc["params"],
-        }
-    if name.startswith("effect_"):
-        return describe_effect(name[len("effect_") :])
-    if name.startswith("sfx_"):
-        return describe_sfx(name[len("sfx_") :])
-    raise ValueError(f"Unknown audio operation '{name}'.")
+    doc: Mapping[str, Any] | None = OP_DOCS.get(name)
+    if doc is None and name.startswith("effect_"):
+        doc = _effect_doc(name[len("effect_") :])
+        if doc is None:
+            raise ValueError(f"Unknown audio effect '{name[len('effect_') :]}'.")
+    if doc is None and name.startswith("sfx_"):
+        doc = _sfx_doc(name[len("sfx_") :])
+        if doc is None:
+            raise ValueError(f"Unknown SFX '{name[len('sfx_') :]}'.")
+    if doc is None:
+        raise ValueError(f"Unknown audio operation '{name}'.")
+    return detail(name, doc)
+
+
+def _effect_doc(name: str) -> dict[str, Any] | None:
+    """The catalogue document for one DSP effect, by its short name."""
+    for effect in audio_effects.audio_effect_catalog()["effects"]:
+        if effect["name"] == name:
+            return {
+                "category": "effects",
+                "description": effect["description"],
+                "params": effect["params"],
+            }
+    return None
+
+
+def _sfx_doc(name: str) -> dict[str, Any] | None:
+    """The catalogue document for one synthesised sound effect."""
+    for sound in sfx.sfx_catalog()["sfx"]:
+        if sound["name"] == name:
+            return {
+                "category": "sfx",
+                "description": sound["description"],
+                "params": {},
+            }
+    return None
 
 
 def describe_effect(name: str) -> dict[str, Any]:
     """Describe a DSP effect by its short name."""
-    for entry in audio_effects.audio_effect_catalog()["effects"]:
-        if entry["name"] == name:
-            return {
-                "name": f"effect_{name}",
-                "category": "effects",
-                "description": entry["description"],
-                "params": entry["params"],
-            }
-    raise ValueError(f"Unknown audio effect '{name}'.")
+    doc = _effect_doc(name)
+    if doc is None:
+        raise ValueError(f"Unknown audio effect '{name}'.")
+    return detail(f"effect_{name}", doc)
 
 
 def describe_sfx(name: str) -> dict[str, Any]:
     """Describe a synthesised sound effect by its short name."""
-    for entry in sfx.sfx_catalog()["sfx"]:
-        if entry["name"] == name:
-            return {
-                "name": f"sfx_{name}",
-                "category": "sfx",
-                "description": entry["description"],
-                "params": {},
-            }
-    raise ValueError(f"Unknown SFX '{name}'.")
+    doc = _sfx_doc(name)
+    if doc is None:
+        raise ValueError(f"Unknown SFX '{name}'.")
+    return detail(f"sfx_{name}", doc)
 
 
 def describe_audio(samples: np.ndarray, sr: int = 44100) -> dict[str, Any]:

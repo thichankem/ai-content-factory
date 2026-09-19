@@ -21,6 +21,7 @@ from .research import ResearchMixin
 from .resources import ResourcesMixin
 from .scripting import ScriptingMixin
 from .seo import SeoMixin
+from .studio import StudioMixin
 from .styles import StylesMixin
 from .timeline import TimelineMixin
 from .voice import VoiceMixin
@@ -63,6 +64,7 @@ __all__ = [
     "SeoMixin",
     "ServiceContext",
     "StateConflictError",
+    "StudioMixin",
     "StylesMixin",
     "TimelineMixin",
     "VoiceMixin",

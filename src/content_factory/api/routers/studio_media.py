@@ -9,6 +9,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     UploadFile,
 )
 from fastapi.responses import FileResponse
@@ -33,6 +34,22 @@ _EDITED_MEDIA_TYPES: dict[str, str] = {
 def build_router(service: ContentFactoryService) -> APIRouter:
 
     router = APIRouter()
+
+    # Read-only describe endpoints are registered for both GET and POST: GET is
+    # the honest method for a lookup, POST keeps every existing client (and the
+    # frontend, which posts a form) working. The bodies live in these helpers so
+    # the two methods can never answer differently.
+    def _describe_video_op(name: str) -> dict[str, Any]:
+        try:
+            return service.describe_video_operation(name)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    def _describe_audio_op(name: str) -> dict[str, Any]:
+        try:
+            return service.describe_audio_operation(name)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @router.get("/studio/image/presets")
     def image_presets() -> dict[str, Any]:
@@ -130,15 +147,19 @@ def build_router(service: ContentFactoryService) -> APIRouter:
         """Every audio operation grouped by category, with descriptions."""
         return service.audio_operation_catalog()
 
+    @router.get("/studio/audio/describe-op")
+    def describe_audio_op_get(
+        name: str = Query(..., description="Operation name from /studio/audio/ops."),
+    ) -> dict[str, Any]:
+        """Explain one audio operation in plain language (read-only)."""
+        return _describe_audio_op(name)
+
     @router.post("/studio/audio/describe-op")
     def describe_audio_op_studio(
         name: str = Form(...),
     ) -> dict[str, Any]:
-        """Explain one audio operation in plain language."""
-        try:
-            return service.describe_audio_operation(name)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        """Explain one audio operation in plain language (form-encoded form)."""
+        return _describe_audio_op(name)
 
     @router.post("/studio/audio/describe")
     async def describe_audio_studio(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
@@ -226,15 +247,19 @@ def build_router(service: ContentFactoryService) -> APIRouter:
         """Every video/audio operation grouped by category, with descriptions."""
         return service.video_operation_catalog()
 
+    @router.get("/studio/video/describe-op")
+    def describe_video_op_get(
+        name: str = Query(..., description="Operation name from /studio/video/ops."),
+    ) -> dict[str, Any]:
+        """Explain one video/audio operation in plain language (read-only)."""
+        return _describe_video_op(name)
+
     @router.post("/studio/video/describe-op")
     def describe_video_op_studio(
         name: str = Form(...),
     ) -> dict[str, Any]:
-        """Explain one video/audio operation in plain language."""
-        try:
-            return service.describe_video_operation(name)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        """Explain one video/audio operation in plain language (form-encoded)."""
+        return _describe_video_op(name)
 
     @router.get("/projects/{project_id}/timeline/describe")
     def describe_video_timeline_studio(project_id: str) -> dict[str, Any]:
@@ -264,12 +289,25 @@ def build_router(service: ContentFactoryService) -> APIRouter:
         data = await file.read()
         return service.suggest_image_edits(data)
 
+    @router.get("/studio/image/describe-op")
+    def describe_image_op_get(
+        name: str = Query(..., description="Op name from /studio/image/ops."),
+        params: str | None = Query(
+            None, description="Optional op parameters as a JSON object string."
+        ),
+    ) -> dict[str, Any]:
+        """Explain a single image op in plain language (read-only)."""
+        return _describe_image_op(name, params)
+
     @router.post("/studio/image/describe-op")
     def describe_image_op_studio(
         name: str = Form(...),
         params: str | None = Form(None),
     ) -> dict[str, Any]:
-        """Explain a single op in plain language."""
+        """Explain a single op in plain language (form-encoded)."""
+        return _describe_image_op(name, params)
+
+    def _describe_image_op(name: str, params: str | None) -> dict[str, Any]:
         import json as _json
 
         parsed = _json.loads(params) if params else None

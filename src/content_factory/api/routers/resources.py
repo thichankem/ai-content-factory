@@ -24,9 +24,13 @@ def build_router(service: ContentFactoryService) -> APIRouter:
     router = APIRouter()
 
     @router.get("/resources")
-    def resources() -> dict[str, Any]:
+    def resources(
+        refresh: bool = Query(
+            False, description="Re-probe the hardware instead of using the cache."
+        ),
+    ) -> dict[str, Any]:
         """Hardware profile, governor limits, per-kind admission and counters."""
-        return service.resource_snapshot()
+        return service.resource_snapshot(refresh=refresh)
 
     @router.get("/resources/kinds")
     def resource_kinds() -> list[str]:

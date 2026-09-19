@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from .audio_effects import _biquad, _rbj_coeffs
+from .audio_effects import AudioEffectError, _biquad, _rbj_coeffs
 
 __all__ = [
     "register_adapter",
@@ -21,6 +21,9 @@ __all__ = [
     "stem_catalog",
     "voice_isolation",
 ]
+
+#: Stem counts the DSP fallback can actually produce.
+_SUPPORTED_STEM_COUNTS = (2, 3)
 
 #: Registered ML adapters keyed by stem mode (e.g. "stems2", "voice").
 _SEPARATION_ADAPTERS: dict[str, Callable[[np.ndarray, int], dict[str, np.ndarray]]] = {}
@@ -70,7 +73,15 @@ def separate_stems(
     Uses a registered ML adapter for ``mode`` when present, otherwise falls back
     to a deterministic DSP band split. ``num=2`` yields voice/instrumental;
     ``num=3`` yields low/mid/high.
+
+    ``num`` is validated rather than coerced: an out-of-range count used to be
+    silently answered with the three-band split, so a caller asking for 4 or 9
+    stems got a plausible-looking result for a request that was never honoured.
     """
+    if num not in _SUPPORTED_STEM_COUNTS:
+        supported = ", ".join(str(n) for n in sorted(_SUPPORTED_STEM_COUNTS))
+        msg = f"num must be one of {{{supported}}}, got {num}."
+        raise AudioEffectError(msg)
     key = mode or (f"stems{num}" if num > 2 else "voice")
     adapter = _SEPARATION_ADAPTERS.get(key) or _SEPARATION_ADAPTERS.get(str(num))
     if adapter is not None:

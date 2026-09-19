@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from content_factory.audio import duck_music, duck_music_under_speech, ffmpeg_binary
+from content_factory.hardware import require_ffmpeg, resolve_ffmpeg
 from content_factory.thumbnail import (
     ThumbnailCandidate,
     _extract_frame,
@@ -48,6 +49,42 @@ def tiny_video(tmp_path: Path) -> Path:
 
 def test_ffmpeg_binary_is_available() -> None:
     assert ffmpeg_binary()
+
+
+def test_require_ffmpeg_falls_back_to_a_bundled_build(tmp_path: Path) -> None:
+    """A venv with no ffmpeg on PATH still works when one is bundled.
+
+    Resolution used to stop at ``shutil.which``, so an installed
+    ``imageio-ffmpeg`` binary was never consulted and every ffmpeg-backed
+    feature failed on a machine that had one the whole time.
+    """
+    bundled = tmp_path / "ffmpeg.exe"
+    bundled.write_bytes(b"")
+    resolved = require_ffmpeg(
+        purpose="a test",
+        which=lambda name: None,
+        bundled=lambda: (str(bundled),),
+    )
+    assert resolved == str(bundled)
+
+
+def test_require_ffmpeg_prefers_path_over_bundled() -> None:
+    chosen = require_ffmpeg(
+        purpose="a test",
+        which=lambda name: "/usr/bin/ffmpeg",
+        bundled=lambda: ("/opt/bundled/ffmpeg",),
+    )
+    assert chosen == "/usr/bin/ffmpeg"
+
+
+def test_require_ffmpeg_still_raises_when_nothing_is_found() -> None:
+    with pytest.raises(RuntimeError, match="ffmpeg is required for a test"):
+        require_ffmpeg(purpose="a test", which=lambda name: None, bundled=lambda: ())
+
+
+def test_resolve_ffmpeg_reports_only_what_is_on_path() -> None:
+    """Discovery stays honest: it must not silently substitute a bundled build."""
+    assert resolve_ffmpeg(None, which=lambda name: None) is None
 
 
 def test_duck_music_under_speech_produces_output(tmp_path: Path) -> None:

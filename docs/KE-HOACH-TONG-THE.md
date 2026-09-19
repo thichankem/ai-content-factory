@@ -6,10 +6,12 @@
 > này** (mục *Nhật ký thay đổi* ở cuối). Không xoá yêu cầu cũ — chỉ đánh dấu
 > `[x]` khi hoàn thành.
 
-- Cập nhật lần cuối: 2026-09-18
-- Trạng thái kiểm chứng gần nhất: 854 test xanh (0 failed/0 error/0 skipped),
-  Ruff + format + mypy sạch; smoke đầu-cuối 64/64 trên server mới; 22/22 live
-  check cho tầng SEO qua HTTP thật.
+- Cập nhật lần cuối: 2026-09-19 (sau phiên refactor backend)
+- Trạng thái kiểm chứng gần nhất: **1.087 test xanh** (exit 0, 161,8 giây),
+  Ruff check + format (220 file) + mypy **sạch** trên `src`/`tests` (149 file
+  được kiểm kiểu); smoke đầu-cuối **64/64** trên server mới; frontend import
+  sạch (98 file) và `tsc --noEmit` 0 lỗi. Lưu ý: `scripts/` vẫn còn 253 finding
+  Ruff và **không** nằm trong CI.
 
 ---
 
@@ -2341,5 +2343,221 @@ Người vận hành yêu cầu thiết kế lại Bước 1 trong phần fronte
 - `python scripts/frontend_imports.py`: **clean (98 files)**.
 - Visual Inspection Playwright & Multimodal Vision: Kiểm tra thành công luồng tự sinh kịch bản từ ô chat bên trái sang trình soạn thảo bên phải, Pacing Bar cập nhật trực tiếp `1m 0s`, thanh Virality Score `55/100 Điểm Virality`, tính năng ẩn/hiện chatbot, thanh chỉnh tốc độ Slider/Stepper và chuyển đổi sang Thẻ phân cảnh dọc 1 cột.
 - Cả hai server `http://localhost:3000` (Next.js) và `http://127.0.0.1:8080` (FastAPI) đang chạy liên tục cho Operator kiểm thử.
+
+## 2026-09-19 — Rà soát toàn bộ backend (trọng tâm: edit / ảnh / video / âm thanh) + viết lại README
+
+**Mục tiêu**
+- Rà soát lại toàn bộ backend, dọn dẹp phần chỉnh sửa (edit), ảnh, video, âm thanh
+  đang chồng chéo, và viết lại toàn bộ README theo đúng số đo thực tế.
+
+**Đã làm — 11 lỗi thật, tập trung ở tầng DSP âm thanh**
+
+1. `audio_effects._rbj_coeffs` dựng tử số **high-pass** từ hệ số gain của shelf (`a`)
+   và bỏ mất số hạng `z^-2`. Hệ quả: bộ lọc trở thành mạch vi phân, đáp tuyến
+   **tăng ~57 lần** quanh tần số cắt thay vì suy giảm. Mọi high-pass *và* mọi
+   hiệu ứng dải xây trên nó đều sai. → Sửa đúng công thức RBJ theo `cos(w0)`.
+2. `_rbj_coeffs` **không có nhánh `lowpass`** (rơi vào nhánh high-shelf). Hiệu ứng
+   `lowpass` vì thế dùng hệ số high-pass và làm **ngược** tên gọi. → Thêm nhánh
+   low-pass chuẩn và nối lại `_fx_lowpass`.
+3. Các hiệu ứng dải dùng **high-pass cho biên trên**: `telephone` (3.400 Hz),
+   `radio` (4.000 Hz), `megaphone` (3.000 Hz), `underwater` (600 Hz) — tức là giữ
+   *mọi thứ trên* tần số cắt trên. → Biên trên dùng low-pass.
+4. `audio_separation._band` dùng high-pass cho biên trên; stem `low` (3 stem)
+   dùng high-pass 250 Hz. "Tách giọng" thực chất trả về mọi thứ **trên 4 kHz**,
+   còn stem "low" trả về mọi thứ trên 250 Hz. → Dải = high-pass(thấp) +
+   low-pass(cao); `low` = low-pass(250).
+5. `audio_analysis.rms` **hard-code 44.100 Hz** cho bước nhảy cửa sổ → sai số đo
+   noise floor / SNR ở mọi sample rate khác. → Thêm tham số `sr`, truyền tiếp
+   qua `noise_floor`.
+6. `audio_assist.execute_mastering_chain` gọi hàm private của module khác
+   (`voice_engine._spectral_gate`, `_normalize_loudness`). → Bổ sung API công khai
+   `voice_engine.denoise_pcm` / `normalize_loudness_pcm`; `denoise_audio` dùng lại
+   `denoise_pcm`.
+7. `hardware.require_ffmpeg` chỉ dừng ở `shutil.which("ffmpeg")` → venv có sẵn
+   binary `imageio-ffmpeg` vẫn không chạy được gì (đúng như ghi nhận trong
+   `tests/README.md`). → Fallback sang bản đóng gói sẵn; `resolve_ffmpeg` vẫn
+   trung thực và chỉ báo cái có trên `PATH`.
+8. `api/routers/media.py::media_remove_tag`: xoá dòng `return service.media_list()`
+   không bao giờ chạy tới (và gọi hàm đã bị đổi tên → `AttributeError` nếu chạy).
+9. `services/production.py::apply_video_effect` mã hoá lại ảnh qua
+   `edit_image_bytes` (decode → effect → PNG → decode PNG → encode PNG) mà báo cáo
+   lại không nói đã áp hiệu ứng gì. → Thêm `persist_image_bytes`; kết quả kèm
+   `effect` và `params`.
+10. `Image.fromarray(..., mode="RGB")` tại 9 chỗ (`photo_ops`, `video_effects`,
+    `production`) — tham số đã bị Pillow đánh dấu bỏ, Pillow 13 xoá hẳn. → Bỏ tham số.
+11. `services/media_tools.py::resolve_media_ref`: xoá dòng `del edited_dir` vô nghĩa.
+
+**Khoá hồi quy (quan trọng hơn cả bản sửa)**
+- Bộ test cũ **không thể phân biệt** bộ lọc đúng với bộ lọc sai: nó chỉ so hai
+  tương quan gần bằng 0 với nhau. Test mới đo **đáp tuyến tần số**.
+- `tests/test_audio_effects.py`: `lowpass` phải giữ 200 Hz và chặn 12 kHz (và
+  chiều ngược lại cho `highpass`); `telephone` phải chặn 12 kHz.
+- `tests/test_audio_separation.py`: stem `voice` phải **giữ** âm 440 Hz trong dải
+  200–4.000 Hz và chặn cả 60 Hz lẫn 12 kHz; chia 3 stem kiểm tra từng dải.
+- `tests/test_production.py`: `require_ffmpeg` ưu tiên `PATH`, fallback bản đóng
+  gói, và vẫn raise khi không có gì.
+
+**Kiểm chứng**
+- `python -m pytest`: **1.082 test, tất cả pass** (exit 0).
+- `python -m ruff check src tests`: **0 finding**.
+- `python -m ruff format --check src tests`: **216 file đã đúng định dạng**.
+- `python -m mypy src`: **0 lỗi / 145 file**.
+- `python scripts/smoke.py --port 8137`: **64/64** trên server mới.
+- `python scripts/frontend_imports.py`: sạch (98 file); `cd frontend && npm run
+  type-check`: 0 lỗi.
+- Kiểm chứng sống: với `PATH` rỗng, `resolve_ffmpeg()` trả `None` nhưng
+  `require_ffmpeg()` trả binary `imageio-ffmpeg` và vòng encode/decode MP3 chạy
+  thật. Qua HTTP: `POST /studio/audio/effect`, `/studio/audio/stems`,
+  `/studio/audio/analyze` đều 200 và tạo asset.
+
+**Quyết định**
+- **Không** tự ý thêm lưu project ra đĩa: `store.py` là dict in-memory, nhưng
+  persistence phải là tuỳ chọn (setting) vì suite và smoke giả định store sạch
+  mỗi tiến trình. Đã ghi vào mục *Known gaps* của README.
+- Giữ `_highpass` một-cực của `voice_engine` (có ghi chú là xấp xỉ) — nó phục vụ
+  khử rùm giọng nói, không thay bằng biquad RBJ để tránh đổi âm thanh chuỗi voice.
+- README gốc và `tests/README.md` được viết lại theo số đo thật; mọi con số đều
+  kèm lệnh tái tạo.
+
+**Việc tiếp theo**
+- Thêm `scripts/` vào CI (hoặc loại trừ tường minh) — hiện 253 finding `ruff`
+  không ai kiểm.
+- Lưu project ra `storage/` theo kiểu tuỳ chọn, có compare-and-save.
+- Cắm adapter ML thật cho `dub_audio` / `voice_clone` và (tuỳ chọn) Demucs cho
+  `audio_separation`.
+- Viết test đáp tuyến tương tự cho `voice_engine._lowpass` / `_highpass`.
+
+## 2026-09-19 — Refactor toàn bộ backend: gom trùng lặp, tách tầng studio, khoá bằng kiểm thử kiến trúc
+
+**Mục tiêu**
+- Refactor lại toàn bộ backend: xoá chỗ trùng lặp thật, tách các module đang gánh
+  hai trách nhiệm, và cố định kết quả bằng test — không chỉ đổi cho đẹp.
+
+**Đã làm — 7 module mới, 4 nhóm việc**
+
+1. **`params.py` — một chỗ đọc tham số duy nhất.** Bốn engine (`audio_effects`,
+   `sfx`, `video_effects`, `photo_ops`) mỗi nơi tự viết bản `_num` / `_seed` /
+   `_clamp01` với thân hàm và thông báo lỗi giống nhau, chỉ khác lớp exception.
+   Giờ dùng chung `number` / `flag` / `seed` / `clamp01`; mỗi engine chỉ còn một
+   dòng gọi lại kèm kiểu lỗi của mình (ví dụ `audio_effects._num`).
+2. **`pixels.py` — một chỗ tính toán điểm ảnh.** `photo_ops._luminance` /
+   `_remap` / `_to_img` và `video_effects._luminance` / `_remap` / `_to_uint8`
+   giống nhau từng ký tự; hệ số Rec.709 (0.2126/0.7152/0.0722) bị viết lại ở ba
+   module. Giờ chỉ còn `as_rgb`, `rgb_array`, `to_image`, `to_uint8`,
+   `luminance`, `remap`.
+3. **`catalog.py` — một chỗ dựng catalogue khả truy cập.** `photo_assist`,
+   `video_assist`, `audio_assist` mỗi nơi copy đúng một vòng lặp 12 dòng để nhóm
+   op theo category. Giờ dùng chung `entry` / `detail` / `grouped_catalog`.
+4. **`services/studio.py` — tách tầng studio khỏi tầng render.**
+   `services/production.py` (452 dòng) vừa là facade ảnh/giọng/âm thanh vừa là
+   renderer ffmpeg — mở file tên "production" để tìm thao tác ảnh là sai chỗ.
+   Giờ: `StudioMixin` (338 dòng) cho ảnh/giọng/âm thanh, `ProductionMixin`
+   (137 dòng) cho pipeline video + xuất file.
+
+**Dọn kèm**
+- `services/media_tools.py::resolve_media_ref`: một hàm rẽ nhánh dài → ba phép
+  tra cứu có tên (`_library_path` → `_edited_asset_path` → `_sandboxed_path`),
+  thứ tự ưu tiên được ghi rõ trong docstring.
+- `photo_ops._flag` là **code chết** (các op gọi phương thức `op.flag(...)` của
+  `ImageOp`) — bị phát hiện và xoá ngay khi rút helper ra.
+- `photo_compositor._clamp01` đổi tên thành `_clamp01_array`: nó clamp mảng, và
+  sẽ đọc nhầm thành cùng một helper với `params.clamp01` (clamp số vô hướng).
+
+**Khoá hồi quy — điều quan trọng nhất**
+- `tests/test_architecture.py` thêm hàm kiểm tra: nếu một module **định nghĩa
+  lại** `_num` / `_seed` / `_clamp01` / `_luminance` / `_remap` / `_to_uint8`
+  mà không import bản dùng chung, test **fail**. Đã kiểm chứng bẫy này thật sự
+  bắt lỗi (giả lập một bản `_num` viết lại → bị gắn cờ).
+- Thêm test cố định hành vi của `params` / `pixels` / `catalog` (ép kiểu, kiểu
+  lỗi, toán RGB, nhóm category) để mặt tiếp xúc dùng chung không trôi.
+- Lưu ý kỹ thuật: bẫy này **không** thể chỉ đếm số câu lệnh trong thân hàm —
+  một bản `try/except` viết lại vẫn là **một** node AST. Vì vậy nó kiểm tra
+  *có import bản dùng chung hay không*, chứ không đo độ dài thân hàm.
+
+**Kiểm chứng**
+- `python -m pytest`: **1.087 test, tất cả pass** (exit 0) — thêm 5 test kiến trúc.
+- `python -m ruff check src tests`: 0 finding; `ruff format --check`: 220 file đã đúng.
+- `python -m mypy src`: 0 lỗi / **149 file** (thêm `params`, `pixels`, `catalog`,
+  `services/studio`).
+- `python scripts/smoke.py --port 8142`: **64/64** trên server mới (xác nhận tầng
+  service sau khi tách vẫn phục vụ đủ 110 tool và mọi endpoint studio).
+
+**Quyết định**
+- **Không** tách `agent_tools.py` ở phiên này. File đang ở 1892/1900 dòng — sát
+  trần nhưng **chưa vượt**, và việc tách theo danh sách spec sẽ **đổi thứ tự**
+  manifest (110 tool), vì các họ handler không trùng với các danh sách spec:
+  `_DISCOVERY` mượn `_h_list_media`/`_h_get_media`, `_TIMELINE` mượn
+  `_h_auto_cut_to_beat`, `_IMAGE` mượn `_h_compose_images`/`_h_collage_images`.
+  Đã ghi rõ trong `AGENTS.md` để lần thêm tool tới sẽ tách theo **họ handler**
+  (như `agent_audio.py`, `agent_video.py` đã làm).
+- Giữ nguyên hợp đồng lỗi: engine vẫn ném đúng lớp exception cũ (`AudioEffectError`,
+  `SfxError`, `ImageError`) — chỉ phần *logic* ép kiểu được dùng chung.
+- Giữ nguyên thứ tự category trong catalogue (mỗi category khai báo **luôn** xuất
+  hiện kể cả khi rỗng), để client không thấy menu nhảy.
+
+**Việc tiếp theo**
+- Khi thêm tool mới: tách `agent_tools.py` theo họ handler trước, rồi mới thêm.
+- `scripts/` vẫn ngoài CI (253 finding `ruff`) — nên đưa vào hoặc loại trừ tường minh.
+
+## 2026-09-19 — Rà soát chức năng bằng cách chạy thật (229 lượt gọi)
+
+**Mục tiêu**
+- Chủ dự án yêu cầu: tự tay chạy từng chức năng (nhanh → chậm, ưu tiên chức năng
+  cần AI vision trước), rồi ghi lại danh sách đã/chưa kiểm, lỗi, thời gian, mức
+  hoàn thiện và khả năng — để chuyển giao cho các agent khác.
+
+**Đã làm**
+- Viết `scripts/feature_audit.py` (kiểu `smoke.py`): tự dựng server, tự tạo fixture
+  (test card, WAV giọng, MP4 thật, project + timeline), gọi từng chức năng qua HTTP,
+  đo thời gian và mã trả về, ghi JSON + báo cáo Markdown. Chạy theo nhóm được
+  (`--groups vision,image,negative`). Fixture vào `storage/uploads/feature-audit/`
+  (gitignore), log server vào `storage/feature-audit-server.log` — nơi đọc traceback.
+- **Đã gọi 110/110 tool** (107 qua harness + 3 chạy tay), **88 đường HTTP** trong 185
+  endpoint, **18 ca đầu vào sai**: tổng 229 lượt, 198 đúng, 31 sai (21 × 500 rỗng).
+
+**Phát hiện chính (chi tiết + vị trí code ở `docs/FEATURE-AUDIT.md`)**
+- **Hai tool chết 100 %**: `research_project` (handler sync gọi hàm `async` →
+  *Unable to serialize unknown type: coroutine*) và `ground_project`
+  (`TypeError: missing 1 required positional argument: 'data'`).
+- **Mọi lỗi nghiệp vụ → HTTP 500 rỗng**: `api/routers/tools.py` chỉ bắt 4 loại lỗi;
+  `ImageError`/`AudioEffectError`/`SfxError`/`VideoEffectError`/`VoiceError` (đều là
+  `ValueError`) và `MediaToolError`/`AiAudioError` thoát ra ngoài. 16/18 ca đầu vào
+  sai rơi vào đây, kể cả lỗi “cần ML adapter” mà mô tả tool hứa là “clear error”.
+- **Tải video trả 200 nhưng lưu HTML**: khi yt-dlp lỗi, `download_from_url` fallback
+  tải thô URL và lưu trang YouTube (795 KB `<!DOCTYPE html>`) thành `.mp4`; cả
+  `youtube_download` và `download_audio_clip` đều vậy — dữ liệu rác vào library.
+- **`render_video` bị 409 khi pipeline còn chạy** (mất 6,2 s công render); chờ
+  pipeline lắng (3,1 s) thì render 3,8 s thành công → luồng publish đầy đủ chạy được
+  (`approvals(video)` → `publish` → `published`).
+- **Scene id đổi khi rebuild/pipeline tiến** → agent cache id sẽ 404.
+- **`library/` lệch 5/45 mục** (4 “video” chỉ có audio, 1 “image” 108 byte hỏng) vì
+  `detect_kind` phân loại theo đuôi file.
+- **55/110 tool không xuất hiện lần nào trong `tests/` hoặc `scripts/`** — giải thích
+  vì sao bộ 1 087 test vẫn xanh trong khi 2 tool chết hoàn toàn.
+
+**Kết luận về “AI vision”**
+- Cây nguồn **không có** đường multimodal nào: `enable_vision=False`,
+  `vision_backend="rule_based"`, `VisionSceneScorer` chỉ là `Protocol` không có lớp
+  cài đặt, và `providers.py` chỉ có `generate_script(prompt: str)`. Toàn bộ chức năng
+  “hiểu ảnh/video” hiện chạy bằng heuristic cục bộ — và chạy tốt
+  (`media_palette` trả đúng 5 màu thật của test card; `inspect_media` probe chính xác).
+
+**Kiểm chứng**
+- `python scripts/feature_audit.py --port 8206 --json docs/FEATURE-AUDIT-LOG.json
+  --md docs/FEATURE-AUDIT-LOG.md`: 229 lượt, 198 đúng.
+- Thí nghiệm đường publish riêng (2 bước) xác nhận `render_video` + `approvals` +
+  `publish` chạy đúng khi thứ tự đúng.
+- `ruff check scripts/feature_audit.py`: sạch; `ruff format --check`: đã đúng định dạng.
+
+**Quyết định**
+- **Không sửa lỗi trong phiên này** — chủ dự án yêu cầu danh sách để chuyển giao;
+  báo cáo ghi rõ vị trí code và cách sửa cho từng lỗi (L1–L16).
+- Không chạy lại toàn bộ test suite sau khi thêm script mới vì script nằm ngoài
+  `src`/`tests` (CI không phủ `scripts/`).
+
+**Việc tiếp theo**
+- Ưu tiên: L1/L2 (2 tool chết) → L3 (map lỗi 4xx) → L4 (validate nội dung tải về)
+  → L7 (kind từ ffprobe + dọn library) → L5/L6 (render/rebuild ổn định) → L15
+  (test “mọi tool không được trả 500”).
 
 

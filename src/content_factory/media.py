@@ -29,7 +29,7 @@ from .config import (
     validate_stream_chunk_bytes,
     validate_upload_max_bytes,
 )
-from .hardware import require_ffmpeg
+from .hardware import require_ffmpeg, resolve_ffprobe
 from .models import (
     MediaItem,
     MediaKind,
@@ -97,6 +97,143 @@ def detect_kind(filename: str) -> MediaKind:
     return MediaKind.OTHER
 
 
+def resolve_kind(filename: str, probe: dict | None = None) -> MediaKind:
+    """The kind a file really is: probed streams first, extension second.
+
+    The extension lies often enough to matter — a library scan found four
+    items registered as ``video`` whose only stream was audio (``.mp4``/
+    ``.webm`` containers holding a soundtrack) and one 108-byte ``.png`` that
+    was not an image at all. Anything built on that classification then
+    misbehaved: re-encoding a "video" with no video stream failed, and the
+    palette/collage tools choked on the fake image.
+
+    Only a *successful* probe is trusted (``probe['streams_known']``): when
+    ffprobe is missing or the file cannot be read, the extension stays the
+    answer, because guessing ``other`` for everything would be worse than the
+    problem this solves.
+    """
+    kind = detect_kind(filename)
+    if not probe or not probe.get("streams_known"):
+        return kind
+    has_video = bool(probe.get("has_video"))
+    has_audio = bool(probe.get("has_audio"))
+    if kind is MediaKind.VIDEO and not has_video:
+        return MediaKind.AUDIO if has_audio else MediaKind.OTHER
+    if kind is MediaKind.AUDIO and not has_audio:
+        return MediaKind.VIDEO if has_video else MediaKind.OTHER
+    return kind
+
+
+#: First bytes that give away a web page or an error body rather than media.
+_TEXT_PAYLOAD_PREFIXES = (b"<!doctype", b"<html", b"<?xml", b"<head", b'{"', b"{\n")
+
+
+class DownloadRejectedError(ValueError):
+    """Raised when a URL that was asked for media did not return media."""
+
+
+def _looks_like_text_payload(path: Path) -> bool:
+    """Whether a downloaded file starts like a page instead of a container."""
+    try:
+        with path.open("rb") as handle:
+            head = handle.read(512).lstrip().lower()
+    except OSError:  # pragma: no cover - an unreadable file is caught elsewhere
+        return False
+    return head.startswith(_TEXT_PAYLOAD_PREFIXES)
+
+
+def _require_media_payload(content_type: Any, url: str) -> None:
+    """Refuse a raw download whose Content-Type is not media.
+
+    A server may omit the header entirely; only a *stated* non-media type is
+    refused here, because the file itself is checked afterwards anyway.
+    """
+    if not isinstance(content_type, str):
+        return
+    kind = content_type.split(";")[0].strip().lower()
+    if kind.startswith("text/") or kind in {"application/json", "application/xml"}:
+        msg = (
+            f"{url} answered with '{kind or 'no content type'}', not audio or "
+            "video. The link is not a direct media URL (or the site blocked the "
+            "request); use a direct file URL or a supported video link."
+        )
+        raise DownloadRejectedError(msg)
+
+
+def _require_media_file(path: Path, url: str) -> None:
+    """Refuse a downloaded file that holds no audio or video stream."""
+    if _looks_like_text_payload(path):
+        msg = (
+            f"{url} returned a web page, not media "
+            f"({path.stat().st_size} bytes starting with markup). The extractor "
+            "was blocked or the link is not a media URL."
+        )
+        raise DownloadRejectedError(msg)
+    meta = probe_media(path)
+    if meta.get("streams_known") and not (meta["has_video"] or meta["has_audio"]):
+        msg = (
+            f"{url} downloaded {path.stat().st_size} bytes but ffprobe found no "
+            "audio or video stream in them."
+        )
+        raise DownloadRejectedError(msg)
+
+
+def _parse_vtt_timestamp(value: str) -> float | None:
+    """``00:01:02.500`` (or ``01:02.500``) as seconds, or ``None``."""
+    parts = value.strip().split(":")
+    if not 2 <= len(parts) <= 3:
+        return None
+    try:
+        numbers = [float(part.replace(",", ".")) for part in parts]
+    except ValueError:
+        return None
+    seconds = 0.0
+    for number in numbers:
+        seconds = seconds * 60 + number
+    return round(seconds, 3)
+
+
+def _vtt_to_segments(vtt: str) -> list[dict[str, float | str]]:
+    """Parse a WebVTT file into ``{"start_seconds", "end_seconds", "text"}``.
+
+    Captions are the *instant* transcript path and they already carry the
+    timings a subtitle burn-in or a beat-aligned cut needs; throwing them away
+    and returning ``segments: []`` next to a full ``text`` made the tool look
+    like it had found timecodes it had actually discarded.
+    """
+    import re
+
+    segments: list[dict[str, float | str]] = []
+    start: float | None = None
+    end: float | None = None
+    lines: list[str] = []
+
+    def flush() -> None:
+        text = " ".join(lines).strip()
+        if start is not None and end is not None and text:
+            segments.append(
+                {"start_seconds": start, "end_seconds": end, "text": text}
+            )
+
+    for raw in vtt.splitlines():
+        line = raw.strip()
+        if "-->" in line:
+            flush()
+            left, _, right = line.partition("-->")
+            start = _parse_vtt_timestamp(left.split()[-1] if left.split() else "")
+            right_tokens = right.split()
+            end = _parse_vtt_timestamp(right_tokens[0]) if right_tokens else None
+            lines = []
+            continue
+        if not line or line.startswith(("WEBVTT", "Kind:", "Language:", "NOTE")):
+            continue
+        cleaned = re.sub(r"<[^>]+>", "", line)
+        if cleaned:
+            lines.append(cleaned)
+    flush()
+    return segments
+
+
 def _safe_name(filename: str) -> str:
     import re
 
@@ -104,8 +241,13 @@ def _safe_name(filename: str) -> str:
 
 
 def probe_media(path: Path) -> dict:
-    """Return duration/width/height for a media file using ffprobe."""
-    binary = shutil.which("ffprobe")
+    """Return duration/width/height/streams for a media file using ffprobe.
+
+    ``streams_known`` is the honest part: it is ``True`` only when ffprobe ran
+    and understood the file, so a caller can tell "this really is audio-only"
+    apart from "nobody could measure this" — see :func:`resolve_kind`.
+    """
+    binary = resolve_ffprobe()
     if binary is None:
         return {}
     proc = subprocess.run(
@@ -129,17 +271,21 @@ def probe_media(path: Path) -> dict:
         data = json.loads(proc.stdout)
     except json.JSONDecodeError:
         return {}
-    result: dict = {}
+    result: dict = {"streams_known": True, "has_video": False, "has_audio": False}
     fmt = data.get("format") or {}
     try:
         result["duration_seconds"] = float(fmt.get("duration", 0) or 0) or None
     except (TypeError, ValueError):
         result["duration_seconds"] = None
     for stream in data.get("streams") or []:
-        if stream.get("codec_type") == "video":
-            result["width"] = stream.get("width")
-            result["height"] = stream.get("height")
-            break
+        codec_type = stream.get("codec_type")
+        if codec_type == "video":
+            result["has_video"] = True
+            if result.get("width") is None:
+                result["width"] = stream.get("width")
+                result["height"] = stream.get("height")
+        elif codec_type == "audio":
+            result["has_audio"] = True
     return result
 
 
@@ -257,6 +403,9 @@ class MediaLibrary:
         self._index_path = self._dir / "index.json"
         self._lock = threading.RLock()
         self._items: dict[str, MediaItem] = {}
+        # Raw caption files by (url, language): the timings of a transcript
+        # survive the temporary download directory that produced them.
+        self._caption_cache: dict[str, str] = {}
         self._cache = cache
         # Authoritative media-file store. Local disk by default; S3 when the
         # caller passes a cloud backend. ``media_dir/files/`` stays the local
@@ -333,6 +482,7 @@ class MediaLibrary:
             meta = (
                 probe_media(dest) if kind in (MediaKind.VIDEO, MediaKind.AUDIO) else {}
             )
+            kind = resolve_kind(clean, meta)
             item = MediaItem(
                 id=item_id,
                 filename=clean,
@@ -374,6 +524,13 @@ class MediaLibrary:
         """Download an external video or audio by URL.
 
         Supports YouTube, TikTok, MP4, and direct stream links.
+
+        The result is *verified* before it is indexed: a failed extraction used
+        to fall back to fetching the URL raw and storing whatever came back, so
+        a blocked YouTube request produced a 795 KB HTML page registered as
+        ``kind=video, mime=video/mp4, duration=null`` and reported as success.
+        Nothing downstream could use it, and every consumer that trusted the
+        kind broke on it. A payload that is not media is now an error.
         """
         import urllib.request
         from urllib.parse import urlparse
@@ -430,11 +587,13 @@ class MediaLibrary:
                     urllib.request.urlopen(req, timeout=30) as resp,
                     target_file.open("wb") as out_f,
                 ):
+                    _require_media_payload(resp.headers.get("Content-Type", ""), url)
                     shutil.copyfileobj(resp, out_f)
                 target_filename = fallback_name
 
             if target_file is None or not target_file.is_file():
-                raise ValueError(f"Could not download media from URL: {url}")
+                raise DownloadRejectedError(f"Could not download media from URL: {url}")
+            _require_media_file(target_file, url)
 
             with target_file.open("rb") as f:
                 return self.upload_stream(
@@ -523,14 +682,39 @@ class MediaLibrary:
             vtt_files.sort(
                 key=lambda p: 0 if language in p.name else (1 if "en" in p.name else 2)
             )
-            text = self._vtt_to_text(
-                vtt_files[0].read_text(encoding="utf-8", errors="ignore")
-            )
+            raw = vtt_files[0].read_text(encoding="utf-8", errors="ignore")
+            self._remember_captions(url, language, raw)
+            text = self._vtt_to_text(raw)
             return text or None
         except Exception:  # noqa: BLE001 - a subtitle miss just means fall back to whisper
             return None
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def fetch_subtitle_segments(
+        self, url: str, language: str = "en"
+    ) -> list[dict[str, float | str]]:
+        """Timed segments of a video's captions, from the file already fetched.
+
+        ``fetch_subtitles`` is what downloads captions; this reads the cue
+        timings out of *that same* file, so it costs nothing when called right
+        after and never triggers a second network round trip on a path whose
+        whole point is being instant. A caller that never fetched captions gets
+        an empty list, not a download.
+        """
+        raw = self._caption_cache.get(self._caption_key(url, language))
+        return _vtt_to_segments(raw) if raw else []
+
+    @staticmethod
+    def _caption_key(url: str, language: str) -> str:
+        return f"{url}|{language}"
+
+    def _remember_captions(self, url: str, language: str, raw: str) -> None:
+        """Keep the last few caption files so their timings stay available."""
+        with self._lock:
+            self._caption_cache[self._caption_key(url, language)] = raw
+            while len(self._caption_cache) > 8:
+                self._caption_cache.pop(next(iter(self._caption_cache)))
 
     @staticmethod
     def _vtt_to_text(vtt: str) -> str:
@@ -564,22 +748,31 @@ class MediaLibrary:
 
         Strategy 1 — existing subtitles/captions (instant, free, no model).
         Strategy 2 — download the audio and run faster-whisper locally.
-        Returns ``{"source", "text", "segments", "media_id"}``.
+        Returns ``{"source", "text", "segments", "has_timestamps", "media_id"}``.
+
+        ``has_timestamps`` is the honest part: caption files are parsed into
+        cue timings, but a source that could not be split (or a cached text-only
+        transcript) reports ``False`` instead of leaving a caller to discover
+        that ``segments`` is empty *after* it trusted them for subtitle timing.
         """
         subs = self.fetch_subtitles(url, language)
         if subs:
+            segments = self.fetch_subtitle_segments(url, language)
             return {
                 "source": "subtitles",
                 "text": subs,
-                "segments": [],
+                "segments": segments,
+                "has_timestamps": bool(segments),
                 "media_id": None,
             }
         item = self.download_from_url(url, language=language, extract_audio=True)
         item = self.transcribe(item.id, language)
+        segments = [s.model_dump() for s in item.transcript_segments]
         return {
             "source": "whisper",
             "text": item.transcription,
-            "segments": [s.model_dump() for s in item.transcript_segments],
+            "segments": segments,
+            "has_timestamps": bool(segments),
             "media_id": item.id,
         }
 

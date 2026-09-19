@@ -114,6 +114,7 @@ class MediaMixin(VoiceMixin):
             source=result["source"],
             text=result["text"],
             segments=result["segments"],
+            has_timestamps=bool(result.get("has_timestamps", result["segments"])),
             media_id=result["media_id"],
         )
 

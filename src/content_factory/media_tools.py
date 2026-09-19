@@ -59,6 +59,20 @@ class MediaToolError(RuntimeError):
     """Raised when a media operation cannot be completed."""
 
 
+class MediaToolArgumentError(MediaToolError):
+    """Raised when the *caller* passed something the tool cannot accept.
+
+    A subclass of :class:`MediaToolError` so existing ``except MediaToolError``
+    code keeps working, but distinct so the HTTP layer can answer 422 ("fix
+    your request") rather than 500 ("the server broke") — the two used to be
+    indistinguishable to a client, and only one of them is retryable.
+    """
+
+
+#: Sections :func:`describe` can build; anything else is a typo worth naming.
+DESCRIBE_SECTIONS = ("loudness", "silence", "cuts", "palette", "beats", "text")
+
+
 # ---------------------------------------------------------------------------
 # Process helpers
 # ---------------------------------------------------------------------------
@@ -398,7 +412,14 @@ def describe(
     (``cuts``, ``palette``, ``beats``, ``loudness``, ``silence``, ``text``).
     """
     resolved = _require_file(path)
-    wanted = set(include or ["loudness", "silence", "cuts", "palette", "beats", "text"])
+    unknown = sorted(set(include or ()) - set(DESCRIBE_SECTIONS))
+    if unknown:
+        msg = (
+            f"Unknown describe section(s) {unknown}; valid sections are "
+            f"{list(DESCRIBE_SECTIONS)}."
+        )
+        raise MediaToolArgumentError(msg)
+    wanted = set(include or DESCRIBE_SECTIONS)
     report: dict[str, Any] = {"probe": probe(resolved)}
     info = report["probe"]
 

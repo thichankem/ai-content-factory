@@ -31,6 +31,7 @@ from PIL import (
 __all__ = [
     "ImageError",
     "ImageOp",
+    "ImageSessionNotFoundError",
     "apply_ops",
     "auto_enhance",
     "export_bytes",
@@ -40,6 +41,16 @@ __all__ = [
 
 class ImageError(ValueError):
     """Raised when an image op is malformed or cannot be applied."""
+
+
+class ImageSessionNotFoundError(ImageError):
+    """Raised when an edit session id is unknown (or was never created).
+
+    A subclass of :class:`ImageError` so existing ``except ImageError`` code
+    keeps working, but distinct so the HTTP layer can answer 404 instead of
+    the 422 that a malformed op deserves: "this session does not exist" is not
+    the caller's argument being wrong, it is a different resource.
+    """
 
 
 _MAX_DIM = 8192

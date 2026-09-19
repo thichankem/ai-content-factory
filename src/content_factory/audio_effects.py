@@ -18,6 +18,9 @@ from typing import Any
 
 import numpy as np
 
+from .params import number
+from .params import seed as _seed
+
 __all__ = [
     "AUDIO_EFFECTS",
     "apply_audio_effect",
@@ -30,18 +33,9 @@ class AudioEffectError(ValueError):
     """Raised when an audio effect is malformed or cannot be applied."""
 
 
-def _seed(params: dict[str, Any]) -> int:
-    try:
-        return int(params.get("seed", 0))
-    except (TypeError, ValueError):
-        return 0
-
-
 def _num(params: dict[str, Any], key: str, default: float) -> float:
-    try:
-        return float(params.get(key, default))
-    except (TypeError, ValueError) as exc:
-        raise AudioEffectError(f"'{key}' must be a number.") from exc
+    """Local spelling of :func:`params.number` that keeps this module's error type."""
+    return number(params, key, default, error=AudioEffectError)
 
 
 def _clamp_db(value: float) -> float:

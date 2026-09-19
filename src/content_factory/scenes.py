@@ -61,12 +61,25 @@ def _distribute_durations(items: list[str], total_seconds: float) -> list[float]
 
 
 def build_video_project(
-    script: str | None, total_seconds: int, language: str
+    script: str | None,
+    total_seconds: int,
+    language: str,
+    previous: VideoProject | None = None,
 ) -> VideoProject:
-    """Parse a script into a default, fully editable video project."""
+    """Parse a script into a default, fully editable video project.
+
+    When ``previous`` is given, scenes are matched to it by position and keep
+    their ids. The pipeline rebuilds the timeline whenever it advances and
+    ``build_video_project`` (the tool) rebuilds it on demand, so a fresh random
+    id per build meant that an id an agent or the UI had just been handed
+    turned into a 404 on the next call — through no fault of the caller. A
+    scene keeps its identity across a rebuild; genuinely new scenes get new
+    ids.
+    """
     sections = _split_sections(script or "")
     texts = [text for _, text in sections]
     durations = _distribute_durations(texts, float(total_seconds))
+    reused = list(previous.scenes) if previous is not None else []
 
     scenes: list[VideoScene] = []
     for index, ((label, text), duration) in enumerate(
@@ -74,7 +87,7 @@ def build_video_project(
     ):
         scenes.append(
             VideoScene(
-                id=uuid.uuid4().hex[:8],
+                id=_stable_scene_id(reused, index),
                 label=label,
                 text=text or f"Scene {index + 1}",
                 narration=text,
@@ -100,3 +113,12 @@ def build_video_project(
             )
         )
     return VideoProject(scenes=scenes, aspect_ratio="9:16", fps=30, captions=True)
+
+
+def _stable_scene_id(previous: list[VideoScene], index: int) -> str:
+    """The id this position already had, or a fresh one."""
+    if index < len(previous):
+        existing = previous[index].id
+        if existing:
+            return existing
+    return uuid.uuid4().hex[:8]

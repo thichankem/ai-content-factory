@@ -15,7 +15,6 @@ from ..models import (
     VideoScene,
     utcnow,
 )
-from ..scenes import build_video_project
 from .context import ServiceContext
 from .errors import (
     NotFoundError,
@@ -27,13 +26,13 @@ class TimelineMixin(ServiceContext):
     """Video timeline NLE: scenes, retime, markers, report and render plan."""
 
     def build_video_project(self, project_id: str) -> Project:
-        """(Re)build the editable video project from the current script."""
+        """(Re)build the editable video project from the current script.
+
+        Scene ids survive the rebuild (see ``_rebuild_video_project``), so a
+        client that holds one can keep editing after rebuilding.
+        """
         project = self.get_project(project_id).model_copy(deep=True)
-        video_project = build_video_project(
-            project.script,
-            project.duration_target_seconds,
-            project.target_language,
-        )
+        video_project = self._rebuild_video_project(project)
         self._store_video_project(project, video_project)
         self._attach_source_footage(project)
         return self._store.save(project)

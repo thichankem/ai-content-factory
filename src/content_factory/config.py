@@ -195,6 +195,10 @@ class Settings(BaseSettings):
     # The vertical slice simulates rendering; these tune the fake worker.
     generation_steps: int = 10
     generation_step_delay_seconds: float = 0.3
+    # A render started while the generation worker is still rewriting the
+    # project would be discarded at the compare-and-save, so it waits for the
+    # worker up to this long before refusing with a retryable 409.
+    render_settle_seconds: float = Field(default=60.0, ge=0.0, le=600.0)
     video_format: str = "mp4"
     render_threads: int = Field(default=1, ge=1, le=8)
     render_max_dimension: int | None = Field(default=None, ge=64, le=1920)

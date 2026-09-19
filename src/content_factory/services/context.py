@@ -32,6 +32,7 @@ from ..models import (
     ProjectStatus,
     ScriptDocument,
     VideoAsset,
+    VideoProject,
     WorkflowRun,
 )
 from ..presets import PresetLibrary
@@ -216,11 +217,7 @@ class ServiceContext:
         project = self.get_project(project_id)
         self._transition(project, ProjectStatus.VIDEO_REVIEW)
         project.progress = 100
-        project.video_project = build_video_project(
-            project.script,
-            project.duration_target_seconds,
-            project.target_language,
-        )
+        project.video_project = self._rebuild_video_project(project)
         self._attach_source_footage(project)
         project.video = VideoAsset(
             asset_url=f"/projects/{project.id}/video",
@@ -238,6 +235,20 @@ class ServiceContext:
         self._transition(project, ProjectStatus.FAILED)
         project.error = str(error)
         return self._store.save(project)
+
+    def _rebuild_video_project(self, project: Project) -> VideoProject:
+        """Rebuild the timeline from the script, reusing the previous scene ids.
+
+        Every rebuild goes through here so a scene keeps its id for the life of
+        the project: an agent or the UI caches those ids, and a rebuild that
+        renamed them all turned the next edit into a 404.
+        """
+        return build_video_project(
+            project.script,
+            project.duration_target_seconds,
+            project.target_language,
+            previous=project.video_project,
+        )
 
     def _attach_source_footage(self, project: Project) -> None:
         """Turn on the music bed for a re-cooked project.
@@ -283,6 +294,34 @@ class ServiceContext:
         self._workers = {t for t in self._workers if t.is_alive()}
         self._workers.add(thread)
         thread.start()
+
+    def wait_for_workers(
+        self, timeout: float = 60.0, *, project_id: str | None = None
+    ) -> bool:
+        """Wait for background workers to settle; ``False`` if the deadline passes.
+
+        A heavy operation that mutates a project — the render export above all
+        — cannot run while the generation worker is still rewriting that same
+        project: the compare-and-save at the end of a render rejects the export
+        ("Project changed during rendering"), and the caller loses the whole
+        render. Waiting for the worker first turns a guaranteed loss into a
+        short pause. ``project_id`` narrows the wait to that project's worker.
+        """
+        deadline = time.monotonic() + max(0.0, timeout)
+        name = f"generation-{project_id}" if project_id else None
+        while True:
+            pending = [
+                thread
+                for thread in self._workers
+                if thread.is_alive() and (name is None or thread.name == name)
+            ]
+            if not pending:
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            for thread in pending:
+                thread.join(timeout=remaining)
 
     def _produce(self, project_id: str) -> None:
         """Background loop simulating rendering progress, then finalizing."""

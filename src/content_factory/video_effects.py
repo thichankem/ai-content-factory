@@ -18,6 +18,13 @@ from typing import Any
 
 import numpy as np
 
+from .params import clamp01 as _clamp01
+from .params import seed as _seed
+from .pixels import as_rgb
+from .pixels import luminance as _luminance
+from .pixels import remap as _remap
+from .pixels import to_uint8 as _to_uint8
+
 __all__ = [
     "apply_frame_effect",
     "effect_catalog",
@@ -27,51 +34,6 @@ __all__ = [
 
 class VideoEffectError(ValueError):
     """Raised when a frame effect is malformed or cannot be applied."""
-
-
-def _seed(params: dict[str, Any]) -> int:
-    try:
-        return int(params.get("seed", 0))
-    except (TypeError, ValueError):
-        return 0
-
-
-def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, float(value)))
-
-
-def _as_rgb(frame: Any) -> np.ndarray:
-    arr = np.asarray(frame, dtype=np.float32)
-    if arr.ndim != 3 or arr.shape[2] < 3:
-        raise VideoEffectError("A frame must be a HxWx3 array.")
-    return arr[..., :3] / 255.0
-
-
-def _to_uint8(rgb: np.ndarray) -> np.ndarray:
-    return (np.clip(rgb, 0.0, 1.0) * 255.0).astype(np.uint8)
-
-
-def _luminance(rgb: np.ndarray) -> np.ndarray:
-    return 0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2]
-
-
-def _remap(src: np.ndarray, map_x: np.ndarray, map_y: np.ndarray) -> np.ndarray:
-    """Bilinear remap of a uint8 HxWxC array (OpenCV, else nearest-neighbour)."""
-    try:
-        import cv2
-    except ImportError:
-        cv2 = None  # type: ignore[assignment]
-    if cv2 is not None:
-        return cv2.remap(
-            src,
-            map_x.astype(np.float32),
-            map_y.astype(np.float32),
-            cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_REPLICATE,
-        )
-    ix = np.clip(np.round(map_x).astype(int), 0, src.shape[1] - 1)
-    iy = np.clip(np.round(map_y).astype(int), 0, src.shape[0] - 1)
-    return src[iy, ix]
 
 
 # --- Individual effects ------------------------------------------------------
@@ -266,7 +228,7 @@ def apply_frame_effect(
     name = (name or "").lower()
     if name not in _EFFECTS:
         raise VideoEffectError(f"Unknown effect '{name}'. Known: {sorted(_EFFECTS)}")
-    rgb = _as_rgb(frame)
+    rgb = as_rgb(frame, error=VideoEffectError)
     out = _EFFECTS[name](rgb, dict(params or {}))
     return _to_uint8(out)
 

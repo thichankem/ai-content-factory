@@ -227,7 +227,10 @@ class ImageVoiceStudio:
     def _require_session(self, session_id: str) -> _EditSession:
         session = self._sessions.get(session_id)
         if session is None:
-            raise image_engine.ImageError(f"Unknown image session '{session_id}'.")
+            raise image_engine.ImageSessionNotFoundError(
+                f"Unknown image session '{session_id}'. Begin one with "
+                "begin_image_session (POST /studio/image/sessions) first."
+            )
         return session
 
     def _render_session(
