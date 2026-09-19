@@ -77,7 +77,6 @@ class MediaToolsMixin(MediaMixin):
             raise NotFoundError(
                 f"Nothing named '{ref}' in the media library or edited assets."
             ) from exc
-        del edited_dir
         if not resolved.is_file():
             raise NotFoundError(f"Nothing named '{ref}' in the allowed media roots.")
         return resolved

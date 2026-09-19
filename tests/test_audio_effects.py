@@ -31,6 +31,32 @@ def test_all_effects_registered() -> None:
         "reverb",
         "voice_changer",
         "noise_gate",
+        "highpass",
+        "lowpass",
+        "bandpass",
+        "notch",
+        "lowshelf",
+        "highshelf",
+        "expander",
+        "de_esser",
+        "clipper",
+        "saturation",
+        "delay",
+        "echo",
+        "chorus",
+        "flanger",
+        "phaser",
+        "distortion",
+        "bitcrusher",
+        "tremolo",
+        "vibrato",
+        "ring_modulation",
+        "telephone",
+        "radio",
+        "megaphone",
+        "underwater",
+        "robot",
+        "reverse",
     ):
         assert name in audio_effect_names()
 
@@ -73,6 +99,45 @@ def test_reverb_adds_tail(samples: np.ndarray) -> None:
     out = apply_audio_effect(samples, 44100, "reverb", {"amount": 0.5, "decay": 0.6})
     # Wet tail extends energy past the dry signal's end.
     assert float(np.max(np.abs(out[int(44100 * 0.95) :]))) > 1e-4
+
+
+def _tone(sr: int, freq: float, amp: float = 0.5) -> np.ndarray:
+    t = np.arange(sr, dtype=np.float32) / sr
+    return (amp * np.sin(2 * np.pi * freq * t)).astype(np.float32)
+
+
+def test_lowpass_rejects_highs_and_keeps_lows() -> None:
+    """``lowpass`` must attenuate above its cutoff, not below it.
+
+    It used to be wired to the *high-pass* coefficients, so it did the exact
+    opposite of its name.
+    """
+    sr = 44100
+    low = _tone(sr, 200)
+    high = _tone(sr, 12000)
+    out_low = apply_audio_effect(low, sr, "lowpass", {"freq": 1000})
+    out_high = apply_audio_effect(high, sr, "lowpass", {"freq": 1000})
+    assert float(np.sqrt(np.mean(out_low**2))) > 0.5 * float(np.sqrt(np.mean(low**2)))
+    assert float(np.sqrt(np.mean(out_high**2))) < 0.1 * float(np.sqrt(np.mean(high**2)))
+
+
+def test_highpass_rejects_lows_and_keeps_highs() -> None:
+    sr = 44100
+    low = _tone(sr, 200)
+    high = _tone(sr, 12000)
+    out_low = apply_audio_effect(low, sr, "highpass", {"freq": 1000})
+    out_high = apply_audio_effect(high, sr, "highpass", {"freq": 1000})
+    assert float(np.sqrt(np.mean(out_low**2))) < 0.1 * float(np.sqrt(np.mean(low**2)))
+    assert float(np.sqrt(np.mean(out_high**2))) > 0.5 * float(np.sqrt(np.mean(high**2)))
+
+
+def test_telephone_is_band_limited() -> None:
+    """The telephone band (300-3400 Hz) must reject audio *above* 3400 Hz."""
+    sr = 44100
+    mid = apply_audio_effect(_tone(sr, 1000), sr, "telephone", {})
+    high = apply_audio_effect(_tone(sr, 12000), sr, "telephone", {})
+    assert float(np.sqrt(np.mean(mid**2))) > 0.1
+    assert float(np.sqrt(np.mean(high**2))) < float(np.sqrt(np.mean(mid**2))) * 0.2
 
 
 def test_catalog_has_descriptions() -> None:

@@ -209,7 +209,6 @@ def build_router(service: ContentFactoryService) -> APIRouter:
     def media_remove_tag(media_id: str, tag: str) -> MediaItem:
         """Remove one tag from an item (idempotent)."""
         return guard_value(lambda: service.media_remove_tag(media_id, tag))
-        return service.media_list()
 
     @router.get("/media/{media_id}", response_model=MediaItem)
     def media_get(media_id: str) -> MediaItem:

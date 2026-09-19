@@ -96,6 +96,131 @@ def build_router(service: ContentFactoryService) -> APIRouter:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @router.post("/studio/audio/analyze")
+    async def analyze_audio_studio(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
+        """Measure an audio clip: waveform, spectrogram, frequency, meters."""
+        data = await file.read()
+        try:
+            return service.analyze_audio(data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/studio/audio/sfx")
+    def sfx_catalog_studio() -> dict[str, Any]:
+        """Every synthesised sound effect with a plain-language description."""
+        return service.sfx_catalog()
+
+    @router.post("/studio/audio/sfx")
+    def synthesize_sfx_studio(
+        name: str = Form(...),
+        params: str | None = Form(None),
+        format: str = Form("wav"),
+    ) -> dict[str, Any]:
+        """Generate a sound effect from scratch and persist it."""
+        import json as _json
+
+        parsed = _json.loads(params) if params else None
+        try:
+            return service.synthesize_sfx(name, parsed, export_format=format)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/studio/audio/ops")
+    def audio_ops_catalog() -> dict[str, Any]:
+        """Every audio operation grouped by category, with descriptions."""
+        return service.audio_operation_catalog()
+
+    @router.post("/studio/audio/describe-op")
+    def describe_audio_op_studio(
+        name: str = Form(...),
+    ) -> dict[str, Any]:
+        """Explain one audio operation in plain language."""
+        try:
+            return service.describe_audio_operation(name)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/audio/describe")
+    async def describe_audio_studio(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008
+        """Describe an audio clip in plain language from its measurements."""
+        data = await file.read()
+        try:
+            return service.describe_audio(data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/audio/mastering")
+    async def suggest_audio_mastering_studio(
+        file: UploadFile = File(...),  # noqa: B008
+    ) -> dict[str, Any]:
+        """Auto-suggest a mastering chain from the audio measurements."""
+        data = await file.read()
+        try:
+            return service.suggest_audio_mastering(data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/audio/mastering/apply")
+    async def apply_audio_mastering_studio(
+        file: UploadFile = File(...),  # noqa: B008
+        format: str = Form("wav"),
+    ) -> dict[str, Any]:
+        """Run the auto-suggested mastering chain and persist the mastered audio."""
+        data = await file.read()
+        try:
+            return service.apply_audio_mastering(data, export_format=format)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/studio/audio/ai")
+    def ai_audio_catalog_studio() -> dict[str, Any]:
+        """Every AI audio capability with a plain-language description."""
+        return service.ai_audio_catalog()
+
+    @router.post("/studio/audio/dub")
+    async def dub_audio_studio(
+        file: UploadFile = File(...),  # noqa: B008
+        target_text: str = Form(...),
+        lang: str = Form("en"),
+    ) -> dict[str, Any]:
+        """Dub a clip via a registered ML adapter (raises if none configured)."""
+        data = await file.read()
+        try:
+            return service.dub_audio(data, target_text, lang)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/studio/audio/voice-clone")
+    async def voice_clone_studio(
+        file: UploadFile = File(...),  # noqa: B008
+        ref_voice: UploadFile = File(...),  # noqa: B008
+    ) -> dict[str, Any]:
+        """Clone a voice via a registered ML adapter (raises if none configured)."""
+        data = await file.read()
+        ref = await ref_voice.read()
+        try:
+            return service.voice_clone(data, ref)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.get("/studio/audio/stems")
+    def stem_catalog_studio() -> dict[str, Any]:
+        """Every available audio stem with a plain-language description."""
+        return service.stem_catalog()
+
+    @router.post("/studio/audio/stems")
+    async def separate_audio_stems_studio(
+        file: UploadFile = File(...),  # noqa: B008
+        num: int = Form(2),
+        format: str = Form("wav"),
+    ) -> dict[str, Any]:
+        """Separate a mono clip into stems (voice/instrumental or low/mid/high)."""
+        data = await file.read()
+        try:
+            return service.separate_audio_stems(data, num, export_format=format)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @router.get("/studio/video/ops")
     def video_ops_catalog() -> dict[str, Any]:
         """Every video/audio operation grouped by category, with descriptions."""

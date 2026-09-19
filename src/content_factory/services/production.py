@@ -123,9 +123,10 @@ class ProductionMixin(MediaToolsMixin):
         img = image_engine.load_image(data)
         frame = np.asarray(img.convert("RGB"))
         result = video_effects.apply_frame_effect(frame, name, params)
-        out = PILImage.fromarray(result, mode="RGB")
+        out = PILImage.fromarray(result)
         blob = image_engine.export_bytes(out, export_format)
-        return self._studio.edit_image_bytes(blob, ops=[], export_format=export_format)
+        report = self._studio.persist_image_bytes(blob, export_format)
+        return {**report, "effect": name, "params": params or {}}
 
     def audio_effect_catalog(self) -> dict:
         """Every audio effect with a plain-language description."""
@@ -148,6 +149,125 @@ class ProductionMixin(MediaToolsMixin):
         processed = audio_effects.apply_audio_effect(samples, sr, name, params)
         blob = voice_engine.encode_pcm(processed, sr, export_format)
         return self._studio.persist_audio_bytes(blob, export_format)
+
+    # --- audio analysis, SFX & accessibility ---------------------------------
+
+    def analyze_audio(self, data: bytes) -> dict:
+        """Measure an audio clip: waveform, spectrogram, frequency, meters."""
+        import numpy as np
+
+        from .. import audio_analysis, voice_engine
+
+        samples, sr = voice_engine.decode_to_pcm(data)
+        return audio_analysis.analyze_samples(np.asarray(samples, dtype=np.float32), sr)
+
+    def sfx_catalog(self) -> dict:
+        """Every synthesised sound effect with a plain-language description."""
+        from .. import sfx
+
+        return sfx.sfx_catalog()
+
+    def synthesize_sfx(
+        self, name: str, params: dict | None = None, *, export_format: str = "wav"
+    ) -> dict:
+        """Generate a sound effect from scratch and persist it."""
+        from .. import sfx, voice_engine
+
+        samples = sfx.synthesize_sfx(name, 44100, params)
+        blob = voice_engine.encode_pcm(samples, 44100, export_format)
+        return self._studio.persist_audio_bytes(blob, export_format)
+
+    def audio_operation_catalog(self) -> dict:
+        """Every audio operation grouped by category, with descriptions."""
+        from .. import audio_assist
+
+        return audio_assist.catalog()
+
+    def describe_audio_operation(self, name: str) -> dict:
+        """Explain one audio operation in plain language."""
+        from .. import audio_assist
+
+        return audio_assist.describe_operation(name)
+
+    def describe_audio(self, data: bytes) -> dict:
+        """Describe an audio clip in plain language from its measurements."""
+        import numpy as np
+
+        from .. import audio_assist, voice_engine
+
+        samples, sr = voice_engine.decode_to_pcm(data)
+        return audio_assist.describe_audio(np.asarray(samples, dtype=np.float32), sr)
+
+    def suggest_audio_mastering(self, data: bytes) -> dict:
+        """Auto-suggest a mastering chain from the audio measurements."""
+        import numpy as np
+
+        from .. import audio_assist, voice_engine
+
+        samples, sr = voice_engine.decode_to_pcm(data)
+        return audio_assist.suggest_mastering_chain(
+            np.asarray(samples, dtype=np.float32), sr
+        )
+
+    def apply_audio_mastering(self, data: bytes, *, export_format: str = "wav") -> dict:
+        """Run the auto-suggested mastering chain and persist the mastered audio."""
+        import numpy as np
+
+        from .. import audio_assist, voice_engine
+
+        samples, sr = voice_engine.decode_to_pcm(data)
+        mastered, report = audio_assist.execute_mastering_chain(
+            np.asarray(samples, dtype=np.float32), sr
+        )
+        blob = voice_engine.encode_pcm(mastered, sr, export_format)
+        asset = self._studio.persist_audio_bytes(blob, export_format)
+        return {"asset": asset, "report": report}
+
+    def ai_audio_catalog(self) -> dict:
+        """Every AI audio capability with a plain-language description."""
+        from .. import ai_audio
+
+        return ai_audio.ai_audio_catalog()
+
+    def dub_audio(self, data: bytes, target_text: str, lang: str = "en") -> dict:
+        """Dub a clip via a registered ML adapter (raises if none configured)."""
+        from .. import ai_audio
+
+        return ai_audio.dub_audio(data, target_text, lang)
+
+    def voice_clone(self, data: bytes, ref_voice: bytes) -> dict:
+        """Clone a voice via a registered ML adapter (raises if none configured)."""
+        from .. import ai_audio
+
+        return ai_audio.voice_clone(data, ref_voice)
+
+    def stem_catalog(self) -> dict:
+        """Every available audio stem with a plain-language description."""
+        from .. import audio_separation
+
+        return audio_separation.stem_catalog()
+
+    def separate_audio_stems(
+        self,
+        data: bytes,
+        num: int = 2,
+        *,
+        export_format: str = "wav",
+    ) -> dict:
+        """Separate a mono clip into stems (voice/instrumental or low/mid/high)."""
+        import numpy as np
+
+        from .. import audio_separation, voice_engine
+
+        samples, sr = voice_engine.decode_to_pcm(data)
+        stems = audio_separation.separate_stems(
+            np.asarray(samples, dtype=np.float32), sr, num=int(num)
+        )
+        out = {}
+        for name, stem in stems.items():
+            blob = voice_engine.encode_pcm(stem, sr, export_format)
+            out[name] = self._studio.persist_audio_bytes(blob, export_format)
+        return {"stems": out, "count": len(out)}
 
     def video_operation_catalog(self) -> dict:
         """Every video/audio operation grouped by category, with descriptions."""

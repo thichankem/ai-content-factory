@@ -198,11 +198,54 @@ lại, (c) chạy lại được mà không phá stage trước, (d) có lối t
       limiter, reverb, voice changer, noise gate — thuần numpy
 - [x] **Tầng trợ năng video** (`video_assist.py`): catalog thao tác video/audio,
       mô tả timeline bằng lời, gợi ý sửa tự động theo báo cáo validator
+- [x] **Audio DSP mở rộng** (`audio_effects.py`): 32 hiệu ứng — EQ/filters,
+      dynamics (compressor/limiter/gate/expander/de-esser/clipper), creative
+      (delay/chorus/flanger/phaser/distortion/bitcrusher/tremolo/vibrato/ring
+      mod/telephone/radio/megaphone/underwater/robot/reverse), reverb, voice
+      changer
+- [x] **Phân tích âm thanh** (`audio_analysis.py`): waveform, spectrogram,
+      frequency spectrum, dynamic range, clipping, noise floor, phase correlation
+- [x] **Sinh hiệu ứng âm thanh** (`sfx.py`): whoosh, impact, explosion, footstep,
+      ambience, transition, ui_click
+- [x] **Tầng trợ năng audio** (`audio_assist.py`): catalog, describe_audio,
+      suggest_mastering_chain
 - [ ] Adapter ML pluggable: tách chủ thể (rembg), panorama, HDR merge, RAW decode,
       upscale (Real-ESRGAN), stabilize, object/face tracking, auto reframe
 - [ ] Version history bền vững trên đĩa (hiện session lưu trong RAM)
 - [ ] Workflow: autosave/recovery, bins, compound clips, adjustment layers,
       templates, batch export, multiple export versions, safe zones
+- [ ] Export audio đa định dạng (AAC/FLAC/OGG/M4A/AIFF, stems)
+- [ ] AI audio nặng (voice isolation, stem separation, AI mastering, dubbing,
+      voice cloning) — adapter pluggable
+- [x] **Web video editor — hiệu ứng thị giác** (`frontend/editor.js`): thêm
+      chromatic-aberration, glow, ripple, vhs, light-leak (bên cạnh glitch/
+      pixelate/scanlines/film-grain/old-film/dreamy/sharpen/mosaic)
+- [x] **Web video editor — export**: SRT subtitles, PNG frame (bên cạnh WebM
+      MediaRecorder + FFmpeg backend)
+- [x] **Web video editor — timeline drag & drop** (move clip), **animation
+      presets** (Pop/Kinetic/Cinematic/Snappy/Minimal), **SRT/VTT import**
+- [x] **Web video editor — CSS effects + blend modes**: thêm hue/saturate/noir/
+      neon/duotone/drop-shadow filter + select blend mode (screen/multiply/
+      overlay/soft-light/hard-light/color-dodge/difference)
+- [x] **Web video editor — drag-to-trim** trên timeline (kéo mép clip đổi duration)
+- [x] **Web video editor — vector shape overlays** (rect/circle/triangle/star/heart
+      + màu, vị trí, kích thước)
+- [x] **Web video editor — autosave + version history** (snapshot local, restore)
+- [x] **Web video editor — export GIF + PNG sequence** (encoder GIF89a thuần JS)
+- [x] **AI audio — stem separation + voice isolation** (`audio_separation.py`,
+      thuần DSP + adapter ML pluggable)
+- [x] **AI audio — apply mastering chain** (`execute_mastering_chain`: denoise →
+      effects → loudness normalise)
+- [x] **Web video editor — keyboard shortcuts** (Ctrl+D duplicate, Ctrl+▲/▼ move)
+- [x] **AI audio — dubbing & voice-clone adapter** (`ai_audio.py`, registry
+      pluggable + lỗi rõ ràng khi chưa có adapter)
+- [x] **Media Studio — favorites** (★/☆ + filter ★ Yêu thích)
+- [x] **Web video editor — render-engine detector** (WebCodecs/WebGL2/WebGPU/
+      OffscreenCanvas badge)
+- [x] **Web video editor — background render queue** (render history + 📥 Render
+      Queue)
+- [x] **Web video editor — auto-reframe social presets** (chips 9:16/16:9/1:1/4:5)
+- [ ] Web video editor — WebGL2 render pipeline thật (tuỳ chọn, kiến trúc lớn)
 - [ ] "Auto-edit giống editor chuyên nghiệp": cắt theo nhịp, chọn B-roll khớp
 
 ### P7 — Tự động hoá & vận hành
@@ -327,6 +370,318 @@ không được là hằng số trong code.
    chạy ComfyUI/Ollama/XTTS local.
 
 ## 9. Nhật ký thay đổi
+
+### 2026-09-18 — Phiên Web Video Editor: auto-reframe social presets (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "Social Media" — *Auto resize / Auto
+  reframe / Social presets*.
+- **Đã làm:**
+  - **Quick auto-reframe** — chips `📱 9:16 · 📺 16:9 · 📷 1:1 · 🖼 4:5` trong
+    toolbar editor; `quickReframe(aspect)` đổi tỉ lệ canvas một chạm (pushHistory
+    + resizeCanvas), báo "Auto-reframed to … (TikTok / YouTube / …)".
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); smoke test
+  **64/64 PASSED**; full backend suite **exit 0**.
+- **Việc tiếp theo:** WebGL2 render pipeline thật (tuỳ chọn, kiến trúc lớn).
+
+### 2026-09-18 — Phiên Web Video Editor: background render queue (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "Web-specific" — *Background rendering /
+  Render cache*.
+- **Đã làm:**
+  - **Render queue / history** — `recordRender()` ghi mỗi lần export (WebM,
+    GIF, PNG frame, PNG sequence) với kind + detail + size + timestamp vào
+    `localStorage render_history` (cap 20); nút `📥 Render Queue` trong export
+    panel hiển thị lịch sử render (dropdown `.ed-versions-menu`), badge đếm.
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); smoke test
+  **64/64 PASSED**.
+- **Việc tiếp theo:** WebGL2 render pipeline thật (tuỳ chọn, kiến trúc lớn).
+
+### 2026-09-18 — Phiên Web Video Editor: render-engine capability detector (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "Web-specific" — *WebCodecs / WebGL /
+  WebGPU / OffscreenCanvas* qua detector năng lực trình duyệt.
+- **Đã làm:**
+  - `detectRenderCapabilities()` — phát hiện thật (không bịa) WebCodecs,
+    WebGL2, WebGPU, OffscreenCanvas, Worker; hiện badge `⚙ WebGL2 ✓ · WebCodecs
+    ✗ · WebGPU ✓ · Offscreen ✓` trong toolbar editor + tooltip mô tả render
+    path đang dùng (GPU-accelerated hay Canvas 2D fallback).
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); logic detector
+  test trong Node với mock globals cho đúng shape; smoke test **64/64 PASSED**.
+- **Việc tiếp theo:** WebGL2 render pipeline thật (composite qua shader) nếu
+  cần render nặng — kiến trúc lớn, tuỳ chọn.
+
+### 2026-09-18 — Phiên Media Studio: favorites (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "Asset management" — *Favorites* cho kho
+  tư liệu Media Studio (search/kind/tag/sort/dedup đã có sẵn).
+- **Đã làm:**
+  - Nút **★/☆ Favorite** trên mỗi thẻ media (`toggleMediaFavorite`), lưu danh
+    sách yêu thích vào `localStorage ms_favorites`.
+  - Nút **★ Yêu thích** trong filter bar (`toggleFavoritesFilter`) để chỉ hiển
+    thị mục yêu thích.
+- **Kiểm chứng:** `node --check frontend/app.js` + `editor.js` sạch (exit 0);
+  smoke test **64/64 PASSED**.
+- **Việc tiếp theo:** WebCodecs/WebGL (render nặng trên trình duyệt — kiến
+  trúc lớn).
+
+### 2026-09-18 — Phiên AI Audio: dubbing & voice-clone adapter (yêu cầu 14)
+
+- **Mục tiêu phiên:** hoàn thiện nhóm "AI audio" — *AI dubbing* và *AI voice
+  cloning* qua hợp đồng adapter ML pluggable.
+- **Đã làm:**
+  - `src/content_factory/ai_audio.py` (mới) — registry adapter pluggable cho
+    `dub` và `voice_clone` (`register_adapter`, `dub_audio`, `voice_clone`).
+    Hai chức năng này thật sự cần model (không có DSP thay thế trung thực), nên
+    khi chưa đăng ký adapter sẽ lỗi rõ ràng "needs an ML adapter" — **không
+    bịa kết quả**. `ai_audio_catalog()` liệt kê năng lực + trạng thái adapter
+    cho tầng trợ năng.
+  - `services/production.py` — `ai_audio_catalog`, `dub_audio`, `voice_clone`.
+  - `api/routers/studio_media.py` — `GET /studio/audio/ai`,
+    `POST /studio/audio/dub`, `POST /studio/audio/voice-clone`.
+  - `agent_video.py` — 3 agent tool mới (registry giờ **110 tool**):
+    `ai_audio_catalog`, `dub_audio`, `voice_clone`.
+  - Test mới: `tests/test_ai_audio.py` (6 test, gồm register/call adapter).
+- **Kiểm chứng:** ruff + format + mypy sạch; 63 test xanh (ai_audio +
+  agent_tools + architecture); live HTTP: catalog 200, dub 422 với lỗi rõ ràng.
+- **Việc tiếp theo:** WebCodecs/WebGL (render nặng), asset library chi tiết
+  (folders/tags/search đã có nền trong Media Studio).
+
+### 2026-09-18 — Phiên Web Video Editor: keyboard shortcuts bổ sung (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "Interaction" — *Keyboard shortcuts* cho
+  các thao tác timeline phổ biến.
+- **Đã làm:**
+  - Thêm **Ctrl+D** (Duplicate scene) và **Ctrl+▲ / Ctrl+▼** (Move scene
+    up/down) vào keydown handler; cập nhật modal "Keyboard Shortcuts" tham
+    chiếu. Các phím tắt khác (Space, I/O, C, Delete, M, F, ?, Ctrl+Z/S/M…)
+    đã có sẵn.
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); smoke test
+  **64/64 PASSED**.
+- **Việc tiếp theo:** asset library chi tiết (folders/tags/search), WebCodecs/
+  WebGL, AI adapters nặng khác (dubbing, voice cloning).
+
+### 2026-09-18 — Phiên AI Audio: apply mastering chain (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "AI audio" — *AI mastering*: chạy chuỗi
+  mastering đề xuất thành file thật.
+- **Đã làm:**
+  - `audio_assist.execute_mastering_chain(samples, sr)` — thực thi từng bước
+    gợi ý theo thứ tự (denoise → effects → loudness normalise) thuần numpy,
+    trả về `(processed, report)` với danh sách bước đã chạy.
+  - `services/production.py` — `apply_audio_mastering(data, export_format)`.
+  - `api/routers/studio_media.py` — `POST /studio/audio/mastering/apply`.
+  - `agent_video.py` — agent tool `apply_audio_mastering` (registry giờ **107
+    tool**).
+  - Test: thêm `test_execute_mastering_chain_runs` + `..._caps_peak` vào
+    `tests/test_audio_assist.py` (xác nhận limiter được áp khi tín hiệu clip).
+- **Kiểm chứng:** ruff + format + mypy sạch; 73 test xanh (audio_assist +
+  separation + agent_tools + architecture); live HTTP `/studio/audio/mastering/
+  apply` 200.
+- **Việc tiếp theo:** asset library, WebCodecs/WebGL, các AI adapter nặng khác
+  (dubbing, voice cloning).
+
+### 2026-09-18 — Phiên AI Audio: stem separation + voice isolation (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "AI audio" — *voice isolation* / *stem
+  separation* với thuật toán thuần DSP trước + adapter ML pluggable.
+- **Đã làm:**
+  - `src/content_factory/audio_separation.py` (mới) — `separate_stems(samples,
+    sr, num)` tách 2 stem (voice/instrumental) hoặc 3 stem (low/mid/high) bằng
+    biquad band-split; `voice_isolation()`; `register_adapter(mode, fn)` cho
+    phép cắm backend ML (Demucs/Spleeter/UVR) sau này; `stem_catalog()` cho
+    tầng trợ năng (mô tả bằng lời + cờ adapter).
+  - `services/production.py` — expose `stem_catalog`, `separate_audio_stems`.
+  - `api/routers/studio_media.py` — `GET /studio/audio/stems`,
+    `POST /studio/audio/stems` (num=2|3, format wav/mp3).
+  - `agent_video.py` — 2 agent tool mới (registry giờ **106 tool**):
+    `stem_catalog`, `separate_audio_stems`.
+  - Test mới: `tests/test_audio_separation.py` (7 test, gồm adapter override).
+- **Kiểm chứng:** ruff + format + mypy sạch; 7 test mới xanh + agent_tools +
+  architecture (64 passed); live HTTP qua TestClient: stems catalog 200, tách 2
+  và 3 stem đều 200.
+- **Việc tiếp theo:** asset library, WebCodecs/WebGL, các AI adapter nặng khác
+  (dubbing, voice cloning, AI mastering).
+
+### 2026-09-18 — Phiên Web Video Editor: export GIF + PNG sequence (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "Export" — *GIF* và *PNG sequence* (bên
+  cạnh WebM MediaRecorder + PNG frame + SRT đã có).
+- **Đã làm:**
+  - **Export Animated GIF** — encoder GIF89a thuần JS không phụ thuộc thư viện
+    (`encodeGif` + `_gifLzw` LZW + palette 256 màu 6³ cube + grays), render
+    toàn timeline ở 10fps (cap 120 frame), nút `🎞 Export Animated GIF`.
+  - **Export PNG Sequence** — render từng frame (8fps, cap 30) thành các file
+    `frame_001.png…` tải tuần tự, nút `🖼 Export PNG Sequence`.
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); encoder GIF
+  test trong Node cho cấu trúc hợp lệ (header GIF89a + trailer 0x3B); smoke
+  test **64/64 PASSED**.
+- **Việc tiếp theo:** asset library, WebCodecs/WebGL, backend AI adapters
+  (voice isolation, stem separation, AI mastering).
+
+### 2026-09-18 — Phiên Web Video Editor: autosave + version history (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "Project" — *Autosave* và *Version history*
+  cho timeline.
+- **Đã làm:**
+  - **Autosave** — nút `⏱ Autosave` (toggle-active) + `startAutosave()` chạy
+    mỗi ~10s, tự lưu qua `saveEditor()` khi `ed.dirty`; báo "Autosave ON/OFF".
+  - **Version history** — mỗi lần save đẩy snapshot `{revision, ts, scenes}`
+    vào `localStorage ed_versions` (cap 20); nút `🗂 Versions` mở menu liệt kê
+    các phiên bản, click để `restoreVersion()` (khôi phục scenes + undo/redo).
+    CSS `.ed-versions-menu`.
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); smoke test
+  **64/64 PASSED**.
+- **Việc tiếp theo:** export GIF/PNG sequence, WebCodecs/WebGL, backend AI
+  adapters (voice isolation, stem separation, AI mastering).
+
+### 2026-09-18 — Phiên Web Video Editor: vector shape overlays (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "Shapes & graphics" — vẽ hình vector làm
+  overlay trên video.
+- **Đã làm:**
+  - **Vector shape overlays** — `drawShape` vẽ 5 hình lên frame (rect, circle,
+    triangle, star, heart) với màu tuỳ chọn (`prop-shape` + `prop-shape-color`),
+    vị trí/kích thước dùng chung hệ thống overlay (top-left/right, center,
+    bottom-left/right, size). Gọi sau `drawOverlay` trong `drawContent`. Map vào
+    nhóm "Shapes & graphics" (*Rectangle*, *Circle*, *Polygon*, *Icons*).
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); smoke test
+  **64/64 PASSED**.
+- **Việc tiếp theo:** asset library, autosave/version history, export GIF/PNG
+  sequence, WebCodecs/WebGL.
+
+### 2026-09-18 — Phiên Web Video Editor: drag-to-trim trên timeline (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung nhóm "Timeline" — *Trim* kéo trực tiếp trên
+  timeline (bên cạnh split/merge/dup/delete/move đã có).
+- **Đã làm:**
+  - **Drag-to-trim** — thêm handle `.tl-trim` ở mép phải mỗi clip trên track
+    video; kéo ngang để đổi `duration_seconds` (clamp 0.5–30s), map pixel↔giây
+    theo tỉ lệ track/tổng duration. `attachTrimHandle` + CSS `.tl-seg.trimming`
+    (viền cam) + `.tl-trim` (cursor ew-resize). Có undo/redo qua `pushHistory`.
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); smoke test
+  **64/64 PASSED**.
+- **Việc tiếp theo:** shapes/graphics, asset library, autosave/version history,
+  export GIF/PNG sequence, WebCodecs/WebGL.
+
+### 2026-09-18 — Phiên Web Video Editor: hiệu ứng thị giác + export bổ sung (yêu cầu 14)
+
+- **Mục tiêu phiên:** mở rộng **vanilla web video editor** (`frontend/editor.js`
+  + `index.html` + `style.css`) theo checklist web video editor của chủ dự án.
+  Editor hiện đã có rất nhiều (timeline multi-track, canvas compositing, filter/
+  grade/effect, keyframe motion, transition, Ken Burns, caption, nhạc/beat,
+  undo/redo, safe zones, pro validator, export WebM qua MediaRecorder, AI
+  copilot) — phiên này bổ sung các khoảng trống rõ rệt, ưu tiên hiệu quả cao.
+- **Đã làm:**
+  - **Thêm 5 hiệu ứng thị giác** vào `applyEffect` + `prop-effect` select:
+    `chromatic-aberration` (RGB split), `glow` (bloom), `ripple`, `vhs` (băng
+    VHS), `light-leak` — thuần canvas 2D, map vào nhóm "Visual effects".
+  - **Export SRT phụ đề** (`exportSrt`) — sinh file `.srt` từ caption/narration
+    của từng scene, nút "📄 Export SRT Subtitles".
+  - **Export frame hiện tại PNG** (`exportPngFrame`) — nút "🖼 Export Current
+    Frame (PNG)".
+  - Helper `downloadBlob` + `srtTimestamp`.
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); smoke test
+  **64/64 PASSED** (app boot + toàn bộ pipeline HTTP vẫn xanh).
+- **Việc tiếp theo:** true multi-track drag & drop clip, trim/split kéo trên
+  timeline, CSS-style effects đầy đủ (drop-shadow, blend modes, backdrop blur),
+  animation presets, SRT/VTT import, shapes/graphics, asset library (folders/
+  tags/search), project autosave/version history, export GIF/PNG sequence,
+  WebCodecs/WebGL cho render nặng.
+
+### 2026-09-18 — Phiên Web Video Editor: CSS effects + blend modes (yêu cầu 14)
+
+- **Mục tiêu phiên:** mở rộng nhóm "CSS-style effects" + "Blend mode" trong
+  checklist web video editor.
+- **Đã làm:**
+  - **Thêm 7 CSS filter** vào `FILTERS` + `prop-filter` select: `hue` (hue
+    rotate), `saturate` (hyper saturated), `noir`, `neon`, `duotone`,
+    `drop-shadow` — bên cạnh grayscale/sepia/invert/blur/warm/cool/contrast/
+    brightness/vignette đã có.
+  - **Blend modes** — select `prop-blend` mới (`BLEND_MODES`): Normal, Screen,
+    Multiply, Overlay, Soft Light, Hard Light, Color Dodge, Difference — áp
+    dụng qua `ctx.globalCompositeOperation` khi composite scene lên frame
+    trong `drawContent`. Map vào nhóm "CSS-style effects" (*Blend modes*) và
+    nhóm "Image" (*Blend mode*).
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0) — đã sửa 2
+  lỗi cú pháp key có dấu gạch ngang phải đặt trong ngoặc kép (`drop-shadow`,
+  `source-over`…); smoke test **64/64 PASSED**.
+- **Việc tiếp theo:** trim/split kéo trên timeline, shapes/graphics, asset
+  library, autosave/version history, export GIF/PNG sequence, WebCodecs/WebGL.
+
+### 2026-09-18 — Phiên Web Video Editor: drag & drop clip + animation presets + SRT import (yêu cầu 14)
+
+- **Mục tiêu phiên:** tiếp tục mở rộng **vanilla web video editor** theo checklist
+  web video editor — bổ sung các khoảng trống về tương tác timeline, animation
+  preset và phụ đề.
+- **Đã làm:**
+  - **Timeline drag & drop (Move clip)** — kéo ngang một `tl-seg` trên track
+    video để đổi thứ tự scene (`attachDragReorder` + pointer events + CSS
+    `.tl-seg.dragging`), có undo/redo qua `pushHistory`. Map vào nhóm "Timeline":
+    *Move clip*, *Drag & drop clip*.
+  - **Animation presets** — 5 preset một chạm (`Pop`, `Kinetic`, `Cinematic`,
+    `Snappy`, `Minimal`) đặt sẵn combo entrance+exit+Ken Burns (`applyAnimPreset`
+    + `ANIM_PRESETS` + chips `data-animpreset`). Map vào nhóm "Animation":
+    *Animation presets*, *Text animation*.
+  - **SRT/VTT import** — nút "⬆ Import SRT File" đọc file `.srt`/`.vtt`, parse
+    cue (`parseSrt`), nạp caption + thời lượng vào scene (tạo scene mới nếu
+    timeline rỗng, overlay nếu đã có). Map vào nhóm "Subtitle": *SRT import*.
+- **Kiểm chứng:** `node --check frontend/editor.js` sạch (exit 0); smoke test
+  **64/64 PASSED**.
+- **Việc tiếp theo:** trim/split kéo trên timeline, CSS effects đầy đủ
+  (drop-shadow/blend/backdrop-blur), shapes/graphics, asset library, autosave/
+  version history, export GIF/PNG sequence, WebCodecs/WebGL.
+
+### 2026-09-18 — Phiên Audio Editor: DSP mở rộng + phân tích + SFX + trợ năng (yêu cầu 14)
+
+- **Mục tiêu phiên:** bổ sung các chức năng edit âm thanh cho video trong 20
+  nhóm chủ dự án liệt kê (thu âm/import, cắt, âm lượng, EQ, dynamics, noise
+  cleanup, voice, nhạc nền, SFX, sync, mixer, automation, spatial, music,
+  AI audio, creative effects, video-editor-specific, phân tích, export,
+  workflow) — bằng thuật toán thuần numpy/ffmpeg chạy offline, **và** tầng trợ
+  năng để cả người có/nhìn và không nhìn được (và AI agent) đều hiểu và dùng
+  được từng chức năng. Nhiều chức năng đã có sẵn (media_tools read+cut, voice
+  chain, ducking, beat grid, TTS/STT) — phiên này lấp các khoảng trống rõ rệt.
+- **Đã làm:**
+  - `src/content_factory/audio_effects.py` (mở rộng) — từ 6 lên **32 hiệu ứng
+    DSP** thuần numpy:
+    - **Filter:** `highpass`, `lowpass`, `bandpass`, `notch`, `lowshelf`,
+      `highshelf` (biquad RBJ).
+    - **Dynamics:** `expander`, `de_esser`, `clipper`, `saturation`.
+    - **Creative:** `delay`, `echo`, `chorus`, `flanger`, `phaser`,
+      `distortion`, `bitcrusher`, `tremolo`, `vibrato`, `ring_modulation`,
+      `telephone`, `radio`, `megaphone`, `underwater`, `robot`, `reverse`.
+  - `src/content_factory/audio_analysis.py` (mới) — phân tích âm thanh thuần
+    numpy: `waveform` (RMS envelope), `spectrogram` (STFT dB), `frequency_spectrum`
+    (dải octave + tần số trội), `dynamic_range` (crest factor), `clipping`,
+    `noise_floor`, `phase_correlation`, `analyze_samples` (bundle).
+  - `src/content_factory/sfx.py` (mới) — **sinh hiệu ứng âm thanh** từ đầu:
+    `whoosh`, `impact`, `explosion`, `footstep`, `ambience`, `transition`,
+    `ui_click` — không cần file mẫu.
+  - `src/content_factory/audio_assist.py` (mới) — **tầng trợ năng audio**:
+    `catalog()` (toàn bộ thao tác audio phân nhóm), `describe_operation`,
+    `describe_audio` (mô tả clip bằng lời từ số đo), `suggest_mastering_chain`
+    (gợi ý chuỗi mastering tự động: limiter khi clip, denoise khi ồn, highpass
+    khi rumble, compressor khi dynamic rộng, normalize cuối).
+  - `services/production.py` — expose `analyze_audio`, `sfx_catalog`,
+    `synthesize_sfx`, `audio_operation_catalog`, `describe_audio_operation`,
+    `describe_audio`, `suggest_audio_mastering`.
+  - `api/routers/studio_media.py` — endpoint mới: `POST /studio/audio/analyze`,
+    `GET /studio/audio/sfx`, `POST /studio/audio/sfx`, `GET /studio/audio/ops`,
+    `POST /studio/audio/describe-op`, `POST /studio/audio/describe`,
+    `POST /studio/audio/mastering`.
+  - `agent_video.py` — 7 agent tool mới (registry giờ **104 tool**): `analyze_audio`,
+    `sfx_catalog`, `synthesize_sfx`, `audio_operation_catalog`,
+    `describe_audio_operation`, `describe_audio`, `suggest_audio_mastering`.
+  - Test mới: `tests/test_audio_analysis.py`, `tests/test_sfx.py`,
+    `tests/test_audio_assist.py`; mở rộng `tests/test_audio_effects.py`.
+- **Kiểm chứng:** ruff + format + mypy sạch trên mọi file đổi; 38 test mới/mở
+  rộng xanh; live HTTP qua TestClient: analyze/sfx/ops/describe/mastering đều
+  200. Toàn bộ chạy offline (numpy); decode/encode âm thanh dùng ffmpeg.
+- **Việc tiếp theo:** nối vào UI Audio Studio; thêm workflow (version history
+  bền vững, autosave/recovery, bins, compound clips, adjustment layers), export
+  đa định dạng (AAC/FLAC/OGG/M4A/AIFF, stems), và adapter ML pluggable cho các
+  chức năng AI nặng (voice isolation, stem separation, AI mastering, dubbing,
+  voice cloning).
 
 ### 2026-09-18 — Phiên Chỉnh video: hiệu ứng + tầng trợ năng (yêu cầu 14)
 

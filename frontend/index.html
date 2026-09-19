@@ -1246,6 +1246,7 @@
               </select>
               <button id="btn-ms-filter" class="btn primary">Lọc</button>
               <button id="btn-ms-filter-clear" class="btn sm">✕</button>
+              <button id="btn-ms-favs" class="btn" title="Chỉ hiển thị mục yêu thích">★ Yêu thích</button>
               <span id="ms-db-stats" class="muted small" style="margin-left:auto;"></span>
             </div>
 
@@ -1458,6 +1459,12 @@
       <div class="editor-brand">
         <span class="adobe-badge pr" style="font-size: 13px; padding: 2px 6px;">NLE</span>
         <h2>Video Studio Pro (Multi-Track NLE)</h2>
+        <div class="pl-preset-chips" style="display:inline-flex; gap:4px; margin-right:8px; flex-wrap:wrap;">
+          <span class="pl-chip" data-reframe="9:16" title="Auto-reframe to TikTok / Shorts">📱 9:16</span>
+          <span class="pl-chip" data-reframe="16:9" title="Auto-reframe to YouTube">📺 16:9</span>
+          <span class="pl-chip" data-reframe="1:1" title="Auto-reframe to Instagram">📷 1:1</span>
+          <span class="pl-chip" data-reframe="4:5" title="Auto-reframe to Reels">🖼 4:5</span>
+        </div>
         <select id="ed-aspect" class="ed-select">
           <option value="9:16" selected>9:16 · Vertical Shorts / TikTok</option>
           <option value="16:9">16:9 · Landscape Cinematic (YouTube)</option>
@@ -1478,6 +1485,7 @@
 
       <div class="editor-actions">
         <span id="ed-status">Ready</span>
+        <span id="render-cap-badge" class="render-cap-badge" title="Browser render-engine capabilities (Web-specific)">…</span>
         <button id="btn-ed-copilot" class="btn primary glow-pulse" title="AI Natural Language Timeline Co-Pilot [Ctrl+K]">🤖 Co-Pilot</button>
         <button id="btn-ed-ai-thumbs" class="btn" title="AI Auto-Thumbnails with CTR Prediction">✨ CTR Thumbs</button>
         <button id="btn-ed-safezone" class="btn toggle-active" title="Toggle Action &amp; Title Safe Margins / TikTok Overlay (Ctrl+')">⊞ Safe Margins</button>
@@ -1487,6 +1495,11 @@
         <button id="btn-ed-redo" class="btn" title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
         <button id="btn-ed-capture" class="btn" title="Send Frame to Photo Lab for Thumbnail [Ctrl+P]">📸 Thumbnail</button>
         <button id="btn-ed-save" class="btn" title="Save Project to Disk (Ctrl+S)">💾 Save</button>
+        <button id="btn-ed-autosave" class="btn toggle-active" title="Toggle Autosave (saves every ~10s when there are changes)">⏱ Autosave</button>
+        <div class="ed-versions-wrap" style="position: relative; display: inline-block;">
+          <button id="btn-ed-versions" class="btn" title="Restore a saved version of this timeline">🗂 Versions</button>
+          <div id="ed-versions-menu" class="ed-versions-menu" hidden></div>
+        </div>
         <button id="btn-ed-export" class="btn primary" title="Export to Render Queue (Ctrl+M)">⚡ Export</button>
         <button id="btn-ed-close" class="btn icon-btn" title="Close Studio (Esc)">✕</button>
       </div>
@@ -1699,6 +1712,24 @@
                 <option value="cool">Cool Ice</option>
                 <option value="contrast">High Contrast</option>
                 <option value="brightness">Bright Boost</option>
+                <option value="hue">Hue Shift</option>
+                <option value="saturate">Hyper Saturated</option>
+                <option value="noir">Film Noir</option>
+                <option value="neon">Neon Glow</option>
+                <option value="duotone">Duotone</option>
+                <option value="drop-shadow">Drop Shadow</option>
+              </select>
+            </label>
+            <label>Blend Mode
+              <select id="prop-blend">
+                <option value="source-over">Normal</option>
+                <option value="screen">Screen</option>
+                <option value="multiply">Multiply</option>
+                <option value="overlay">Overlay</option>
+                <option value="soft-light">Soft Light</option>
+                <option value="hard-light">Hard Light</option>
+                <option value="color-dodge">Color Dodge</option>
+                <option value="difference">Difference</option>
               </select>
             </label>
           </div>
@@ -1756,6 +1787,23 @@
             <input id="prop-overlay-size" type="range" min="16" max="140" value="48">
           </label>
 
+          <h4 style="margin-top: 14px;">🔷 Vector Shape Overlay</h4>
+          <div class="two-col">
+            <label>Shape
+              <select id="prop-shape">
+                <option value="none">None</option>
+                <option value="rect">Rectangle</option>
+                <option value="circle">Circle</option>
+                <option value="triangle">Triangle</option>
+                <option value="star">Star</option>
+                <option value="heart">Heart</option>
+              </select>
+            </label>
+            <label>Shape Color
+              <input id="prop-shape-color" type="color" value="#6366f1">
+            </label>
+          </div>
+
           <div class="props-actions">
             <button id="btn-scene-add" class="btn">＋ Add Scene</button>
             <button id="btn-scene-dup" class="btn">Duplicate</button>
@@ -1811,6 +1859,17 @@
             </label>
           </div>
 
+          <div style="margin-top: 10px;">
+            <div class="muted small" style="margin-bottom: 4px;">⚡ Animation Presets</div>
+            <div class="pl-preset-chips" style="flex-wrap: wrap;">
+              <span class="pl-chip" data-animpreset="pop" title="Zoom-in entrance">Pop</span>
+              <span class="pl-chip" data-animpreset="kinetic" title="Slide-up + fade, zoom motion">Kinetic</span>
+              <span class="pl-chip" data-animpreset="cinematic" title="Fade in/out, pan motion">Cinematic</span>
+              <span class="pl-chip" data-animpreset="snappy" title="Bounce in, zoom out">Snappy</span>
+              <span class="pl-chip" data-animpreset="minimal" title="Simple fade">Minimal</span>
+            </div>
+          </div>
+
           <label class="inline" style="margin-top: 12px;">
             <input type="checkbox" id="prop-captions" checked> Render Kinetic Captions on Canvas
           </label>
@@ -1825,6 +1884,13 @@
               </select>
               <button id="btn-simplify-subtitles" class="btn sm primary">✨ Simplify</button>
             </div>
+          </div>
+
+          <div style="margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+            <h4>📥 Import Subtitles</h4>
+            <p class="muted small" style="margin-bottom: 6px;">Nạp file .srt để đặt caption + thời lượng từng scene theo phụ đề.</p>
+            <button id="btn-import-srt" class="btn sm block">⬆ Import SRT File</button>
+            <input type="file" id="srt-file" accept=".srt,.vtt,text/plain" hidden>
           </div>
         </div>
 
@@ -1845,6 +1911,11 @@
             <select id="prop-effect">
               <option value="none">None</option>
               <option value="glitch">Cyber Glitch</option>
+              <option value="chromatic-aberration">Chromatic Aberration / RGB Split</option>
+              <option value="glow">Bloom Glow</option>
+              <option value="ripple">Ripple Distortion</option>
+              <option value="vhs">Retro VHS Tape</option>
+              <option value="light-leak">Light Leak</option>
               <option value="pixelate">8-bit Pixelate</option>
               <option value="scanlines">Retro CRT Scanlines</option>
               <option value="film-grain">Fine Film Grain (35mm)</option>
@@ -1965,6 +2036,24 @@
           </div>
           <div class="props-actions" style="margin-top: 8px;">
             <button id="btn-me-render-ffmpeg" class="btn block">🎬 Render Real Video (Backend FFmpeg)</button>
+          </div>
+          <div class="props-actions" style="margin-top: 8px;">
+            <button id="btn-me-export-srt" class="btn block" title="Export captions as an SRT subtitle file">📄 Export SRT Subtitles</button>
+          </div>
+          <div class="props-actions" style="margin-top: 8px;">
+            <button id="btn-me-export-png" class="btn block" title="Export the current frame as a PNG still">🖼 Export Current Frame (PNG)</button>
+          </div>
+          <div class="props-actions" style="margin-top: 8px;">
+            <button id="btn-me-export-gif" class="btn block" title="Export the whole timeline as an animated GIF">🎞 Export Animated GIF</button>
+          </div>
+          <div class="props-actions" style="margin-top: 8px;">
+            <button id="btn-me-export-pngseq" class="btn block" title="Export each frame as a numbered PNG sequence">🖼 Export PNG Sequence</button>
+          </div>
+          <div class="props-actions" style="margin-top: 8px;">
+            <div class="ed-versions-wrap" style="position: relative; display: block;">
+              <button id="btn-me-render-queue" class="btn block" title="View recent renders (background render queue / cache)">📥 Render Queue <span id="render-queue-count" class="badge">0</span></button>
+              <div id="render-queue-menu" class="ed-versions-menu" hidden></div>
+            </div>
           </div>
         </div>
       </div>
@@ -2327,6 +2416,8 @@
           <div class="shortcut-row"><span>Audio Gain &amp; Normalize</span><kbd>G</kbd></div>
           <div class="shortcut-row"><span>Delete Selected Scene</span><kbd>Delete</kbd></div>
           <div class="shortcut-row"><span>Duplicate Selected Scene</span><kbd>Ctrl + D</kbd></div>
+          <div class="shortcut-row"><span>Move Scene Up</span><kbd>Ctrl + ▲</kbd></div>
+          <div class="shortcut-row"><span>Move Scene Down</span><kbd>Ctrl + ▼</kbd></div>
         </div>
 
         <div class="shortcut-group">

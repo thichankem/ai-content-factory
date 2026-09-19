@@ -3250,6 +3250,54 @@ async function applyMediaFilter() {
   }
 }
 
+// ---- Media favorites (client-side, localStorage) ---------------------------
+
+function loadMediaFavorites() {
+  try {
+    const v = JSON.parse(localStorage.getItem("ms_favorites") || "[]");
+    return Array.isArray(v) ? v : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveMediaFavorites(list) {
+  try {
+    localStorage.setItem("ms_favorites", JSON.stringify(list));
+  } catch (_) { /* storage full — ignore */ }
+}
+
+function toggleMediaFavorite(id) {
+  const favs = loadMediaFavorites();
+  const i = favs.indexOf(id);
+  if (i >= 0) favs.splice(i, 1);
+  else favs.push(id);
+  saveMediaFavorites(favs);
+  // Re-apply the current filter so the grid reflects the change.
+  applyMediaFilter();
+}
+
+function toggleFavoritesFilter() {
+  const btn = $("btn-ms-favs");
+  if (!btn) return;
+  btn.classList.toggle("toggle-active");
+  const onlyFavs = btn.classList.contains("toggle-active");
+  const params = new URLSearchParams();
+  const kind = ($("ms-filter-kind") || {}).value;
+  const tag = ($("ms-filter-tag") || {}).value;
+  const sort = ($("ms-filter-sort") || {}).value;
+  if (kind) params.set("kind", kind);
+  if (tag) params.set("tag", tag);
+  if (sort) params.set("sort", sort);
+  api(`/media?${params.toString()}`).then((items) => {
+    if (onlyFavs) {
+      const favs = loadMediaFavorites();
+      items = items.filter((m) => favs.includes(m.id));
+    }
+    renderMediaGrid(items);
+  }).catch((err) => showError("Lọc media: " + err.message));
+}
+
 function renderMediaGrid(items) {
   const grid = $("ms-media-grid");
   if (!grid) return;
@@ -3257,15 +3305,18 @@ function renderMediaGrid(items) {
     grid.innerHTML = '<div class="media-empty">No media yet — upload something to begin.</div>';
     return;
   }
+  const favs = loadMediaFavorites();
   grid.innerHTML = items.map((m) => {
     const isAv = m.kind === "video" || m.kind === "audio";
     const isYt = (m.source || "").indexOf("youtube.com") !== -1 || (m.source || "").indexOf("youtu.be") !== -1;
+    const isFav = favs.includes(m.id);
     return `
     <div class="media-card" data-id="${esc(m.id)}">
       <div class="media-card-kind">${esc(m.kind)}</div>
       <div class="media-card-name" title="${esc(m.filename)}">${esc(m.filename)}</div>
       <div class="media-card-meta">${m.duration_seconds ? m.duration_seconds + "s" : ""} · ${m.size_bytes}B</div>
       <div class="media-card-actions">
+        <button class="media-btn" onclick="toggleMediaFavorite('${esc(m.id)}')" title="Favorite">${isFav ? "★" : "☆"}</button>
         <button class="media-btn" onclick="msTranscribe('${esc(m.id)}')">🧠 Transcribe</button>
         <button class="media-btn" onclick="msRecook('${esc(m.id)}')">♻ Re-cook</button>
         <button class="media-btn" onclick="msDetail('${esc(m.id)}')">👁 View</button>
@@ -3413,6 +3464,8 @@ function setupMediaStudioListeners() {
     const sort = $("ms-filter-sort"); if (sort) sort.value = "newest";
     loadMediaStudio();
   });
+  const favBtn = $("btn-ms-favs");
+  if (favBtn) favBtn.addEventListener("click", toggleFavoritesFilter);
   // Denoise modal
   const denoiseCancel = $("btn-denoise-cancel");
   const denoiseApply = $("btn-denoise-apply");

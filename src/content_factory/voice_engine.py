@@ -25,7 +25,11 @@ __all__ = [
     "KNOWN_CHAIN_STEPS",
     "VoiceChain",
     "VoiceError",
+    "decode_to_pcm",
+    "denoise_pcm",
     "duck_music",
+    "encode_pcm",
+    "normalize_loudness_pcm",
     "process_voice",
 ]
 
@@ -296,6 +300,35 @@ def _spectral_gate(
     return out.astype(np.float32)
 
 
+def denoise_pcm(
+    samples: np.ndarray,
+    sr: int,
+    *,
+    strength: float = 0.8,
+    noise_profile: np.ndarray | None = None,
+) -> np.ndarray:
+    """Spectral-gate denoise on raw PCM — the engine behind :func:`denoise_audio`.
+
+    Public so callers that already hold PCM (the mastering chain, an in-memory
+    edit pipeline) can denoise in place instead of encoding to bytes and back.
+    """
+    return _spectral_gate(
+        np.asarray(samples, dtype=np.float32),
+        sr,
+        float(np.clip(strength, 0.0, 1.0)),
+        noise_profile,
+    )
+
+
+def normalize_loudness_pcm(
+    samples: np.ndarray, target_lufs: float = -14.0
+) -> np.ndarray:
+    """RMS loudness normalise on raw PCM — the engine behind the voice chain."""
+    return _normalize_loudness(
+        np.asarray(samples, dtype=np.float32), float(target_lufs)
+    )
+
+
 def denoise_audio(
     data: bytes,
     *,
@@ -314,7 +347,7 @@ def denoise_audio(
     profile = None
     if noise_profile:
         profile, _ = decode_to_pcm(noise_profile)
-    denoised = _spectral_gate(samples, sr, float(np.clip(strength, 0.0, 1.0)), profile)
+    denoised = denoise_pcm(samples, sr, strength=strength, noise_profile=profile)
     out = encode_pcm(denoised, sr, export_format)
     report = {
         "strength": float(np.clip(strength, 0.0, 1.0)),

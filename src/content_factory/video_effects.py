@@ -136,7 +136,7 @@ def _fx_glow(rgb: np.ndarray, params: dict[str, Any]) -> np.ndarray:
     try:
         from PIL import Image, ImageFilter
 
-        pil = Image.fromarray(_to_uint8(rgb), mode="RGB")
+        pil = Image.fromarray(_to_uint8(rgb))
         blurred = pil.filter(ImageFilter.GaussianBlur(radius=max(1, int(amount * 12))))
         bloom = np.asarray(blurred, dtype=np.float32) / 255.0
     except Exception:  # noqa: BLE001 - fall back to a box blur approximation

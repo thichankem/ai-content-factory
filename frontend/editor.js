@@ -46,6 +46,24 @@ const FILTERS = {
   cool: "hue-rotate(180deg) saturate(1.3)",
   contrast: "contrast(1.45)",
   brightness: "brightness(1.35)",
+  hue: "hue-rotate(45deg) saturate(1.2)",
+  saturate: "saturate(2)",
+  noir: "grayscale(1) contrast(1.4) brightness(0.9)",
+  neon: "hue-rotate(285deg) saturate(2.6) contrast(1.35)",
+  duotone: "sepia(1) hue-rotate(-55deg) saturate(2.4)",
+  "drop-shadow": "drop-shadow(0 0 14px rgba(0,0,0,0.7))",
+};
+
+// Canvas blend modes (CSS-style compositing of the scene over the frame).
+const BLEND_MODES = {
+  "source-over": "source-over",
+  screen: "screen",
+  multiply: "multiply",
+  overlay: "overlay",
+  "soft-light": "soft-light",
+  "hard-light": "hard-light",
+  "color-dodge": "color-dodge",
+  difference: "difference",
 };
 
 function canvasSize(aspect) {
@@ -59,6 +77,33 @@ function canvasSize(aspect) {
     W = Math.round((maxH * w) / h);
   }
   return { W, H };
+}
+
+// Detect browser render-engine capabilities (Web-specific category) and show
+// an honest status badge — no fabricated values.
+function detectRenderCapabilities() {
+  const cap = { webcodecs: false, webgl2: false, webgpu: false, offscreen: false, worker: false };
+  try { cap.webcodecs = !!(window.VideoEncoder && window.VideoDecoder); } catch (_) { /* noop */ }
+  try {
+    const c = document.createElement("canvas");
+    cap.webgl2 = !!(c.getContext && c.getContext("webgl2"));
+  } catch (_) { /* noop */ }
+  try { cap.webgpu = !!navigator.gpu; } catch (_) { /* noop */ }
+  try { cap.offscreen = !!window.OffscreenCanvas; } catch (_) { /* noop */ }
+  try { cap.worker = !!window.Worker; } catch (_) { /* noop */ }
+  const badge = $("render-cap-badge");
+  if (badge) {
+    const parts = [
+      `WebGL2 ${cap.webgl2 ? "✓" : "✗"}`,
+      `WebCodecs ${cap.webcodecs ? "✓" : "✗"}`,
+      `WebGPU ${cap.webgpu ? "✓" : "✗"}`,
+      `Offscreen ${cap.offscreen ? "✓" : "✗"}`,
+    ];
+    badge.textContent = "⚙ " + parts.join(" · ");
+    badge.title = "Render engine: " + parts.join(", ") + " — " +
+      (cap.webgl2 ? "GPU-accelerated compositing available." : "Canvas 2D fallback in use.");
+  }
+  return cap;
 }
 
 function totalDuration() {
@@ -98,6 +143,7 @@ async function openEditor() {
     showError("No video project yet — run generation first.");
     return;
   }
+  detectRenderCapabilities();
   const vp = project.video_project;
   ed.scenes = JSON.parse(JSON.stringify(vp.scenes || []));
   ed.aspect = vp.aspect_ratio || "9:16";
@@ -112,6 +158,7 @@ async function openEditor() {
   ed.undoStack = [];
   ed.redoStack = [];
   ed.dirty = false;
+  ed.autosave = true;
   ed.voiceover = project.voiceover || null;
   ed.voiceoverVolume = vp.voiceover_volume ?? 1;
   ed.markers = vp.markers || [];
@@ -360,6 +407,108 @@ function redo() {
 
 // ---------- timeline ----------
 
+// Drag a timeline segment horizontally to reorder (move) the clip.
+function attachDragReorder(seg, index) {
+  let startX = 0;
+  let startIndex = index;
+  let moved = false;
+  seg.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    startX = e.clientX;
+    startIndex = index;
+    moved = false;
+    seg.setPointerCapture(e.pointerId);
+    seg.classList.add("dragging");
+  });
+  seg.addEventListener("pointermove", (e) => {
+    if (!seg.classList.contains("dragging")) return;
+    const track = seg.parentElement;
+    if (!track) return;
+    const rect = track.getBoundingClientRect();
+    const targetX = e.clientX - rect.left;
+    const children = Array.from(track.children);
+    let acc = 0;
+    let target = startIndex;
+    for (let k = 0; k < children.length; k++) {
+      acc += children[k].getBoundingClientRect().width;
+      if (targetX < acc) { target = k; break; }
+    }
+    if (target !== startIndex) {
+      const arr = ed.scenes;
+      const [movedScene] = arr.splice(startIndex, 1);
+      arr.splice(target, 0, movedScene);
+      startIndex = target;
+      index = target;
+      moved = true;
+      renderTimeline();
+      selectScene(target);
+      drawFrame(ed.t);
+    }
+  });
+  const endDrag = (e) => {
+    if (!seg.classList.contains("dragging")) return;
+    seg.classList.remove("dragging");
+    try { seg.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
+    if (moved) {
+      pushHistory();
+      setEdStatus(`Moved clip to position ${startIndex + 1}`);
+      scheduleProReport();
+    }
+  };
+  seg.addEventListener("pointerup", endDrag);
+  seg.addEventListener("pointercancel", endDrag);
+}
+
+// Drag a clip's right-edge handle to trim (change) its duration.
+function attachTrimHandle(seg, index) {
+  const handle = seg.querySelector(".tl-trim");
+  if (!handle) return;
+  let startX = 0;
+  let origDur = 0;
+  let pxPerSec = 1;
+  let trimmed = false;
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    startX = e.clientX;
+    const sc = ed.scenes[index];
+    if (!sc) return;
+    origDur = sc.duration_seconds;
+    const track = seg.parentElement;
+    const trackW = track ? track.getBoundingClientRect().width : 640;
+    pxPerSec = trackW / Math.max(0.1, totalDuration());
+    trimmed = false;
+    handle.setPointerCapture(e.pointerId);
+    seg.classList.add("trimming");
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!seg.classList.contains("trimming")) return;
+    const dx = e.clientX - startX;
+    const sc = ed.scenes[index];
+    if (!sc) return;
+    const newDur = Math.max(0.5, Math.min(30, origDur + dx / pxPerSec));
+    if (Math.abs(newDur - sc.duration_seconds) > 0.05) {
+      sc.duration_seconds = Math.round(newDur * 10) / 10;
+      trimmed = true;
+      renderTimeline();
+      selectScene(index);
+      drawFrame(ed.t);
+    }
+  });
+  const endTrim = (e) => {
+    if (!seg.classList.contains("trimming")) return;
+    seg.classList.remove("trimming");
+    try { handle.releasePointerCapture(e.pointerId); } catch (_) { /* noop */ }
+    if (trimmed) {
+      pushHistory();
+      setEdStatus(`Trimmed clip to ${ed.scenes[index].duration_seconds}s`);
+      scheduleProReport();
+    }
+  };
+  handle.addEventListener("pointerup", endTrim);
+  handle.addEventListener("pointercancel", endTrim);
+}
+
 function renderTimeline() {
   const tl = $("timeline");
   const tlText = $("timeline-text");
@@ -373,8 +522,11 @@ function renderTimeline() {
     seg.className = `tl-seg${i === ed.selected ? " active" : ""}`;
     seg.style.flexGrow = sc.duration_seconds;
     seg.innerHTML = `<div class="tl-label">${esc(sc.label || "Scene " + (i + 1))}</div>` +
-      `<div class="tl-dur">${sc.duration_seconds}s${sc.speed !== 1 ? " · " + sc.speed + "x" : ""}</div>`;
+      `<div class="tl-dur">${sc.duration_seconds}s${sc.speed !== 1 ? " · " + sc.speed + "x" : ""}</div>` +
+      `<div class="tl-trim" title="Drag to trim duration"></div>`;
     seg.addEventListener("click", () => selectScene(i));
+    attachDragReorder(seg, i);
+    attachTrimHandle(seg, i);
     tl.appendChild(seg);
 
     const textSeg = document.createElement("div");
@@ -410,6 +562,9 @@ function selectScene(i) {
   $("prop-font").value = sc.font_size || 44;
   $("prop-font-val").textContent = sc.font_size || 44;
   $("prop-filter").value = sc.filter || "none";
+  $("prop-blend").value = sc.blend || "source-over";
+  $("prop-shape").value = sc.shape || "none";
+  $("prop-shape-color").value = sc.shape_color || "#6366f1";
   $("prop-kenburns").value = sc.ken_burns || "none";
   $("prop-entrance").value = sc.entrance || "fade";
   $("prop-exit").value = sc.exit || "none";
@@ -441,6 +596,32 @@ function motionOrDefault(sc) {
   return sc.motion || { scale: 1, rotation: 0, opacity: 1, pos_x: 0, pos_y: 0, easing: "ease-in-out" };
 }
 
+const ANIM_PRESETS = {
+  pop: { entrance: "zoom", exit: "none", ken_burns: "zoom-in", label: "Pop" },
+  kinetic: { entrance: "slide-up", exit: "fade", ken_burns: "zoom-in", label: "Kinetic" },
+  cinematic: { entrance: "fade", exit: "fade", ken_burns: "pan-right", label: "Cinematic" },
+  snappy: { entrance: "bounce", exit: "zoom", ken_burns: "zoom-in", label: "Snappy" },
+  minimal: { entrance: "fade", exit: "none", ken_burns: "none", label: "Minimal" },
+};
+
+function applyAnimPreset(name) {
+  const preset = ANIM_PRESETS[name];
+  const sc = ed.scenes[ed.selected];
+  if (!preset || !sc) return;
+  sc.entrance = preset.entrance;
+  sc.exit = preset.exit;
+  sc.ken_burns = preset.ken_burns;
+  $("prop-entrance").value = preset.entrance;
+  $("prop-exit").value = preset.exit;
+  $("prop-kenburns").value = preset.ken_burns;
+  pushHistory();
+  renderTimeline();
+  selectScene(ed.selected);
+  drawFrame(ed.t);
+  setEdStatus(`Applied "${preset.label}" animation preset`);
+  scheduleProReport();
+}
+
 function applyProps() {
   const sc = ed.scenes[ed.selected];
   if (!sc) return;
@@ -454,6 +635,9 @@ function applyProps() {
   sc.text_style = $("prop-style").value;
   sc.font_size = parseInt($("prop-font").value, 10);
   sc.filter = $("prop-filter").value;
+  sc.blend = $("prop-blend").value;
+  sc.shape = $("prop-shape").value;
+  sc.shape_color = $("prop-shape-color").value;
   sc.ken_burns = $("prop-kenburns").value;
   sc.entrance = $("prop-entrance").value;
   sc.exit = $("prop-exit").value;
@@ -818,6 +1002,83 @@ function applyPixelate(ctx, W, H, amount) {
   ctx.imageSmoothingEnabled = true;
 }
 
+// --- Extra visual FX (chromatic aberration, glow, ripple, VHS, light leak) ---
+
+function applyChromaticAberration(ctx, W, H, p) {
+  const off = canvasCopy(ctx, W, H);
+  const shift = 4 + Math.sin(p * 733) * 2;
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.55;
+  ctx.filter = "sepia(1) hue-rotate(-70deg) saturate(3)";
+  ctx.drawImage(off, -shift, 0);
+  ctx.filter = "sepia(1) hue-rotate(70deg) saturate(3)";
+  ctx.drawImage(off, shift, 0);
+  ctx.restore();
+}
+
+function applyGlow(ctx, W, H, p) {
+  const off = canvasCopy(ctx, W, H);
+  ctx.save();
+  ctx.filter = "blur(8px) brightness(1.35) saturate(1.3)";
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.6;
+  ctx.drawImage(off, 0, 0);
+  ctx.restore();
+}
+
+function applyRipple(ctx, W, H, p) {
+  const off = canvasCopy(ctx, W, H);
+  ctx.save();
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+  const rings = 6;
+  for (let i = rings; i >= 1; i--) {
+    const r = (i / rings) * Math.max(W, H) * (0.4 + 0.1 * Math.sin(p * 3 + i));
+    ctx.globalAlpha = 0.035 * (rings - i + 1);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(off, 0, 0);
+  }
+  ctx.restore();
+}
+
+function applyVHS(ctx, W, H, p) {
+  const off = canvasCopy(ctx, W, H);
+  ctx.save();
+  ctx.filter = "saturate(1.6) contrast(1.15)";
+  ctx.drawImage(off, 0, 0);
+  // Horizontal tracking band.
+  const bandY = (Math.sin(p * 997) * 0.5 + 0.5) * H;
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillRect(0, bandY, W, 10 + Math.random() * 8);
+  // Rolling noise lines.
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  for (let y = 0; y < H; y += 8) {
+    if (Math.random() > 0.7) ctx.fillRect(0, y, W, 1);
+  }
+  ctx.restore();
+  applyScanlines(ctx, W, H);
+}
+
+function applyLightLeak(ctx, W, H, p) {
+  const off = canvasCopy(ctx, W, H);
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  const g = ctx.createRadialGradient(
+    W * (0.2 + 0.5 * Math.abs(Math.sin(p * 611))), H * 0.2, 0,
+    W * 0.2, H * 0.2, Math.max(W, H) * 0.8
+  );
+  g.addColorStop(0, "rgba(255,180,120,0.55)");
+  g.addColorStop(0.5, "rgba(255,120,80,0.18)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(off, 0, 0);
+  ctx.restore();
+}
+
 function applyEffect(ctx, sc, p, W, H) {
   const fx = sc.effect || "none";
   if (fx === "scanlines") applyScanlines(ctx, W, H);
@@ -825,6 +1086,11 @@ function applyEffect(ctx, sc, p, W, H) {
   else if (fx === "old-film") applyOldFilm(ctx, W, H);
   else if (fx === "dreamy") applyDreamy(ctx, W, H);
   else if (fx === "glitch") applyGlitch(ctx, W, H, p);
+  else if (fx === "chromatic-aberration") applyChromaticAberration(ctx, W, H, p);
+  else if (fx === "glow") applyGlow(ctx, W, H, p);
+  else if (fx === "ripple") applyRipple(ctx, W, H, p);
+  else if (fx === "vhs") applyVHS(ctx, W, H, p);
+  else if (fx === "light-leak") applyLightLeak(ctx, W, H, p);
   else if (fx === "sharpen") {
     ctx.save();
     ctx.filter = "contrast(1.25) saturate(1.15)";
@@ -851,6 +1117,56 @@ function drawOverlay(ctx, sc, W, H) {
   else if (sc.overlay_pos === "bottom-right") { x = W - pad; y = H - pad; }
   ctx.globalAlpha = 0.9;
   ctx.fillText(emoji, x, y);
+  ctx.restore();
+}
+
+// Draw a vector shape overlay (rect / circle / triangle / star / heart).
+function drawShape(ctx, sc, W, H) {
+  const shape = sc.shape || "none";
+  if (shape === "none") return;
+  const size = (sc.overlay_size || 48) * (W / 480);
+  const pad = size * 0.8;
+  let x = W / 2;
+  let y = H / 2;
+  if (sc.overlay_pos === "top-left") { x = pad; y = pad; }
+  else if (sc.overlay_pos === "top-right") { x = W - pad; y = pad; }
+  else if (sc.overlay_pos === "bottom-left") { x = pad; y = H - pad; }
+  else if (sc.overlay_pos === "bottom-right") { x = W - pad; y = H - pad; }
+  ctx.save();
+  ctx.fillStyle = sc.shape_color || "#6366f1";
+  ctx.globalAlpha = 0.85;
+  const r = size / 2;
+  if (shape === "rect") {
+    ctx.fillRect(x - r, y - r, size, size);
+  } else if (shape === "circle") {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (shape === "triangle") {
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x - r, y + r);
+    ctx.lineTo(x + r, y + r);
+    ctx.closePath();
+    ctx.fill();
+  } else if (shape === "star") {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const ang = (i * Math.PI) / 5 - Math.PI / 2;
+      const rad = i % 2 === 0 ? r : r * 0.45;
+      const px = x + Math.cos(ang) * rad;
+      const py = y + Math.sin(ang) * rad;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  } else if (shape === "heart") {
+    ctx.beginPath();
+    ctx.moveTo(x, y + r * 0.6);
+    ctx.bezierCurveTo(x - r, y - r * 0.2, x - r * 0.5, y - r, x, y - r * 0.2);
+    ctx.bezierCurveTo(x + r * 0.5, y - r, x + r, y - r * 0.2, x, y + r * 0.6);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -928,6 +1244,9 @@ function drawContent(ctx, sc, alpha, dur, W, H) {
   const filter = FILTERS[sc.filter] || "none";
   if (filter !== "none") ctx.filter = filter;
 
+  // CSS-style blend mode for compositing this scene over the frame
+  ctx.globalCompositeOperation = BLEND_MODES[sc.blend] || "source-over";
+
   // cinematic color grade
   applyGrade(ctx, sc.grade, W, H);
 
@@ -942,6 +1261,7 @@ function drawContent(ctx, sc, alpha, dur, W, H) {
 
   drawText(ctx, sc, p, dur, W, H);
   drawOverlay(ctx, sc, W, H);
+  drawShape(ctx, sc, W, H);
   if (ed.captions) drawCaptions(ctx, sc, W, H);
   ctx.restore();
 
@@ -1067,8 +1387,92 @@ async function saveEditor() {
   await loadProjects();
   renderProject(p);
   ed.dirty = false;
+  snapshotVersion();
   setEdStatus(`Saved ✓ · revision ${ed.revision || 1}`);
   await refreshProReport();
+}
+
+// ---- Local version history (snapshots of the timeline, restorable) ----
+
+function loadVersions() {
+  try {
+    return JSON.parse(localStorage.getItem("ed_versions") || "[]");
+  } catch (_) {
+    return [];
+  }
+}
+
+function snapshotVersion() {
+  const versions = loadVersions();
+  versions.push({
+    revision: ed.revision || 1,
+    ts: Date.now(),
+    scenes: JSON.parse(JSON.stringify(ed.scenes)),
+  });
+  if (versions.length > 20) versions.shift();
+  try {
+    localStorage.setItem("ed_versions", JSON.stringify(versions));
+  } catch (_) { /* storage full — ignore */ }
+}
+
+function renderVersionsMenu() {
+  const menu = $("ed-versions-menu");
+  if (!menu) return;
+  const versions = loadVersions();
+  if (!versions.length) {
+    menu.innerHTML = '<div class="ed-version-item muted">No saved versions yet</div>';
+  } else {
+    menu.innerHTML = versions
+      .slice()
+      .reverse()
+      .map((v, idx) => {
+        const abs = versions.length - 1 - idx;
+        const when = new Date(v.ts).toLocaleTimeString();
+        return `<div class="ed-version-item" data-idx="${abs}" title="Restore revision ${v.revision}">
+          Rev ${v.revision} · ${v.scenes.length} scenes · ${when}</div>`;
+      })
+      .join("");
+  }
+  menu.querySelectorAll(".ed-version-item[data-idx]").forEach((el) => {
+    el.addEventListener("click", () => restoreVersion(parseInt(el.dataset.idx, 10)));
+  });
+  menu.hidden = false;
+}
+
+function restoreVersion(idx) {
+  const versions = loadVersions();
+  const v = versions[idx];
+  if (!v) return;
+  ed.scenes = JSON.parse(JSON.stringify(v.scenes));
+  if (ed.selected >= ed.scenes.length) ed.selected = Math.max(0, ed.scenes.length - 1);
+  pushHistory();
+  renderTimeline();
+  selectScene(ed.selected);
+  drawFrame(ed.t);
+  const menu = $("ed-versions-menu");
+  if (menu) menu.hidden = true;
+  setEdStatus(`Restored version ${v.revision} (${v.scenes.length} scenes)`);
+  scheduleProReport();
+}
+
+// Autosave: persist the project automatically when there are unsaved changes.
+function startAutosave() {
+  if (ed._autosaveTimer) return;
+  ed._autosaveTimer = setInterval(async () => {
+    if (!ed.autosave || !ed.dirty) return;
+    try {
+      await saveEditor();
+    } catch (_) {
+      setEdStatus("Autosave failed — will retry");
+    }
+  }, 10000);
+}
+
+function toggleAutosave() {
+  ed.autosave = !ed.autosave;
+  const btn = $("btn-ed-autosave");
+  if (btn) btn.classList.toggle("toggle-active", ed.autosave);
+  setEdStatus(ed.autosave ? "Autosave ON" : "Autosave OFF");
 }
 
 // ---------- export ----------
@@ -1131,6 +1535,7 @@ async function exportVideo() {
 
   const sizeMb = (blob.size / 1e6).toFixed(2);
   const effFps = ((total * fps) / (encodeMs / 1000)).toFixed(1);
+  recordRender("WebM", `${sizeMb} MB`, blob.size);
   setEdStatus(
     `Exported ✓ ${sizeMb} MB · ${(encodeMs / 1000).toFixed(1)}s encode · ~${effFps} fps effective`
   );
@@ -1139,6 +1544,330 @@ async function exportVideo() {
 
 function setEdStatus(text) {
   $("ed-status").textContent = text;
+}
+
+// ---------- Additional export: SRT subtitles + PNG frame ----------
+
+function downloadBlob(content, filename, mime) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function srtTimestamp(seconds) {
+  const h = String(Math.floor(seconds / 3600)).padStart(2, "0");
+  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
+  const s = String(Math.floor(seconds % 60)).padStart(2, "0");
+  const ms = String(Math.floor((seconds - Math.floor(seconds)) * 1000)).padStart(3, "0");
+  return `${h}:${m}:${s},${ms}`;
+}
+
+function exportSrt() {
+  const cues = [];
+  let t = 0;
+  (ed.scenes || []).forEach((sc) => {
+    const text = (sc.narration || sc.text || "").trim();
+    if (text) cues.push({ start: t, end: t + sc.duration_seconds, text });
+    t += sc.duration_seconds;
+  });
+  const srt = cues
+    .map((c, i) => `${i + 1}\n${srtTimestamp(c.start)} --> ${srtTimestamp(c.end)}\n${c.text}\n`)
+    .join("\n");
+  downloadBlob(srt, "subtitles.srt", "text/plain");
+  setEdStatus(`Exported SRT with ${cues.length} cues ✓`);
+}
+
+function exportPngFrame() {
+  const canvas = $("preview-canvas");
+  if (!canvas) return;
+  drawFrame(ed.t || 0);
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    downloadBlob(blob, "frame.png", "image/png");
+    recordRender("PNG frame", "current frame", blob.size);
+    setEdStatus("Exported current frame as PNG ✓");
+  }, "image/png");
+}
+
+// ---- Animated GIF export (minimal GIF89a encoder, no deps) ----
+
+function _gifPalette() {
+  const pal = [];
+  for (let r = 0; r < 6; r++)
+    for (let g = 0; g < 6; g++)
+      for (let b = 0; b < 6; b++)
+        pal.push([Math.round((r * 255) / 5), Math.round((g * 255) / 5), Math.round((b * 255) / 5)]);
+  for (let i = 0; i < 40; i++) {
+    const v = Math.round((i * 255) / 39);
+    pal.push([v, v, v]);
+  }
+  return pal; // 216 + 40 = 256
+}
+
+function _gifNearest(pal, r, g, b) {
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < pal.length; i++) {
+    const dr = pal[i][0] - r;
+    const dg = pal[i][1] - g;
+    const db = pal[i][2] - b;
+    const d = dr * dr + dg * dg + db * db;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+// Standard GIF LZW encoder over a byte stream of palette indices.
+function _gifLzw(indices, minCodeSize) {
+  const clearCode = 1 << minCodeSize;
+  const eoiCode = clearCode + 1;
+  let codeSize = minCodeSize + 1;
+  let nextCode = eoiCode + 1;
+  const dict = new Map();
+  let prefix = -1;
+  const out = [];
+  let bitBuf = 0;
+  let bitCnt = 0;
+  const emit = (code) => {
+    bitBuf |= code << bitCnt;
+    bitCnt += codeSize;
+    while (bitCnt >= 8) {
+      out.push(bitBuf & 0xff);
+      bitBuf >>>= 8;
+      bitCnt -= 8;
+    }
+  };
+  const reset = () => {
+    dict.clear();
+    nextCode = eoiCode + 1;
+    codeSize = minCodeSize + 1;
+  };
+  reset();
+  emit(clearCode);
+  for (const idx of indices) {
+    if (prefix < 0) { prefix = idx; continue; }
+    const key = prefix * 256 + idx;
+    if (dict.has(key)) {
+      prefix = dict.get(key);
+    } else {
+      emit(prefix);
+      if (nextCode < 4096) {
+        dict.set(key, nextCode++);
+        if (nextCode === 1 << codeSize && codeSize < 12) codeSize++;
+      } else {
+        emit(clearCode);
+        reset();
+      }
+      prefix = idx;
+    }
+  }
+  if (prefix >= 0) emit(prefix);
+  emit(eoiCode);
+  if (bitCnt > 0) out.push(bitBuf & 0xff);
+  return new Uint8Array(out);
+}
+
+function encodeGif(w, h, frames, delayCs) {
+  const palette = _gifPalette();
+  const bytes = [];
+  const pushStr = (s) => { for (let i = 0; i < s.length; i++) bytes.push(s.charCodeAt(i)); };
+  const push16 = (v) => { bytes.push(v & 0xff, (v >> 8) & 0xff); };
+  pushStr("GIF89a");
+  push16(w); push16(h);
+  bytes.push(0xf7, 0, 0); // GCT flag, 256 colors, bg 0, aspect 0
+  for (const c of palette) bytes.push(c[0], c[1], c[2]);
+  for (const fr of frames) {
+    bytes.push(0x21, 0xf9, 0x04, 0x04); // graphic control ext
+    push16(delayCs);
+    bytes.push(0, 0);
+    bytes.push(0x2c); // image descriptor
+    push16(0); push16(0); push16(w); push16(h);
+    bytes.push(0);
+    const idx = new Uint8Array(w * h);
+    const px = fr.pixels;
+    for (let i = 0; i < idx.length; i++) {
+      idx[i] = _gifNearest(palette, px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+    }
+    const comp = _gifLzw(idx, 8);
+    bytes.push(8); // LZW min code size
+    for (let i = 0; i < comp.length; i += 254) {
+      const chunk = comp.subarray(i, i + 254);
+      bytes.push(chunk.length);
+      for (let j = 0; j < chunk.length; j++) bytes.push(chunk[j]);
+    }
+    bytes.push(0);
+  }
+  bytes.push(0x3b); // trailer
+  return new Uint8Array(bytes);
+}
+
+async function exportGif() {
+  const canvas = $("preview-canvas");
+  if (!canvas) return;
+  const total = totalDuration();
+  if (total <= 0) { setEdStatus("Nothing to export"); return; }
+  const fps = 10;
+  const frameCount = Math.max(2, Math.min(120, Math.round(total * fps)));
+  const off = document.createElement("canvas");
+  off.width = canvas.width;
+  off.height = canvas.height;
+  const octx = off.getContext("2d");
+  const frames = [];
+  setEdStatus(`Encoding GIF (${frameCount} frames)…`);
+  for (let i = 0; i < frameCount; i++) {
+    ed.t = (i / frameCount) * total;
+    drawFrame(ed.t);
+    octx.clearRect(0, 0, off.width, off.height);
+    octx.drawImage(canvas, 0, 0);
+    frames.push({ pixels: octx.getImageData(0, 0, off.width, off.height).data });
+  }
+  const gif = encodeGif(off.width, off.height, frames, Math.round(100 / fps));
+  downloadBlob(new Blob([gif], { type: "image/gif" }), "animation.gif", "image/gif");
+  recordRender("GIF", `${frameCount} frames`, gif.length);
+  setEdStatus(`Exported GIF · ${frameCount} frames ✓`);
+}
+
+// Export each frame as a numbered PNG (PNG sequence).
+async function exportPngSequence() {
+  const canvas = $("preview-canvas");
+  if (!canvas) return;
+  const total = totalDuration();
+  if (total <= 0) { setEdStatus("Nothing to export"); return; }
+  const fps = 8;
+  const frameCount = Math.max(1, Math.min(30, Math.round(total * fps)));
+  setEdStatus(`Exporting ${frameCount} PNG frames…`);
+  for (let i = 0; i < frameCount; i++) {
+    ed.t = (i / frameCount) * total;
+    drawFrame(ed.t);
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `frame_${String(i + 1).padStart(3, "0")}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    await new Promise((r) => setTimeout(r, 180));
+  }
+  recordRender("PNG sequence", `${frameCount} frames`, null);
+  setEdStatus(`Exported ${frameCount} PNG frames ✓`);
+}
+
+// ---- Background render queue / render history (Web-specific) --------------
+
+function loadRenderHistory() {
+  try {
+    const v = JSON.parse(localStorage.getItem("render_history") || "[]");
+    return Array.isArray(v) ? v : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function recordRender(kind, detail, sizeBytes) {
+  const hist = loadRenderHistory();
+  hist.push({
+    kind,
+    detail,
+    sizeBytes: sizeBytes == null ? null : Math.round(sizeBytes),
+    ts: Date.now(),
+  });
+  if (hist.length > 20) hist.shift();
+  try {
+    localStorage.setItem("render_history", JSON.stringify(hist));
+  } catch (_) { /* storage full — ignore */ }
+  const badge = $("render-queue-count");
+  if (badge) badge.textContent = String(hist.length);
+}
+
+function toggleRenderQueue() {
+  const menu = $("render-queue-menu");
+  if (!menu) return;
+  if (menu.hidden) {
+    const hist = loadRenderHistory().slice().reverse();
+    menu.innerHTML = hist.length
+      ? hist.map((r) => {
+          const when = new Date(r.ts).toLocaleTimeString();
+          const sz = r.sizeBytes == null ? "" : ` · ${(r.sizeBytes / 1048576).toFixed(2)} MB`;
+          return `<div class="ed-version-item">${esc(r.kind)} — ${esc(r.detail)}${sz} · ${when}</div>`;
+        }).join("")
+      : '<div class="ed-version-item muted">No renders yet</div>';
+    menu.hidden = false;
+  } else {
+    menu.hidden = true;
+  }
+}
+
+// Parse SRT/VTT cue text into {start, end, text}.
+function parseSrt(text) {
+  const cues = [];
+  const blocks = text.replace(/\r/g, "").split(/\n\s*\n/);
+  for (const block of blocks) {
+    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) continue;
+    const timeLine = lines.find((l) => l.includes("-->"));
+    if (!timeLine) continue;
+    const m = timeLine.match(/([\d:,\.]+)\s*-->\s*([\d:,\.]+)/);
+    if (!m) continue;
+    const toSec = (s) => {
+      const p = s.replace(",", ".").split(":");
+      let sec = 0;
+      for (const part of p) sec = sec * 60 + parseFloat(part);
+      return sec;
+    };
+    const textLines = lines.slice(lines.indexOf(timeLine) + 1).join(" ");
+    if (!textLines) continue;
+    cues.push({ start: toSec(m[1]), end: toSec(m[2]), text: textLines });
+  }
+  return cues;
+}
+
+function importSrt() {
+  const input = $("srt-file");
+  if (!input || !input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const cues = parseSrt(String(reader.result || ""));
+    if (!cues.length) {
+      setEdStatus("No subtitle cues found in that file");
+      return;
+    }
+    if (ed.scenes.length === 0) {
+      ed.scenes = cues.map((c) => ({
+        label: "Scene",
+        text: c.text,
+        narration: c.text,
+        duration_seconds: Math.max(1, Math.round(c.end - c.start)),
+        background: "#0f172a",
+        text_color: "#ffffff",
+        text_style: "caption",
+        entrance: "fade",
+        exit: "none",
+        motion: { scale: 1, rotation: 0, opacity: 1, pos_x: 0, pos_y: 0, easing: "ease-in-out" },
+      }));
+    } else {
+      // Overlay cues onto existing scenes by index.
+      cues.forEach((c, i) => {
+        const sc = ed.scenes[i];
+        if (!sc) return;
+        sc.narration = c.text;
+        sc.text = c.text;
+        sc.duration_seconds = Math.max(1, Math.round(c.end - c.start));
+      });
+    }
+    pushHistory();
+    renderTimeline();
+    selectScene(0);
+    drawFrame(ed.t);
+    setEdStatus(`Imported ${cues.length} subtitle cues ✓`);
+    scheduleProReport();
+  };
+  reader.readAsText(input.files[0]);
 }
 
 // ---------- Sound Effects (SFX) Synthesizer (Web Audio API) ----------
@@ -1370,7 +2099,37 @@ $("btn-ed-open-editor") && $("btn-ed-open-editor").addEventListener("click", ope
 $("btn-open-editor").addEventListener("click", openEditor);
 $("btn-ed-close").addEventListener("click", closeEditor);
 $("btn-ed-save").addEventListener("click", () => run(saveEditor));
+$("btn-ed-autosave") && $("btn-ed-autosave").addEventListener("click", toggleAutosave);
+$("btn-ed-versions") && $("btn-ed-versions").addEventListener("click", (ev) => {
+  ev.stopPropagation();
+  const menu = $("ed-versions-menu");
+  if (!menu) return;
+  if (menu.hidden) renderVersionsMenu();
+  else menu.hidden = true;
+});
+document.addEventListener("click", () => {
+  const menu = $("ed-versions-menu");
+  if (menu && !menu.hidden) menu.hidden = true;
+});
+startAutosave();
 $("btn-ed-export").addEventListener("click", () => run(exportVideo));
+$("btn-me-export-srt") && $("btn-me-export-srt").addEventListener("click", () => run(exportSrt));
+$("btn-me-export-png") && $("btn-me-export-png").addEventListener("click", () => run(exportPngFrame));
+$("btn-me-export-gif") && $("btn-me-export-gif").addEventListener("click", () => run(exportGif));
+$("btn-me-export-pngseq") && $("btn-me-export-pngseq").addEventListener("click", () => run(exportPngSequence));
+$("btn-me-render-queue") && $("btn-me-render-queue").addEventListener("click", (ev) => {
+  ev.stopPropagation();
+  toggleRenderQueue();
+});
+document.addEventListener("click", () => {
+  const rq = $("render-queue-menu");
+  if (rq && !rq.hidden) rq.hidden = true;
+});
+$("btn-import-srt") && $("btn-import-srt").addEventListener("click", () => {
+  const input = $("srt-file");
+  if (input) input.click();
+});
+$("srt-file") && $("srt-file").addEventListener("change", () => run(importSrt));
 $("btn-ed-voice").addEventListener("click", () => run(generateVoiceover));
 $("btn-ed-undo").addEventListener("click", undo);
 $("btn-ed-redo").addEventListener("click", redo);
@@ -1494,6 +2253,26 @@ $("ed-aspect").addEventListener("change", () => {
   pushHistory();
   resizeCanvas();
 });
+document.querySelectorAll("[data-reframe]").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll("[data-reframe]").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    quickReframe(chip.dataset.reframe);
+  });
+});
+
+// Quick auto-reframe to a social aspect preset (Social Media category).
+function quickReframe(aspect) {
+  if (ed.aspect === aspect) return;
+  ed.aspect = aspect;
+  const sel = $("ed-aspect");
+  if (sel) sel.value = aspect;
+  pushHistory();
+  resizeCanvas();
+  const labels = { "9:16": "TikTok / Shorts", "16:9": "YouTube", "1:1": "Instagram", "4:5": "Reels" };
+  setEdStatus(`Auto-reframed to ${aspect} (${labels[aspect] || aspect})`);
+  scheduleProReport();
+}
 $("ed-fps").addEventListener("change", () => (ed.fps = parseInt($("ed-fps").value, 10)));
 $("ed-quality").addEventListener("change", () => (ed.quality = $("ed-quality").value));
 $("prop-captions").addEventListener("change", () => (ed.captions = $("prop-captions").checked));
@@ -1520,9 +2299,16 @@ $("prop-font").addEventListener("input", () => {
   $("prop-font-val").textContent = $("prop-font").value;
   applyProps();
 });
-["prop-bg", "prop-color", "prop-transition", "prop-position", "prop-style", "prop-filter", "prop-kenburns", "prop-entrance", "prop-exit", "prop-effect", "prop-grade", "prop-easing", "prop-overlay-pos"].forEach((id) => {
+["prop-bg", "prop-color", "prop-transition", "prop-position", "prop-style", "prop-filter", "prop-blend", "prop-shape", "prop-shape-color", "prop-kenburns", "prop-entrance", "prop-exit", "prop-effect", "prop-grade", "prop-easing", "prop-overlay-pos"].forEach((id) => {
   const el = $(id);
   if (el) el.addEventListener("change", applyProps);
+});
+document.querySelectorAll("[data-animpreset]").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll("[data-animpreset]").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    applyAnimPreset(chip.dataset.animpreset);
+  });
 });
 $("prop-scale").addEventListener("input", () => {
   $("prop-scale-val").textContent = $("prop-scale").value;
@@ -1718,6 +2504,15 @@ document.addEventListener("keydown", (ev) => {
   } else if (ev.key.toLowerCase() === "t" && !ev.ctrlKey) {
     const btn = document.querySelector('.dock-tool-btn[data-tool="text"]');
     if (btn) btn.click();
+  } else if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "d") {
+    ev.preventDefault();
+    proDuplicate();
+  } else if ((ev.ctrlKey || ev.metaKey) && ev.key === "ArrowUp") {
+    ev.preventDefault();
+    proMove(-1);
+  } else if ((ev.ctrlKey || ev.metaKey) && ev.key === "ArrowDown") {
+    ev.preventDefault();
+    proMove(1);
   }
 });
 

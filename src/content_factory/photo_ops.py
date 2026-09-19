@@ -69,7 +69,7 @@ def _rgb(img: Image.Image) -> np.ndarray:
 
 def _to_img(arr: np.ndarray, img: Image.Image) -> Image.Image:
     """Float RGB array in [0, 1] -> RGBA image preserving the original alpha."""
-    out = Image.fromarray((np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8), mode="RGB")
+    out = Image.fromarray((np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8))
     out = out.convert("RGBA")
     out.putalpha(img.getchannel("A"))
     return out
@@ -357,7 +357,7 @@ def _op_noise_reduce(img: Image.Image, op: Any) -> Image.Image:
     if cv2 is not None:
         h = 3.0 + strength * 7.0
         cleaned = cv2.fastNlMeansDenoisingColored(rgb_arr, None, h, h, 7, 21)
-        out = Image.fromarray(cleaned, mode="RGB").convert("RGBA")
+        out = Image.fromarray(cleaned).convert("RGBA")
     else:
         radius = max(1, int(strength * 3))
         out = img.filter(ImageFilter.MedianFilter(radius)).convert("RGBA")
@@ -579,7 +579,7 @@ def _op_liquify(img: Image.Image, op: Any) -> Image.Image:
     ny = np.where(inside, cy + dy * displacement, yy)
     rgb_arr = np.asarray(img.convert("RGB"))
     warped = _remap(rgb_arr, nx, ny)
-    out = Image.fromarray(warped, mode="RGB").convert("RGBA")
+    out = Image.fromarray(warped).convert("RGBA")
     out.putalpha(img.getchannel("A"))
     return out
 
@@ -700,7 +700,7 @@ def _op_perspective(img: Image.Image, op: Any) -> Image.Image:
     warped = cv2.warpPerspective(
         rgb_arr, matrix, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE
     )
-    out = Image.fromarray(warped, mode="RGB").convert("RGBA")
+    out = Image.fromarray(warped).convert("RGBA")
     out.putalpha(img.getchannel("A"))
     return out
 
@@ -723,7 +723,7 @@ def _op_lens_correction(img: Image.Image, op: Any) -> Image.Image:
     map_y = cy + (yy - cy) / scale
     rgb_arr = np.asarray(img.convert("RGB"))
     warped = _remap(rgb_arr, map_x, map_y)
-    out = Image.fromarray(warped, mode="RGB").convert("RGBA")
+    out = Image.fromarray(warped).convert("RGBA")
     out.putalpha(img.getchannel("A"))
     return out
 
@@ -805,7 +805,7 @@ def _op_motion_blur(img: Image.Image, op: Any) -> Image.Image:
         oy = round(dy * distance * (t - 0.5))
         acc += np.roll(base, (oy, ox), axis=(0, 1))
     result = acc / (steps + 1)
-    out = Image.fromarray(result.astype(np.uint8), mode="RGB").convert("RGBA")
+    out = Image.fromarray(result.astype(np.uint8)).convert("RGBA")
     out.putalpha(img.getchannel("A"))
     return out
 
@@ -825,7 +825,7 @@ def _op_lens_blur(img: Image.Image, op: Any) -> Image.Image:
     map_y = cy + (yy - cy) / scale
     rgb_arr = np.asarray(img.convert("RGB"))
     warped = _remap(rgb_arr, map_x, map_y)
-    out = Image.fromarray(warped, mode="RGB").convert("RGBA")
+    out = Image.fromarray(warped).convert("RGBA")
     out.putalpha(img.getchannel("A"))
     return out
 

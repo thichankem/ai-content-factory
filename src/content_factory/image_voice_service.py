@@ -257,6 +257,27 @@ class ImageVoiceStudio:
 
     # --- voice ---------------------------------------------------------------
 
+    def persist_image_bytes(
+        self, data: bytes, export_format: str = "png"
+    ) -> dict[str, Any]:
+        """Persist already-encoded image bytes as an edited asset.
+
+        The counterpart of :meth:`persist_audio_bytes` for pipelines that
+        produce encoded bytes themselves (a frame effect, for instance) and
+        would otherwise have to round-trip through decode/encode just to store
+        the result.
+        """
+        fmt = export_format.lower().lstrip(".")
+        asset_id = uuid.uuid4().hex[:12]
+        path = self._dir / f"{asset_id}.{fmt}"
+        path.write_bytes(data)
+        return {
+            "asset_id": asset_id,
+            "url": f"/edited/{path.name}",
+            "format": fmt,
+            "size_bytes": len(data),
+        }
+
     def process_voice_bytes(
         self,
         data: bytes,
